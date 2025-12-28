@@ -109,6 +109,7 @@ Gate1Validity = R6::R6Class(
       ctx$rr = rr
       ctx$pred = pred
       ctx$measures = measures
+      ctx$primary_measure_id = primary_metric
       ctx$score_dt = scores
       ctx$agg = agg
       ctx$agg_dt = agg_dt

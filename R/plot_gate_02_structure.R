@@ -1,348 +1,442 @@
-#' Gate 2: What is being summarized? (dependence & interactions)
-#'
-#' @keywords internal
-#' @noRd
-Gate2Structure = R6::R6Class(
-  "Gate2Structure",
-  inherit = Gate,
-  public = list(
-    initialize = function() {
-      super$initialize(
-        id = "G2",
-        name = "What is being summarized? (dependence & interactions)",
-        pdr = "D"
-      )
-    },
+# FILE: R/plot_gate_02_structure.R
+#
+# Plot helpers for Gate 2 (Dependence & structure).
+#
+# Design goal: make ALE and PDP+ICE plots look close to {iml}'s defaults:
+# - ALE: single line + rug
+# - PDP+ICE: many ICE lines + one PDP line + rug + legend "Curve"
+#
+# IMPORTANT: this file must not redefine the Gate2 R6 class.
 
-    run = function(ctx) {
-      task = ctx$task
-      model = ctx$final_model
-      if (is.null(model)) {
-        model = ctx$learner$clone(deep = TRUE)
-        model$train(task)
-        ctx$final_model = model
-      }
+NULL
 
-      cfg = ctx$structure %||% list()
-      .autoiml_assert_known_names(
-        cfg,
-        allowed = c(
-          "sample_n", "max_features", "ice_keep_n",
-          "grid_n", "grid_type",
-          "ice_center",
-          "ale_bins", "trim",
-          "cor_threshold",
-          "hstat_max_features", "hstat_grid_n", "hstat_threshold",
-          "regionalize", "regional_method",
-          "gadget_max_depth", "gadget_min_bucket", "gadget_gamma",
-          "gadget_n_thresholds", "gadget_top_k"
-        ),
-        where = "ctx$structure"
-      )
-
-      sample_n = as.integer(cfg$sample_n %||% 200L)
-      max_features = as.integer(cfg$max_features %||% 5L)
-      ice_keep_n = as.integer(cfg$ice_keep_n %||% 30L)
-      grid_n = as.integer(cfg$grid_n %||% 10L)
-      grid_type = as.character(cfg$grid_type %||% "equidist")
-      ice_center = as.character(cfg$ice_center %||% "mean")
-      ale_bins = as.integer(cfg$ale_bins %||% 10L)
-      trim = cfg$trim %||% c(0.05, 0.95)
-      cor_threshold = as.numeric(cfg$cor_threshold %||% 0.7)
-
-      hstat_max_features = as.integer(cfg$hstat_max_features %||% 4L)
-      hstat_grid_n = as.integer(cfg$hstat_grid_n %||% 6L)
-      hstat_threshold = as.numeric(cfg$hstat_threshold %||% 0.20)
-
-      regionalize = isTRUE(cfg$regionalize %||% FALSE)
-      regional_method = as.character(cfg$regional_method %||% "auto")
-      gadget_max_depth = as.integer(cfg$gadget_max_depth %||% 3L)
-      gadget_min_bucket = as.integer(cfg$gadget_min_bucket %||% 30L)
-      gadget_gamma = as.numeric(cfg$gadget_gamma %||% 0)
-      gadget_n_thresholds = as.integer(cfg$gadget_n_thresholds %||% 5L)
-      gadget_top_k = as.integer(cfg$gadget_top_k %||% 1L)
-
-      set.seed(ctx$seed %||% 1L)
-
-      feat = task$feature_names
-      ft = task$feature_types
-      num_cols = intersect(ft[type %in% c("numeric", "integer"), id], feat)
-
-      # (1) dependence proxy: max absolute correlation among numeric features
-      max_abs_cor = NA_real_
-      cor_pairs = NULL
-      if (length(num_cols) >= 2L) {
-        dat_num = task$data(cols = num_cols)
-        cm = tryCatch(stats::cor(dat_num, use = "pairwise.complete.obs"), error = function(e) NULL)
-        if (!is.null(cm)) {
-          cm[upper.tri(cm, diag = TRUE)] = NA_real_
-          max_abs_cor = suppressWarnings(max(abs(cm), na.rm = TRUE))
-          if (is.finite(max_abs_cor)) {
-            idx = which(abs(cm) == max_abs_cor, arr.ind = TRUE)
-            idx = idx[1L, , drop = FALSE]
-            cor_pairs = data.table::data.table(
-              var1 = rownames(cm)[idx[1, 1]],
-              var2 = colnames(cm)[idx[1, 2]],
-              abs_cor = max_abs_cor
-            )
-          }
-        }
-      }
-
-      # choose numeric features by variance (full data)
-      eval_feats = character(0)
-      if (length(num_cols) > 0L) {
-        dat_num_full = task$data(cols = num_cols)
-        v = vapply(dat_num_full, function(x) stats::var(as.numeric(x), na.rm = TRUE), numeric(1))
-        ord = order(v, decreasing = TRUE)
-        eval_feats = num_cols[ord]
-        if (length(eval_feats) > max_features) eval_feats = eval_feats[seq_len(max_features)]
-      }
-
-      sample_n = min(sample_n, task$nrow)
-      rows = sample(task$row_ids, size = sample_n)
-      X = task$data(rows = rows, cols = feat)
-
-      # class labels for classif
-      class_labels = NULL
-      if (inherits(task, "TaskClassif")) {
-        if (length(task$class_names) == 2L) {
-          class_labels = task$class_names
-        } else {
-          tab = sort(table(task$truth()), decreasing = TRUE)
-          class_labels = names(tab)[seq_len(min(3L, length(tab)))]
-        }
-      }
-
-      # helpers --------------------------------------------------------------
-      compute_hstat_pair = function(Xs, f1, f2, class_label) {
-        g1 = .autoiml_grid_1d_iml(Xs[[f1]], grid_n = hstat_grid_n, grid_type = "quantile", trim = trim)
-        g2 = .autoiml_grid_1d_iml(Xs[[f2]], grid_n = hstat_grid_n, grid_type = "quantile", trim = trim)
-        if (length(g1) < 2L || length(g2) < 2L) {
-          return(NULL)
-        }
-
-        base = .autoiml_predict_score(model, Xs, task, class_of_interest = class_label)
-        f0 = mean(base, na.rm = TRUE)
-
-        pd1 = sapply(g1, function(v) {
-          X2 = data.table::copy(Xs)
-          X2 = .autoiml_set_feature_value(X2, task, f1, v)
-          mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
-        })
-
-        pd2 = sapply(g2, function(v) {
-          X2 = data.table::copy(Xs)
-          X2 = .autoiml_set_feature_value(X2, task, f2, v)
-          mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
-        })
-
-        pd12 = matrix(NA_real_, nrow = length(g1), ncol = length(g2))
-        for (i in seq_along(g1)) {
-          for (j in seq_along(g2)) {
-            X2 = data.table::copy(Xs)
-            X2 = .autoiml_set_feature_value(X2, task, f1, g1[i])
-            X2 = .autoiml_set_feature_value(X2, task, f2, g2[j])
-            pd12[i, j] = mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
-          }
-        }
-
-        pd1c = pd1 - f0
-        pd2c = pd2 - f0
-        pd12c = pd12 - f0
-        int = pd12c - outer(pd1c, rep(1, length(pd2c))) - outer(rep(1, length(pd1c)), pd2c)
-
-        denom = sum(pd12c^2, na.rm = TRUE)
-        num = sum(int^2, na.rm = TRUE)
-        h2 = if (is.finite(denom) && denom > 0) num / denom else NA_real_
-        h = sqrt(pmin(pmax(h2, 0), 1))
-
-        data.table::data.table(
-          class_label = as.character(class_label),
-          feature1 = f1,
-          feature2 = f2,
-          hstat = as.numeric(h),
-          grid_n = length(g1) * length(g2),
-          sample_n = nrow(Xs)
-        )
-      }
-
-      # main computations ----------------------------------------------------
-      pd_curves = NULL
-      ice_curves = NULL
-      ice_spread = NULL
-      ale_curves = NULL
-      hstats = NULL
-      gadget_results = list()
-      gadget_regions = list()
-
-      # store centered ICE matrices for gadget
-      pred_mats_centered = list()
-      grids = list()
-
-      if (length(eval_feats) > 0L) {
-        for (f in eval_feats) {
-          pdice = .autoiml_pdp_ice_1d(
-            task = task,
-            model = model,
-            X = X,
-            feature = f,
-            grid_n = grid_n,
-            grid_type = grid_type,
-            class_labels = class_labels,
-            ice_keep_n = ice_keep_n,
-            ice_center = ice_center,
-            seed = ctx$seed %||% 1L
-          )
-
-          if (!is.null(pdice$pd) && nrow(pdice$pd) > 0L) {
-            pd_curves = data.table::rbindlist(list(pd_curves, pdice$pd), fill = TRUE)
-          }
-          if (!is.null(pdice$ice) && nrow(pdice$ice) > 0L) {
-            ice_dt = data.table::copy(pdice$ice)
-            ice_dt[, row_id := rows[row_index]]
-            ice_dt[, row_index := NULL]
-            ice_curves = data.table::rbindlist(list(ice_curves, ice_dt), fill = TRUE)
-          }
-          if (!is.null(pdice$ice_spread) && nrow(pdice$ice_spread) > 0L) {
-            ice_spread = data.table::rbindlist(list(ice_spread, pdice$ice_spread), fill = TRUE)
-          }
-
-          if (!is.null(pdice$pred_mats_centered) && length(pdice$pred_mats_centered) > 0L) {
-            for (lab in names(pdice$pred_mats_centered)) {
-              key_lab = if (identical(lab, "response")) "__regr__" else as.character(lab)
-              key = paste0(key_lab, "::", f)
-              pred_mats_centered[[key]] = pdice$pred_mats_centered[[lab]]
-              grids[[key]] = pdice$grid
-            }
-          }
-
-          ale_dt = .autoiml_ale_1d_iml(
-            task = task,
-            model = model,
-            X = X,
-            feature = f,
-            bins = ale_bins,
-            trim = trim,
-            class_labels = class_labels,
-            seed = ctx$seed %||% 1L
-          )
-          if (!is.null(ale_dt) && nrow(ale_dt) > 0L) {
-            ale_curves = data.table::rbindlist(list(ale_curves, ale_dt), fill = TRUE)
-          }
-        }
-
-        # Interaction screening via H-statistic on top ICE-spread features
-        if (!is.null(ice_spread) && nrow(ice_spread) > 0L && !is.null(class_labels)) {
-          cls_main = class_labels[1L]
-          tmp = ice_spread[class_label == cls_main]
-          if (nrow(tmp) == 0L) tmp = ice_spread
-          top_feats = unique(tmp[order(-ice_sd_mean)]$feature)
-          top_feats = top_feats[seq_len(min(length(top_feats), hstat_max_features))]
-        } else {
-          top_feats = eval_feats[seq_len(min(length(eval_feats), hstat_max_features))]
-          cls_main = if (!is.null(class_labels)) class_labels[1L] else NULL
-        }
-
-        if (!is.null(cls_main) && length(top_feats) >= 2L) {
-          pairs = utils::combn(top_feats, 2, simplify = FALSE)
-          hlist = lapply(pairs, function(p) compute_hstat_pair(X, p[1], p[2], cls_main))
-          hstats = data.table::rbindlist(hlist, fill = TRUE)
-        }
-
-        # Optional: GADGET regionalization (centered ICE) for strongest interaction
-        if (regionalize && !is.null(hstats) && nrow(hstats) > 0L) {
-          hs = hstats[is.finite(hstat)][order(-hstat)]
-          if (nrow(hs) > 0L) {
-            hs = hs[seq_len(min(nrow(hs), gadget_top_k))]
-            for (rr in seq_len(nrow(hs))) {
-              top = hs[rr]
-              if (!isTRUE(top$hstat >= hstat_threshold)) next
-
-              f_focus = top$feature1
-              cls_main = top$class_label
-
-              key = paste0(cls_main, "::", f_focus)
-              M = pred_mats_centered[[key]]
-              g = grids[[key]]
-
-              if (is.null(M) || is.null(g)) next
-
-              gad = .autoiml_gadget_regionalize_feature(
-                X = data.table::as.data.table(X),
-                row_ids = rows,
-                feature = f_focus,
-                grid = g,
-                pred_mat = M,
-                split_candidates = setdiff(names(X), f_focus),
-                max_depth = gadget_max_depth,
-                min_bucket = gadget_min_bucket,
-                gamma = gadget_gamma,
-                n_thresholds = gadget_n_thresholds,
-                seed = ctx$seed %||% 1L
-              )
-
-              gadget_results[[paste0(cls_main, "::", f_focus)]] = gad
-              gadget_regions[[paste0(cls_main, "::", f_focus)]] = gad$regions
-            }
-          }
-        }
-      }
-
-      dependence_flag = isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)
-      max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) max(ice_spread$ice_sd_mean, na.rm = TRUE) else NA_real_
-      max_hstat = if (!is.null(hstats) && nrow(hstats) > 0L) max(hstats$hstat, na.rm = TRUE) else NA_real_
-      interaction_flag = isTRUE(is.finite(max_hstat) && max_hstat >= hstat_threshold)
-
-      recommended_method = if (dependence_flag) "ale" else "pd"
-
-      status = "pass"
-      summary = "Dependence/heterogeneity assessed; use dependence-aware global summaries when needed."
-      if (dependence_flag || interaction_flag) {
-        status = "warn"
-        summary = "Meaningful feature dependence and/or heterogeneity detected; prefer ALE (with ICE spreads) over PDP and consider interaction-aware regionalization."
-      }
-
-      metrics = data.table::data.table(
-        max_abs_cor = max_abs_cor,
-        dependence_flag = dependence_flag,
-        recommended_effect_method = recommended_method,
-        max_ice_sd_mean = max_ice_sd,
-        max_hstat = max_hstat,
-        interaction_flag = interaction_flag,
-        analyzed_numeric_features = length(eval_feats),
-        sample_n = sample_n
-      )
-
-      GateResult$new(
-        gate_id = self$id,
-        gate_name = self$name,
-        pdr = self$pdr,
-        status = status,
-        summary = summary,
-        metrics = metrics,
-        artifacts = list(
-          recommendation = list(
-            recommended_effect_method = recommended_method,
-            dependence_flag = dependence_flag,
-            interaction_flag = interaction_flag,
-            hstat_threshold = hstat_threshold,
-            regionalize = regionalize,
-            regional_method_used = if (identical(regional_method, "auto")) recommended_method else regional_method
-          ),
-          max_cor_pair = cor_pairs,
-          ice_spread = ice_spread,
-          ice_curves = ice_curves,
-          pd_curves = pd_curves,
-          ale_curves = ale_curves,
-          hstats = hstats,
-          gadget = gadget_results,
-          gadget_regions = gadget_regions
-        ),
-        messages = c(
-          "Note: PDP/ALE/ICE and H-statistic rely on intervention-style predictions; interpret with care under strong feature dependence and extrapolation."
-        )
-      )
+.autoiml_plot_ctx = function(x) {
+  if (inherits(x, "AutoIML")) {
+    return(x$ctx)
+  }
+  if (inherits(x, "AutoIMLResult")) {
+    if (!is.null(x$extras) && is.list(x$extras) && !is.null(x$extras$ctx)) {
+      return(x$extras$ctx)
     }
-  )
-)
+    return(NULL)
+  }
+  NULL
+}
+
+.autoiml_theme_iml = function(base_size = 11) {
+  ggplot2::theme_minimal(base_size = base_size) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      legend.position = "right",
+      plot.title.position = "plot",
+      plot.title = ggplot2::element_text(face = "plain"),
+      axis.title = ggplot2::element_text(face = "plain")
+    )
+}
+
+.autoiml_rug_dt = function(result, feature, max_n = 2000L) {
+  ctx = .autoiml_plot_ctx(result)
+  if (is.null(ctx) || !is.environment(ctx) || is.null(ctx$task)) {
+    return(NULL)
+  }
+
+  task = ctx$task
+  if (!inherits(task, "Task")) {
+    return(NULL)
+  }
+
+  if (!feature %in% task$feature_names) {
+    return(NULL)
+  }
+
+  v = tryCatch(task$data(cols = feature)[[feature]], error = function(e) NULL)
+  if (is.null(v)) {
+    return(NULL)
+  }
+
+  v = suppressWarnings(as.numeric(v))
+  v = v[is.finite(v)]
+  if (length(v) == 0L) {
+    return(NULL)
+  }
+
+  max_n = as.integer(max_n)
+  if (length(v) > max_n) {
+    set.seed(1L)
+    v = sample(v, max_n)
+  }
+
+  data.table::data.table(x = v)
+}
+
+.autoiml_plot_g2_ice_spread = function(result, class_label = NULL, top_n = 12L) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+
+  gr = .autoiml_get_gate_result(result, "G2")
+  if (is.null(gr)) {
+    return(NULL)
+  }
+
+  dt = gr$artifacts$ice_spread
+  if (is.null(dt) || nrow(dt) == 0L) {
+    return(NULL)
+  }
+
+  dt = data.table::as.data.table(dt)
+
+  if (!is.null(class_label) && "class_label" %in% names(dt)) {
+    cl_sel = as.character(class_label)[1L]
+    dt = dt[class_label == cl_sel]
+  }
+
+  if (nrow(dt) == 0L) {
+    return(NULL)
+  }
+
+  top_n = as.integer(top_n)
+  dt = dt[order(-ice_sd_mean)][seq_len(min(top_n, .N))]
+  dt[, feature := factor(feature, levels = rev(feature))]
+
+  ggplot2::ggplot(dt, ggplot2::aes(x = ice_sd_mean, y = feature)) +
+    ggplot2::geom_col() +
+    ggplot2::labs(
+      title = "Gate 2: ICE heterogeneity",
+      x = "Mean SD of centered ICE (higher = more heterogeneous effect)",
+      y = NULL
+    ) +
+    .autoiml_theme_iml()
+}
+
+.autoiml_plot_g2_effect = function(result,
+  feature = NULL,
+  method = c("auto", "pdp", "ale"),
+  class_label = NULL,
+  show_ice = TRUE,
+  ice_max_curves = 200L,
+  rug = TRUE,
+  rug_alpha = 0.25,
+  base_size = 11) {
+
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+
+  method = match.arg(method)
+
+  gr = .autoiml_get_gate_result(result, "G2")
+  if (is.null(gr)) {
+    return(NULL)
+  }
+
+  pd = gr$artifacts$pd_curves
+  ale = gr$artifacts$ale_curves
+  ice = gr$artifacts$ice_curves
+
+  feats = unique(c(
+    if (!is.null(pd) && nrow(pd) > 0L) unique(pd$feature) else character(),
+    if (!is.null(ale) && nrow(ale) > 0L) unique(ale$feature) else character()
+  ))
+  if (length(feats) == 0L) {
+    return(NULL)
+  }
+
+  if (is.null(feature)) {
+    feature = feats[1L]
+  }
+  feature = as.character(feature)
+
+  # Multi-feature -> patchwork grid if available
+  if (length(feature) > 1L) {
+    plots = lapply(feature, function(f) {
+      .autoiml_plot_g2_effect(
+        result = result,
+        feature = f,
+        method = method,
+        class_label = class_label,
+        show_ice = show_ice,
+        ice_max_curves = ice_max_curves,
+        rug = rug,
+        rug_alpha = rug_alpha,
+        base_size = base_size
+      )
+    })
+    plots = Filter(Negate(is.null), plots)
+    if (length(plots) == 0L) {
+      return(NULL)
+    }
+    if (requireNamespace("patchwork", quietly = TRUE)) {
+      ncol = min(3L, length(plots))
+      return(patchwork::wrap_plots(plots, ncol = ncol))
+    }
+    return(plots)
+  }
+
+  feat_sel = feature[1L]
+  if (!feat_sel %in% feats) {
+    stop("Unknown feature: ", feat_sel, call. = FALSE)
+  }
+
+  rec = gr$artifacts$recommendation %||% list()
+  method_eff = if (method == "auto") (rec$recommended_effect_method %||% "pdp") else method
+
+  rug_dt = if (isTRUE(rug)) .autoiml_rug_dt(result, feature = feat_sel) else NULL
+
+  # =========================
+  # PDP + ICE (iml-like)
+  # =========================
+  if (method_eff == "pdp") {
+    if (is.null(pd) || nrow(pd) == 0L) {
+      return(NULL)
+    }
+
+    pd_dt = data.table::as.data.table(pd)[feature == feat_sel]
+
+    if (!is.null(class_label) && "class_label" %in% names(pd_dt)) {
+      cl_sel = as.character(class_label)[1L]
+      pd_dt = pd_dt[class_label == cl_sel]
+    }
+
+    if (nrow(pd_dt) == 0L) {
+      return(NULL)
+    }
+
+    # ICE data (stored subset); group by row_id
+    ice_dt = NULL
+    if (isTRUE(show_ice) && !is.null(ice) && nrow(ice) > 0L) {
+      ice_dt = data.table::as.data.table(ice)[feature == feat_sel]
+
+      if (!is.null(class_label) && "class_label" %in% names(ice_dt)) {
+        cl_sel = as.character(class_label)[1L]
+        ice_dt = ice_dt[class_label == cl_sel]
+      }
+
+      if (!"row_id" %in% names(ice_dt)) {
+        # fallback if older artifact format is present
+        if ("row_index" %in% names(ice_dt)) {
+          data.table::setnames(ice_dt, "row_index", "row_id")
+        }
+      }
+
+      if (nrow(ice_dt) > 0L && "row_id" %in% names(ice_dt)) {
+        ice_max_curves = as.integer(ice_max_curves)
+        ids = unique(ice_dt$row_id)
+        if (length(ids) > ice_max_curves) {
+          set.seed(1L)
+          ids = sample(ids, ice_max_curves)
+        }
+        ice_dt = ice_dt[row_id %in% ids]
+      } else {
+        ice_dt = NULL
+      }
+    }
+
+    ttl = if (!is.null(class_label)) {
+      sprintf("Positive: %s \u2013 PDP + ICE", as.character(class_label)[1L])
+    } else {
+      "PDP + ICE"
+    }
+
+    p = ggplot2::ggplot()
+
+    if (!is.null(ice_dt) && nrow(ice_dt) > 0L) {
+      p = p +
+        ggplot2::geom_line(
+          data = ice_dt,
+          mapping = ggplot2::aes(x = x, y = yhat, group = row_id, color = "ICE"),
+          alpha = 0.18,
+          linewidth = 0.25
+        )
+    }
+
+    p = p +
+      ggplot2::geom_line(
+        data = pd_dt,
+        mapping = ggplot2::aes(x = x, y = pd, color = "PDP"),
+        linewidth = 0.9
+      )
+
+    if (!is.null(rug_dt)) {
+      p = p +
+        ggplot2::geom_rug(
+          data = rug_dt,
+          mapping = ggplot2::aes(x = x),
+          inherit.aes = FALSE,
+          sides = "b",
+          alpha = rug_alpha
+        )
+    }
+
+    p = p +
+      ggplot2::scale_color_manual(
+        name = "Curve",
+        values = c("ICE" = "grey60", "PDP" = "#E69F00")
+      ) +
+      ggplot2::labs(
+        title = ttl,
+        x = feat_sel,
+        y = "Predicted y"
+      ) +
+      .autoiml_theme_iml(base_size = base_size)
+
+    if ("class_label" %in% names(pd_dt) && is.null(class_label)) {
+      p = p + ggplot2::facet_wrap(~class_label, scales = "free_y")
+    }
+
+    return(p)
+  }
+
+  # =========================
+  # ALE (iml-like)
+  # =========================
+  if (is.null(ale) || nrow(ale) == 0L) {
+    return(NULL)
+  }
+
+  ale_dt = data.table::as.data.table(ale)[feature == feat_sel]
+
+  if (!is.null(class_label) && "class_label" %in% names(ale_dt)) {
+    cl_sel = as.character(class_label)[1L]
+    ale_dt = ale_dt[class_label == cl_sel]
+  }
+
+  if (nrow(ale_dt) == 0L) {
+    return(NULL)
+  }
+
+  ttl = if (!is.null(class_label)) {
+    sprintf("ALE \u2013 %s", as.character(class_label)[1L])
+  } else {
+    "ALE"
+  }
+
+  p = ggplot2::ggplot(ale_dt, ggplot2::aes(x = x, y = ale)) +
+    ggplot2::geom_line(color = "grey20", linewidth = 0.8)
+
+  if (!is.null(rug_dt)) {
+    p = p +
+      ggplot2::geom_rug(
+        data = rug_dt,
+        mapping = ggplot2::aes(x = x),
+        inherit.aes = FALSE,
+        sides = "b",
+        alpha = rug_alpha
+      )
+  }
+
+  p = p +
+    ggplot2::labs(
+      title = ttl,
+      x = feat_sel,
+      y = "ALE of y"
+    ) +
+    .autoiml_theme_iml(base_size = base_size)
+
+  if ("class_label" %in% names(ale_dt) && is.null(class_label)) {
+    p = p + ggplot2::facet_wrap(~class_label, scales = "free_y")
+  }
+
+  p
+}
+
+.autoiml_plot_g2_hstats = function(result, class_label = NULL, top_n = 15L, as_barplot = TRUE) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+
+  gr = .autoiml_get_gate_result(result, "G2")
+  if (is.null(gr)) {
+    return(NULL)
+  }
+
+  dt = gr$artifacts$hstats
+  if (is.null(dt) || nrow(dt) == 0L) {
+    return(NULL)
+  }
+
+  dt = data.table::as.data.table(dt)
+
+  if (!is.null(class_label) && "class_label" %in% names(dt)) {
+    cl_sel = as.character(class_label)[1L]
+    dt = dt[class_label == cl_sel]
+  }
+  if (nrow(dt) == 0L) {
+    return(NULL)
+  }
+
+  if (!"feature1" %in% names(dt) && "f1" %in% names(dt)) data.table::setnames(dt, "f1", "feature1")
+  if (!"feature2" %in% names(dt) && "f2" %in% names(dt)) data.table::setnames(dt, "f2", "feature2")
+
+  dt[, pair := paste0(feature1, " \u00D7 ", feature2)]
+  top_n = as.integer(top_n)
+  dt = dt[is.finite(hstat)][order(-hstat)][seq_len(min(top_n, .N))]
+  dt[, pair := factor(pair, levels = rev(pair))]
+
+  if (isTRUE(as_barplot)) {
+    return(
+      ggplot2::ggplot(dt, ggplot2::aes(x = hstat, y = pair)) +
+        ggplot2::geom_col() +
+        ggplot2::labs(
+          title = "Gate 2: Interaction strength (Friedman H-statistic)",
+          x = "H-statistic",
+          y = NULL
+        ) +
+        .autoiml_theme_iml()
+    )
+  }
+
+  ggplot2::ggplot(dt, ggplot2::aes(x = hstat, y = pair)) +
+    ggplot2::geom_point(size = 2) +
+    ggplot2::labs(
+      title = "Gate 2: Interaction strength (Friedman H-statistic)",
+      x = "H-statistic",
+      y = NULL
+    ) +
+    .autoiml_theme_iml()
+}
+
+.autoiml_plot_g2_gadget = function(result, feature = NULL, class_label = NULL, ncol = 2L) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+
+  gr = .autoiml_get_gate_result(result, "G2")
+  if (is.null(gr)) {
+    return(NULL)
+  }
+
+  gad = gr$artifacts$gadget
+  if (is.null(gad) || length(gad) == 0L) {
+    stop("No GADGET-style regionalization results found in Gate 2 artifacts.", call. = FALSE)
+  }
+
+  if (is.null(feature)) feature = names(gad)[1L]
+  feature = as.character(feature)[1L]
+  if (!feature %in% names(gad)) stop("Unknown feature for regionalization: ", feature, call. = FALSE)
+
+  one = gad[[feature]]
+  if (is.null(one$curves) || nrow(one$curves) == 0L) {
+    return(NULL)
+  }
+
+  dt = data.table::as.data.table(one$curves)
+
+  if (!is.null(class_label) && "class_label" %in% names(dt)) {
+    cl_sel = as.character(class_label)[1L]
+    dt = dt[class_label == cl_sel]
+  }
+  if (nrow(dt) == 0L) {
+    return(NULL)
+  }
+
+  ggplot2::ggplot(dt, ggplot2::aes(x = x, y = y, group = region_id)) +
+    ggplot2::geom_line(color = "grey20", linewidth = 0.7) +
+    ggplot2::facet_wrap(~path, ncol = as.integer(ncol)) +
+    ggplot2::labs(
+      title = sprintf("Gate 2: Regionalized effect curves (GADGET-style) for %s", feature),
+      x = feature,
+      y = "Centered effect (regional)"
+    ) +
+    .autoiml_theme_iml()
+}

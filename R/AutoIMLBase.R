@@ -52,6 +52,10 @@ AutoIML = R6::R6Class(
     #' Random seed used for stochastic components.
     seed = NULL,
 
+    #' @field profile (`character(1)`)
+    #' Configuration profile: `"high_resolution"` or `"fast"`.
+    profile = NULL,
+
     #' @field ctx (`list`)
     #' Mutable context/configuration passed to gates. You may set `auto$ctx$...` before calling `$run()`.
     ctx = NULL,
@@ -83,13 +87,16 @@ AutoIML = R6::R6Class(
     #'   Optional configuration list merged into `ctx`.
     #' @return A new `AutoIML` object.
     initialize = function(task, learner, resampling,
-      purpose = c("exploratory", "global_insight", "decision_support"),
-      quick_start = TRUE,
+      purpose = c("exploratory", "global_insight", "decision_support", "deployment"),
+      profile = c("high_resolution", "fast"),
+      quick_start = FALSE,
       seed = 1L, config = list()) {
       checkmate::assert_class(task, "Task")
       checkmate::assert_class(learner, "Learner")
       checkmate::assert_class(resampling, "Resampling")
       purpose = match.arg(purpose)
+      profile = match.arg(profile)
+      if (isTRUE(quick_start)) profile = "fast"
       checkmate::assert_flag(quick_start)
       checkmate::assert_int(seed, lower = 0)
 
@@ -99,6 +106,7 @@ AutoIML = R6::R6Class(
       self$purpose = purpose
       self$quick_start = quick_start
       self$seed = seed
+      self$profile = profile
 
       # Context is an environment to allow in-place configuration:
       # auto$ctx$structure$sample_n <- 200
@@ -109,6 +117,7 @@ AutoIML = R6::R6Class(
       self$ctx$purpose = purpose
       self$ctx$quick_start = quick_start
       self$ctx$seed = seed
+      self$ctx$profile = profile
 
       # Dedicated per-gate configuration lists
       self$ctx$structure = list()
@@ -130,6 +139,9 @@ AutoIML = R6::R6Class(
           }
         }
       }
+
+      # Apply dataset-dependent defaults (user values override these)
+      .autoiml_apply_config_defaults(self$ctx, profile = profile)
 
       # Runtime log (filled during run)
       self$ctx$run_log = data.table::data.table(
@@ -163,6 +175,10 @@ AutoIML = R6::R6Class(
       ctx$purpose = self$purpose
       ctx$quick_start = self$quick_start
       ctx$seed = self$seed
+      ctx$profile = self$profile
+
+      # Re-apply defaults in case ctx was only partially set
+      .autoiml_apply_config_defaults(ctx, profile = ctx$profile %||% "high_resolution")
 
       # Strict config validation (early fail)
       .autoiml_validate_ctx(ctx)
@@ -201,7 +217,7 @@ AutoIML = R6::R6Class(
       }
 
       irl = irl_from_gates(gate_results)
-      claim_scope = private$claim_scope(irl, self$purpose)
+      claim_scope = claim_scope_from_irl(irl = irl, purpose = self$purpose)
 
       report = report_card(AutoIMLResult$new(
         task_id = self$task$id,
@@ -260,11 +276,14 @@ AutoIML = R6::R6Class(
     #'   Which tables to return. Currently supports `"all"` and gate-specific options.
     #' @param ... Additional arguments forwarded to table helpers.
     #' @return A named list of tables (usually `data.table`s).
-    tables = function(which = c("g2"), ...) {
+    tables = function(which = c("g2", "g6"), ...) {
       if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
       which = match.arg(which)
       if (which == "g2") {
         return(gate2_tables(self$result, ...))
+      }
+      if (which == "g6") {
+        return(gate6_tables(self$result, ...))
       }
       stop("Unknown table group: ", which, call. = FALSE)
     },
@@ -279,7 +298,7 @@ AutoIML = R6::R6Class(
       res = self$result
       cat("\n=== AutoIML Overview ===\n")
       cat("Task: ", res$task_id, " | Learner: ", res$learner_id, " | Resampling: ", self$resampling$id, "\n", sep = "")
-      cat("Purpose: ", res$purpose, " | quick_start: ", res$quick_start, " | seed: ", self$seed, "\n", sep = "")
+      cat("Purpose: ", res$purpose, " | quick_start: ", res$quick_start, " | profile: ", self$profile, " | seed: ", self$seed, "\n", sep = "")
       cat("IRL: ", res$irl, "\n", sep = "")
       cat("Claim scope: ", res$claim_scope, "\n\n", sep = "")
 
@@ -331,6 +350,10 @@ AutoIML = R6::R6Class(
         "g2_effect" = .autoiml_plot_g2_effect(self$result, ...),
         "g2_hstats" = .autoiml_plot_g2_hstats(self$result, ...),
         "g2_gadget" = .autoiml_plot_g2_gadget(self$result, ...),
+        "g6_performance" = .autoiml_plot_g6_performance(self$result, ...),
+        "g6_group_performance" = .autoiml_plot_g6_group_performance(self$result, ...),
+        "g6_rashomon_importance" = .autoiml_plot_g6_rashomon_importance(self$result, ...),
+        "g6_summary" = .autoiml_plot_g6_summary(self$result, ...),
         "shap_local" = .autoiml_plot_shap_local(self, ...),
         "shap_importance" = .autoiml_plot_shap_importance(self, ...),
         "shap_beeswarm" = .autoiml_plot_shap_beeswarm(self, ...),
