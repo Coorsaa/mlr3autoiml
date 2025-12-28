@@ -86,6 +86,61 @@ Gate5Stability = R6::R6Class(
         }
       }
 
+      # Auto-grouping under strong dependence (optional):
+      # If the user did not provide cfg$grouping, cluster features by absolute correlation
+      # and permute as groups + singletons. This reduces attribution distortion when
+      # correlated features are present.
+      auto_grouping = FALSE
+      if (is.null(grouping)) {
+        cor_threshold = ctx$structure$cor_threshold %||% 0.70
+
+        ft = tryCatch(task$feature_types, error = function(e) NULL)
+        num = if (!is.null(ft)) ft$id[ft$type %in% c("numeric", "integer")] else feat
+        num = intersect(num, feat)
+
+        if (length(num) >= 2L) {
+          Xc = task$data(cols = num)
+          cm = suppressWarnings(stats::cor(Xc, use = "pairwise.complete.obs"))
+          if (is.matrix(cm)) {
+            cm[!is.finite(cm)] = 0
+            idx = which(abs(cm) >= cor_threshold & upper.tri(cm), arr.ind = TRUE)
+
+            if (nrow(idx) > 0L) {
+              nodes = num
+              parent = seq_along(nodes)
+              findp = function(i) {
+                while (parent[i] != i) {
+                  parent[i] <<- parent[parent[i]]
+                  i = parent[i]
+                }
+                i
+              }
+              unionp = function(i, j) {
+                ri = findp(i)
+                rj = findp(j)
+                if (ri != rj) parent[rj] <<- ri
+              }
+
+              for (k in seq_len(nrow(idx))) {
+                unionp(idx[k, 1], idx[k, 2])
+              }
+
+              comp = split(nodes, vapply(seq_along(nodes), findp, integer(1)))
+              comp = comp[vapply(comp, length, integer(1)) > 1L]
+
+              if (length(comp) > 0L) {
+                in_group = unique(unlist(comp))
+                singles = setdiff(feat, in_group)
+                groups = c(unname(comp), lapply(singles, c))
+                group_mode = TRUE
+                auto_grouping = TRUE
+              }
+            }
+          }
+        }
+      }
+
+
       imp_list = vector("list", B)
 
       n_full = nrow(X_full)
@@ -210,7 +265,9 @@ Gate5Stability = R6::R6Class(
         artifacts = list(
           perm_importance = perm_imp_summary,
           perm_importance_raw = perm_imp,
-          perf_ci = ci_dt
+          perf_ci = ci_dt,
+          grouping_used = if (isTRUE(group_mode)) groups else NULL,
+          grouping_auto = if (exists("auto_grouping")) auto_grouping else FALSE
         ),
         messages = c(
           "Permutation stability is a heuristic: correlated features and strong model regularization can blur attributions."
