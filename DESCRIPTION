@@ -31,6 +31,7 @@ Suggests:
     mlr3learners,
     mlr3viz,
     ggplot2,
+    ggforce,
     patchwork,
     knitr,
     rmarkdown,
