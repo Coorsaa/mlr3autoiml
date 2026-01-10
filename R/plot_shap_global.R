@@ -5,8 +5,62 @@
 # - Mean(|SHAP|) (global importance)
 #
 # Internal helpers used by AutoIML$plot(type = ...)
-
 NULL
+
+#' @keywords internal
+.autoiml_scale_feature_values = function(feature_value, trim = c(0.05, 0.95)) {
+  v = feature_value
+  if (is.factor(v)) v = as.character(v)
+  v = as.character(v)
+
+  # Try numeric scaling first (robust min-max with trimming)
+  v_num = suppressWarnings(as.numeric(v))
+  ok_num = is.finite(v_num)
+
+  n_non_missing = sum(!is.na(v))
+  frac_num = if (n_non_missing > 0L) sum(ok_num) / n_non_missing else 0
+
+  # Treat as numeric if a clear majority parses to numeric
+  if (sum(ok_num) >= 3L && frac_num >= 0.6) {
+    x_ok = v_num[ok_num]
+    if (length(x_ok) < 2L) {
+      return(rep(0.5, length(v)))
+    }
+
+    trim = as.numeric(trim)
+    if (length(trim) != 2L) trim = c(0.05, 0.95)
+    trim = pmin(pmax(trim, 0), 1)
+
+    lohi = stats::quantile(x_ok, probs = trim, na.rm = TRUE, type = 7)
+    lo = as.numeric(lohi[[1L]])
+    hi = as.numeric(lohi[[2L]])
+
+    # fallback if trimming collapses range
+    if (!is.finite(lo) || !is.finite(hi) || lo == hi) {
+      lo = min(x_ok, na.rm = TRUE)
+      hi = max(x_ok, na.rm = TRUE)
+    }
+    if (!is.finite(lo) || !is.finite(hi) || lo == hi) {
+      return(rep(0.5, length(v)))
+    }
+
+    x = pmin(pmax(v_num, lo), hi)
+    out = (x - lo) / (hi - lo)
+    out[!is.finite(out)] = NA_real_
+    return(out)
+  }
+
+  # Categorical fallback: deterministic mapping to [0, 1]
+  lev = sort(unique(v[!is.na(v)]))
+  if (length(lev) < 2L) {
+    return(rep(0.5, length(v)))
+  }
+
+  code = match(v, lev)
+  out = (code - 1) / (length(lev) - 1)
+  out[is.na(code)] = NA_real_
+  out
+}
 
 .autoiml_shap_sample_dt = function(auto,
   rows = NULL,
@@ -184,96 +238,138 @@ NULL
     ggplot2::theme_minimal()
 }
 
-.autoiml_plot_shap_beeswarm = function(auto,
-  class_label = NULL,
-  rows = NULL,
-  n_rows = 200L,
-  sample_size = 50L,
+.autoiml_shap_global_cached = function(result,
+  class_label,
+  sample_rows = 200L,
+  sample_size = 100L,
   background_n = 200L,
-  top_n = 20L,
-  seed = NULL,
-  jitter_height = 0.25,
-  alpha = 0.6,
-  point_size = 1.2
-) {
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
-  }
-  if (!requireNamespace("data.table", quietly = TRUE)) {
-    stop("Package 'data.table' is required.", call. = FALSE)
+  seed = 1L) {
+
+  # Accept both AutoIML and AutoIMLResult
+  ctx = NULL
+  if (inherits(result, "AutoIML")) ctx <- result$ctx
+  if (inherits(result, "AutoIMLResult")) ctx <- result$extras$ctx
+
+  if (!is.environment(ctx) || is.null(ctx$task) || is.null(ctx$final_model)) {
+    stop("SHAP requires a trained model. Run `auto$run()` first.", call. = FALSE)
   }
 
+  # Cache environment lives inside ctx (ctx is an environment, so this is safe & fast)
+  if (is.null(ctx$.cache_shap_global) || !is.environment(ctx$.cache_shap_global)) {
+    ctx$.cache_shap_global = new.env(parent = emptyenv())
+  }
+  cache = ctx$.cache_shap_global
+
+  cl = as.character(class_label)[1L]
+  key = paste(cl, as.integer(sample_rows), as.integer(sample_size), as.integer(background_n), as.integer(seed), sep = "|")
+
+  if (exists(key, envir = cache, inherits = FALSE)) {
+    return(get(key, envir = cache, inherits = FALSE))
+  }
+
+  # .autoiml_shap_sample_dt() only needs `$ctx`
+  auto_like = if (inherits(result, "AutoIML")) result else list(ctx = ctx)
+
   dt = .autoiml_shap_sample_dt(
-    auto = auto,
-    rows = rows,
-    n_rows = n_rows,
+    auto = auto_like,
+    class_label = cl,
+    n_rows = as.integer(sample_rows),
+    sample_size = as.integer(sample_size),
+    background_n = as.integer(background_n),
+    seed = as.integer(seed)
+  )
+
+  assign(key, dt, envir = cache)
+  dt
+}
+
+.autoiml_plot_shap_beeswarm = function(
+  result,
+  class_label = NULL,
+  sample_rows = 200L,
+  background_n = 200L,
+  sample_size = 80L,
+  top_n = 20L,
+  seed = 1L,
+  bee_width = 0.60,
+  bee_adjust = 1,
+  alpha = 0.60,
+  point_size = 0.90
+) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+  if (!requireNamespace("ggforce", quietly = TRUE)) {
+    stop(
+      "Package 'ggforce' is required for a true violin-like SHAP beeswarm plot. ",
+      "Install it with install.packages('ggforce').",
+      call. = FALSE
+    )
+  }
+
+  shap_dt = .autoiml_shap_global_cached(
+    result = result,
     class_label = class_label,
+    sample_rows = sample_rows,
     sample_size = sample_size,
     background_n = background_n,
     seed = seed
   )
-
-  dt = data.table::as.data.table(dt)
-
-  # Restrict to one class label if present
-  if (!all(is.na(dt$class_label))) {
-    if (!is.null(class_label)) {
-      dt = dt[class_label == as.character(class_label)]
-    } else {
-      u = unique(dt$class_label)
-      u = u[!is.na(u)]
-      if (length(u) > 0L) dt = dt[class_label == u[[1L]]]
-    }
+  if (is.null(shap_dt) || nrow(shap_dt) < 1L) {
+    return(NULL)
   }
 
-  imp = dt[, .(mean_abs_phi = mean(abs(phi), na.rm = TRUE)), by = feature][order(-mean_abs_phi)]
+  shap_dt = data.table::as.data.table(shap_dt)
+
+  if (!is.null(class_label) && "class_label" %in% names(shap_dt)) {
+    cl = as.character(class_label)[1L]
+    shap_dt = shap_dt[class_label == cl]
+  }
+  if (nrow(shap_dt) < 1L) {
+    return(NULL)
+  }
+
+  # top features by mean(|phi|)
   top_n = as.integer(top_n)
-  if (nrow(imp) > top_n) imp = imp[seq_len(top_n)]
+  rank_dt = shap_dt[, .(mean_abs_phi = mean(abs(phi), na.rm = TRUE)), by = feature][order(-mean_abs_phi)]
+  top_feats = rank_dt$feature[seq_len(min(top_n, nrow(rank_dt)))]
 
-  keep_feats = imp$feature
-  dt = dt[feature %in% keep_feats]
+  dt = shap_dt[feature %in% top_feats]
+  dt[, feature_f := factor(feature, levels = rev(top_feats))]
 
-  # order features by importance (top at top)
-  lev = rev(keep_feats)
-  dt[, feature_f := factor(feature, levels = lev)]
+  # scale feature values for colouring (iml/shapviz-style)
+  dt[, value_scaled := .autoiml_scale_feature_values(feature_value), by = feature]
+  dt[!is.finite(value_scaled), value_scaled := NA_real_]
 
-  # numeric-ish feature value scaling per feature for coloring
-  dt[, value_num := suppressWarnings(as.numeric(feature_value))]
-  dt[, value_scaled := NA_real_]
-  dt[is.finite(value_num), value_scaled := {
-    r = range(value_num, finite = TRUE)
-    den = r[2] - r[1]
-    if (!is.finite(den) || den < 1e-12) rep(0.5, .N) else (value_num - r[1]) / den
-  }, by = feature]
+  ttl = if (!is.null(class_label)) sprintf("SHAP beeswarm – %s", as.character(class_label)[1L]) else "SHAP beeswarm"
 
-  title = "SHAP beeswarm"
-  if (!all(is.na(dt$class_label))) {
-    cl = unique(dt$class_label)
-    cl = cl[!is.na(cl)]
-    if (length(cl) > 0L) title = paste0(title, " — class: ", cl[[1L]])
+  p = ggplot2::ggplot(dt, ggplot2::aes(x = phi, y = feature_f, colour = value_scaled)) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5, linewidth = 0.3) +
+    ggforce::geom_sina(
+      orientation = "y",
+      scale = "width",
+      maxwidth = as.numeric(bee_width),
+      adjust = as.numeric(bee_adjust),
+      alpha = as.numeric(alpha),
+      size = as.numeric(point_size)
+    ) +
+    ggplot2::scale_colour_gradient(low = "steelblue", high = "firebrick", na.value = "grey70") +
+    ggplot2::labs(
+      title = ttl,
+      x = "SHAP value (phi)",
+      y = NULL,
+      colour = "Feature value"
+    ) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      legend.position = "right"
+    )
+
+  # multiclass -> facet if not filtered
+  if ("class_label" %in% names(dt) && is.null(class_label)) {
+    p = p + ggplot2::facet_wrap(~class_label, scales = "free_x")
   }
 
-  use_color = any(is.finite(dt$value_scaled))
-
-  if (use_color) {
-    ggplot2::ggplot(dt, ggplot2::aes(x = phi, y = feature_f, color = value_scaled)) +
-      ggplot2::geom_point(
-        alpha = alpha,
-        size = point_size,
-        position = ggplot2::position_jitter(height = jitter_height, width = 0)
-      ) +
-      ggplot2::geom_vline(xintercept = 0, linetype = 2) +
-      ggplot2::labs(title = title, x = "SHAP value (phi)", y = NULL, color = "value (scaled)") +
-      ggplot2::theme_minimal()
-  } else {
-    ggplot2::ggplot(dt, ggplot2::aes(x = phi, y = feature_f)) +
-      ggplot2::geom_point(
-        alpha = alpha,
-        size = point_size,
-        position = ggplot2::position_jitter(height = jitter_height, width = 0)
-      ) +
-      ggplot2::geom_vline(xintercept = 0, linetype = 2) +
-      ggplot2::labs(title = title, x = "SHAP value (phi)", y = NULL) +
-      ggplot2::theme_minimal()
-  }
+  p
 }

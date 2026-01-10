@@ -126,49 +126,129 @@ NULL
   )
 }
 
-.autoiml_default_alt_learners = function(task, learner, max_n = 5L) {
-  stopifnot(inherits(learner, "Learner"))
-  max_n = as.integer(max_n)
-  if (max_n < 1L) {
+.autoiml_task_has_missing_values = function(task, cols = NULL) {
+  if (is.null(cols)) cols = task$feature_names
+  dat = tryCatch(task$data(cols = cols), error = function(e) NULL)
+  if (is.null(dat)) {
+    return(FALSE)
+  }
+  anyNA(dat)
+}
+
+.autoiml_maybe_robustify_learner = function(task, learner) {
+  if (!inherits(learner, "Learner")) {
+    return(learner)
+  }
+
+  has_missings = tryCatch(.autoiml_task_has_missing_values(task), error = function(e) FALSE)
+  if (!isTRUE(has_missings)) {
+    return(learner)
+  }
+
+  # If the learner can handle missings natively, keep it untouched.
+  if ("missings" %in% learner$properties) {
+    return(learner)
+  }
+
+  # Otherwise, wrap with a robust preprocessing pipeline (imputation + encoding).
+  if (!requireNamespace("mlr3pipelines", quietly = TRUE)) {
+    return(NULL)
+  }
+
+  g = mlr3pipelines::ppl("robustify")
+  gl = mlr3::as_learner(mlr3pipelines::`%>>%`(g, learner))
+
+  # preserve predict_type where supported
+  if (!is.null(learner$predict_type)) {
+    gl$predict_type = learner$predict_type
+  }
+
+  gl
+}
+
+.autoiml_default_alt_learners = function(task, base_learner, max_n = 6L) {
+  # Task-type aware defaults (avoid known incompatibilities, e.g. binary-only log_reg on multiclass).
+  is_classif = inherits(task, "TaskClassif")
+  is_regr = inherits(task, "TaskRegr")
+
+  nclass = if (is_classif) length(task$class_names) else NA_integer_
+  is_binary = is_classif && nclass == 2L
+  is_multiclass = is_classif && nclass > 2L
+
+  learner_ids = character(0)
+
+  if (is_regr) {
+    learner_ids = c(
+      "regr.featureless",
+      "regr.lm",
+      "regr.rpart",
+      "regr.ranger",
+      "regr.xgboost",
+      "regr.svm"
+    )
+  } else if (is_binary) {
+    learner_ids = c(
+      "classif.featureless",
+      "classif.log_reg",
+      "classif.rpart",
+      "classif.ranger",
+      "classif.xgboost",
+      "classif.svm",
+      "classif.naive_bayes"
+    )
+  } else if (is_multiclass) {
+    learner_ids = c(
+      "classif.featureless",
+      "classif.multinom",
+      "classif.rpart",
+      "classif.ranger",
+      "classif.xgboost",
+      "classif.svm",
+      "classif.naive_bayes"
+    )
+  } else {
     return(list())
   }
 
   out = list()
-  out[[1L]] = learner$clone(deep = TRUE)
 
-  base_predict_type = learner$predict_type %||% "response"
+  for (id in learner_ids) {
+    if (!mlr3::mlr_learners$has(id)) next
 
-  # Keep dependencies light (stats / rpart / nnet); extend via ctx$alt_learners.
-  cand = if (inherits(task, "TaskClassif")) {
-    c("classif.log_reg", "classif.multinom", "classif.rpart", "classif.featureless")
-  } else if (inherits(task, "TaskRegr")) {
-    c("regr.lm", "regr.rpart", "regr.featureless")
-  } else {
-    character(0)
-  }
+    lrn = mlr3::lrn(id)
 
-  ids = unique(cand)
-  for (id in ids) {
-    if (length(out) >= max_n) break
-
-    l = tryCatch(mlr3::lrn(id), error = function(e) NULL)
-    if (is.null(l)) next
-
-    # Align predict_type as much as possible
-    if (inherits(task, "TaskClassif")) {
-      if (base_predict_type == "prob" && "prob" %in% l$predict_types) {
-        l$predict_type = "prob"
-      } else {
-        l$predict_type = l$predict_types[1L]
-      }
-    } else {
-      l$predict_type = l$predict_types[1L]
+    if (is_classif && "prob" %in% lrn$predict_types) {
+      lrn$predict_type = "prob"
     }
 
-    out[[length(out) + 1L]] = l
+    # Handle missing values via robustify wrapper when needed
+    lrn2 = .autoiml_maybe_robustify_learner(task, lrn)
+    if (is.null(lrn2)) next
+
+    # Drop learners that still fail the task compatibility check
+    ok = tryCatch({
+      task$check_learner(lrn2)
+      TRUE
+    }, error = function(e) FALSE)
+
+    if (!isTRUE(ok)) next
+    out[[id]] = lrn2
   }
 
-  out
+  if (length(out) == 0L) {
+    return(list())
+  }
+
+  # Exclude the base learner id if it appears in the alternatives
+  base_id = base_learner$id %||% ""
+  out = out[vapply(out, function(l) l$id != base_id, logical(1))]
+
+  max_n = as.integer(max_n)
+  if (length(out) > max_n) {
+    out = out[seq_len(max_n)]
+  }
+
+  unname(out)
 }
 
 .autoiml_apply_config_defaults = function(ctx, profile = c("high_resolution", "fast")) {
