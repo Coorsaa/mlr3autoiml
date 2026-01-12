@@ -1,6 +1,22 @@
 # FILE: R/utils.R
-# Internal helpers for mlr3autoiml
-# @keywords internal
+
+#' @title Internal Utility Functions for mlr3autoiml
+#'
+#' @description
+#' Collection of internal helper functions used throughout the mlr3autoiml package.
+#' These include:
+#' \itemize{
+#'   \item Normalization helpers for semantics and SHAP modes
+#'   \item Prediction utilities for classification and regression
+#'   \item Performance metrics (AUC, Brier, logloss, RMSE)
+#'   \item Calibration helpers (ECE, reliability curves, calibration GLM)
+#'   \item Decision curve analysis (DCA)
+#'   \item GateResult resolution utilities
+#'   \item Configuration validation
+#' }
+#'
+#' @name utils
+#' @keywords internal
 NULL
 
 `%||%` = function(a, b) if (!is.null(a)) a else b

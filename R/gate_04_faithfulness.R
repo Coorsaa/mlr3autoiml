@@ -1,15 +1,26 @@
 # FILE: R/gate_04_faithfulness.R
-#' Gate 4: Faithfulness (surrogates, local accuracy, local interactions)
+
+#' @title Gate 4: Faithfulness (Surrogates, Local Accuracy, Local Interactions)
 #'
-#' Gate 4 screens whether the model's behavior is reasonably captured by
-#' (i) simple global surrogates and (ii) additive, case-level attributions.
+#' @description
+#' Screens whether the model's behavior is reasonably captured by:
+#' \itemize{
+#'   \item Simple global surrogates (linear model R-squared)
+#'   \item Additive, case-level attributions (SHAP local accuracy checks)
+#' }
 #'
 #' The gate intentionally keeps diagnostics lightweight; it is not a proof of
 #' faithfulness. If strong interactions or heterogeneous effects are present,
 #' prefer region-wise explanations and interaction-aware tools.
 #'
+#' @section Modes:
+#' SHAP mode defaults to conditional (on-manifold) for associational semantics
+#' and marginal for what-if semantics.
+#'
+#' @name Gate4Faithfulness
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate4Faithfulness = R6::R6Class(
   "Gate4Faithfulness",
   inherit = Gate,

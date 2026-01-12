@@ -1,7 +1,23 @@
 # FILE: R/gate_01_validity.R
-#' Gate 1: Modeling and data validity (preflight)
+
+#' @title Gate 1: Modeling and Data Validity (Preflight)
+#'
+#' @description
+#' Establishes predictive adequacy before explanation. This gate:
+#' \itemize{
+#'   \item Validates learner configuration (requires probabilistic predictions for classification)
+#'   \item Runs honest resampling for performance estimation
+#'   \item Compares against a featureless baseline
+#'   \item Trains the final model on full data for downstream gates
+#' }
+#'
+#' For multiclass tasks with learners lacking native multiclass support,
+#' automatically wraps with one-vs-rest (OVR) if mlr3pipelines is available.
+#'
+#' @name Gate1Validity
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate1Validity = R6::R6Class(
   "Gate1Validity",
   inherit = Gate,

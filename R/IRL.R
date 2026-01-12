@@ -1,24 +1,47 @@
 # FILE: R/IRL.R
 
-#' @title Compute Interpretation Readiness Levels (IRL) from gate outcomes
+#' @title Interpretation Readiness Level (IRL) Computation
 #'
 #' @description
-#' Map gate outcomes to **Interpretation Readiness Levels (IRL)**.
+#' Functions for computing claim-scoped Interpretation Readiness Levels (IRL)
+#' from gate outcomes and deriving conservative claim-scope statements.
 #'
-#' In the revised framework, IRL is **claim-scoped**:
-#' * `global`: readiness for global/descriptive summaries (effects, importance).
-#' * `local`: readiness for case-level explanations.
-#' * `decision`: readiness for threshold/utility-aware decision support.
+#' @details
+#' IRL provides a structured way to assess and communicate the evidentiary
+#' basis for different types of interpretation claims:
+#' \itemize{
+#'   \item \strong{IRL-0}: Exploratory only; insufficient evidence for claims.
+#'   \item \strong{IRL-1}: Cautious insight with basic diagnostics.
+#'   \item \strong{IRL-2}: Publication-grade with multiplicity/transport checks.
+#'   \item \strong{IRL-3}: Deployment-grade with full audit trail.
+#' }
+#'
+#' @name IRL
+NULL
+
+#' @rdname IRL
+#' @title Compute Interpretation Readiness Levels (IRL) from Gate Outcomes
+#'
+#' @description
+#' Map gate outcomes to \strong{Interpretation Readiness Levels (IRL)}.
+#'
+#' In the revised framework, IRL is \strong{claim-scoped}:
+#' \itemize{
+#'   \item `global`: readiness for global/descriptive summaries (effects, importance).
+#'   \item `local`: readiness for case-level explanations.
+#'   \item `decision`: readiness for threshold/utility-aware decision support.
+#' }
 #'
 #' The function returns a named list with IRLs per claim and an `overall` IRL
-#' computed conservatively as the minimum across the **requested** claim scopes
+#' computed conservatively as the minimum across the \strong{requested} claim scopes
 #' (derived from Gate 0A).
 #'
 #' @param gates (`list()`)
-#'   List of [GateResult] objects (typically G0A/G0B, G1–G6, G7A/G7B).
+#'   List of [GateResult] objects (typically G0A/G0B, G1--G6, G7A/G7B).
 #'
 #' @return `list()` with elements `overall`, `global`, `local`, `decision`, and `requested`.
 #' @export
+#' @seealso [claim_scope_from_irl()] for human-readable scope statements.
 irl_from_gates = function(gates) {
   gate_map = setNames(gates, vapply(gates, function(g) g$gate_id, character(1L)))
 
@@ -123,7 +146,7 @@ irl_from_gates = function(gates) {
   )
 }
 
-#' @title Create conservative claim-scope statements from claim-scoped IRL
+#' @title Create Conservative Claim-Scope Statements from Claim-Scoped IRL
 #'
 #' @description
 #' Returns short, human-readable statements describing what kinds of interpretation
@@ -133,8 +156,10 @@ irl_from_gates = function(gates) {
 #'   Claim-scoped IRL list produced by [irl_from_gates()].
 #' @param purpose (`character(1)`)
 #'   One of `"exploratory"`, `"global_insight"`, `"decision_support"`, `"deployment"`.
-#' @return `list()`.
+#'
+#' @return `list()` with elements `overall`, `global`, `local`, `decision`, and `requested`.
 #' @export
+#' @seealso [irl_from_gates()] for computing IRL from gate results.
 claim_scope_from_irl = function(irl, purpose = "exploratory") {
   purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 

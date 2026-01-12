@@ -1,6 +1,20 @@
 # FILE: R/plot_gate_06_multiplicity.R
 
-# @keywords internal
+#' @title Gate 6 Plotting Helpers
+#'
+#' @description
+#' Internal ggplot2-based plotting helpers for Gate 6 (Multiplicity and Transport).
+#'
+#' These functions visualize:
+#' \itemize{
+#'   \item Alternative learner performance comparisons with confidence intervals
+#'   \item Rashomon set membership
+#'   \item Explanation dispersion across Rashomon models (permutation importance)
+#'   \item Group performance heterogeneity
+#' }
+#'
+#' @name plot_gate_06_multiplicity
+#' @keywords internal
 NULL
 
 .autoiml_plot_g6_performance = function(result) {

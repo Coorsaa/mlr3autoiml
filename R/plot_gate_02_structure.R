@@ -1,13 +1,21 @@
 # FILE: R/plot_gate_02_structure.R
-#
-# Plot helpers for Gate 2 (Dependence & structure).
-#
-# Design goal: make ALE and PDP+ICE plots look close to {iml}'s defaults:
-# - ALE: single line + rug
-# - PDP+ICE: many ICE lines + one PDP line + rug + legend "Curve"
-#
-# IMPORTANT: this file must not redefine the Gate2 R6 class.
 
+#' @title Gate 2 Plotting Helpers
+#'
+#' @description
+#' Internal ggplot2-based plotting helpers for Gate 2 (Dependence & Structure).
+#'
+#' Design goal: make ALE and PDP+ICE plots look close to the 'iml' package's defaults:
+#' \itemize{
+#'   \item ALE: single line + rug
+#'   \item PDP+ICE: many ICE lines + one PDP line + rug + legend "Curve"
+#' }
+#'
+#' These functions visualize feature effects, interactions, and heterogeneity
+#' diagnostics produced by Gate 2.
+#'
+#' @name plot_gate_02_structure
+#' @keywords internal
 NULL
 
 .autoiml_plot_ctx = function(x) {

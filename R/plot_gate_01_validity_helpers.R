@@ -1,10 +1,18 @@
 # FILE: R/plot_gate_01_validity_helpers.R
-#
-# Gate 1 plotting helpers (ggplot2).
-#
-# @keywords internal
+
+#' @title Gate 1 Plotting Helpers
+#'
+#' @description
+#' Internal ggplot2-based plotting helpers for Gate 1 (Modeling and Data Validity).
+#'
+#' These functions visualize cross-validation performance scores and comparisons
+#' against baseline models.
+#'
+#' @name plot_gate_01_validity_helpers
+#' @keywords internal
 NULL
 
+#' @describeIn plot_gate_01_validity_helpers Plot Gate 1 CV scores
 #' @keywords internal
 .autoiml_plot_g1_scores = function(result, measure = NULL, include_baseline = TRUE) {
   if (!.autoiml_require_pkg("ggplot2")) {

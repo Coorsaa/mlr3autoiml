@@ -1,12 +1,19 @@
-#' Gate 5: Stability and robustness [D]
+#' @title Gate 5: Stability and Robustness
 #'
+#' @description
 #' Implements two complementary stability layers:
-#' (a) performance variability across resampling iterations (from Gate 1),
-#' (b) explanation stability via bootstrap permutation importance on the final model.
+#' \itemize{
+#'   \item Performance variability across resampling iterations (from Gate 1)
+#'   \item Explanation stability via bootstrap permutation importance on the final model
+#' }
 #'
+#' When features are correlated, the gate automatically groups them for joint
+#' permutation to reduce attribution distortion.
+#'
+#' @name Gate5Stability
 #' @keywords internal
-#' @import data.table
-#' @noRd
+NULL
+
 Gate5Stability = R6::R6Class(
   "Gate5Stability",
   inherit = Gate,

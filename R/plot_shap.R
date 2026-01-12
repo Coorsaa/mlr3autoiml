@@ -1,10 +1,18 @@
 # FILE: R/plot_shap.R
-#
-# SHAP / Shapley plotting helpers (ggplot2).
-#
-# @keywords internal
+
+#' @title Local SHAP Plotting Helpers
+#'
+#' @description
+#' Internal ggplot2-based plotting helpers for local (case-level) SHAP visualizations.
+#'
+#' These functions create waterfall-style plots showing Shapley value contributions
+#' for individual predictions, similar to the SHAP library's Python implementation.
+#'
+#' @name plot_shap
+#' @keywords internal
 NULL
 
+#' @describeIn plot_shap Create a waterfall plot for local SHAP values
 #' @keywords internal
 .autoiml_plot_shap_local = function(
   auto,

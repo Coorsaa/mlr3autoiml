@@ -1,10 +1,20 @@
 # FILE: R/plot_shap_global.R
-#
-# Global SHAP plots:
-# - Beeswarm (per-feature distribution across sampled rows)
-# - Mean(|SHAP|) (global importance)
-#
-# Internal helpers used by AutoIML$plot(type = ...)
+
+#' @title Global SHAP Plotting Helpers
+#'
+#' @description
+#' Internal ggplot2-based plotting helpers for global SHAP visualizations.
+#'
+#' These functions create:
+#' \itemize{
+#'   \item Beeswarm plots showing per-feature SHAP distributions across sampled rows
+#'   \item Mean(|SHAP|) bar plots for global feature importance
+#' }
+#'
+#' The visualizations follow conventions established by the SHAP Python library.
+#'
+#' @name plot_shap_global
+#' @keywords internal
 NULL
 
 #' @keywords internal

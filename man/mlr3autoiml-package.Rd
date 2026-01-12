@@ -21,6 +21,8 @@ The main entry point is the \link{AutoIML} R6 class.
 \itemize{
 \item \link{AutoIML} for the main orchestrator.
 \item \code{\link[=autoiml]{autoiml()}} for a convenience wrapper.
+\item \code{\link[=irl_from_gates]{irl_from_gates()}} for Interpretation Readiness Level computation.
+\item \code{\link[=report_card]{report_card()}} for audit trail summary.
 }
 }
 \author{
@@ -28,7 +30,7 @@ The main entry point is the \link{AutoIML} R6 class.
 
 Authors:
 \itemize{
-  \item Clara Vetter [contributor]
+  \item Clara Vetter
   \item Jonas Hauck
   \item Bernd Bischl
   \item Sven Hilbert
