@@ -13,33 +13,6 @@
 #' (tables, intermediate objects, model surrogates, etc.) required for
 #' reproducibility and reporting.
 #'
-#' @section Fields:
-#' * `task_id` :: `character(1)`\cr
-#'   Task identifier (typically `task$id`).
-#' * `learner_id` :: `character(1)`\cr
-#'   Learner identifier (typically `learner$id`).
-#' * `purpose` :: `character(1)`\cr
-#'   Declared purpose used for gate selection and claim-scope text.
-#' * `quick_start` :: `logical(1)`\cr
-#'   Whether the reduced gate set was used.
-#' * `irl` :: `list()`\cr
-#'   Claim-scoped Interpretation Readiness Levels returned by [irl_from_gates()].
-#' * `claim_scope` :: `list()`\cr
-#'   Human-readable claim-scope guidance derived from IRL and purpose.
-#' * `gate_results` :: `list()`\cr
-#'   List of [GateResult] objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
-#' * `report` :: [data.table::data.table]\cr
-#'   Compact report card table (one row per gate).
-#' * `timings` :: `list()` | `NULL`\cr
-#'   Optional named list of timing information in seconds.
-#' * `extras` :: `list()` | `NULL`\cr
-#'   Optional free-form additional outputs.
-#'
-#' @section Methods:
-#' * `report_card()`\cr
-#'   `()` -> [data.table::data.table]\cr
-#'   Returns the report card table.
-#'
 #' @examples
 #' \dontrun{
 #' # Typically returned by AutoIML$run():
@@ -50,17 +23,60 @@
 AutoIMLResult = R6::R6Class(
   "AutoIMLResult",
   public = list(
+    #' @field task_id (`character(1)`)
+    #' Task identifier (typically `task$id`).
     task_id = NULL,
+
+    #' @field learner_id (`character(1)`)
+    #' Learner identifier (typically `learner$id`).
     learner_id = NULL,
+
+    #' @field purpose (`character(1)`)
+    #' Declared purpose used for gate selection and claim-scope text.
     purpose = NULL,
+
+    #' @field quick_start (`logical(1)`)
+    #' Whether the reduced gate set was used.
     quick_start = NULL,
+
+    #' @field irl (`list()`)
+    #' Claim-scoped Interpretation Readiness Levels returned by [irl_from_gates()].
     irl = NULL,
+
+    #' @field claim_scope (`list()`)
+    #' Human-readable claim-scope guidance derived from IRL and purpose.
     claim_scope = NULL,
+
+    #' @field gate_results (`list()`)
+    #' List of [GateResult] objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
     gate_results = NULL,
+
+    #' @field report ([data.table::data.table])
+    #' Compact report card table (one row per gate).
     report = NULL,
+
+    #' @field timings (`list()` | `NULL`)
+    #' Optional named list of timing information in seconds.
     timings = NULL,
+
+    #' @field extras (`list()` | `NULL`)
+    #' Optional free-form additional outputs.
     extras = NULL,
 
+    #' @description
+    #' Create a new `AutoIMLResult` object.
+    #'
+    #' @param task_id (`character(1)`) Task identifier.
+    #' @param learner_id (`character(1)`) Learner identifier.
+    #' @param purpose (`character(1)`) Declared purpose.
+    #' @param quick_start (`logical(1)`) Whether quick_start mode was used.
+    #' @param irl (`list()`) Interpretation Readiness Levels.
+    #' @param claim_scope (`list()`) Claim-scope guidance.
+    #' @param gate_results (`list()`) List of [GateResult] objects.
+    #' @param report ([data.table::data.table]) Report card table.
+    #' @param timings (`list()` | `NULL`) Optional timing information.
+    #' @param extras (`list()`) Optional additional outputs.
+    #' @return A new `AutoIMLResult` object.
     initialize = function(
       task_id,
       learner_id,
@@ -85,10 +101,17 @@ AutoIMLResult = R6::R6Class(
       self$extras = extras
     },
 
+    #' @description
+    #' Returns the report card table.
+    #' @return A [data.table::data.table] with one row per gate.
     report_card = function() {
       self$report
     },
 
+    #' @description
+    #' Print a summary of the result object.
+    #' @param ... Ignored.
+    #' @return Invisibly returns `self`.
     print = function(...) {
       cat(sprintf("<AutoIMLResult task=%s learner=%s>\n", self$task_id, self$learner_id))
       cat(sprintf("  Purpose: %s (quick_start=%s)\n", self$purpose, self$quick_start))

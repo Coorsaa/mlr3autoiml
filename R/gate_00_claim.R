@@ -1,25 +1,32 @@
 # FILE: R/gate_00_claim.R
-#' Gate 0A: Scope claim & use (claim-first)
+
+#' @title Gate 0A: Scope Claim & Use (Claim-First)
 #'
-#' Establish and validate the **intended interpretive claim(s)** (global / local / decision)
-#' and the **semantics** under which explanations are interpreted.
+#' @description
+#' Establishes and validates the \strong{intended interpretive claim(s)} (global / local / decision)
+#' and the \strong{semantics} under which explanations are interpreted.
 #'
-#' This gate makes the "meaning" of explanation artifacts explicit *before* producing them.
-#' In the updated framework, we distinguish three semantics families:
+#' This gate makes the "meaning" of explanation artifacts explicit \emph{before} producing them.
+#' The framework distinguishes three semantics families:
 #'
-#' * **Associational / on-manifold (descriptive)**: summarize patterns along the empirical
-#'   joint distribution (do not interpret as interventions).
-#' * **Marginal what-if (model-based, non-causal)**: "what would the model predict if we set X_j = x?",
-#'   which may break empirical dependence and requires explicit support / off-manifold diagnostics.
-#' * **Causal / recourse (intervention / action)**: requires explicit causal assumptions and an action-set
-#'   (mutable features, constraints, costs). This package does **not** implement causal identification;
-#'   requesting causal/recourse semantics triggers a hard stop.
+#' @section Semantics:
+#' \describe{
+#'   \item{Associational / on-manifold (descriptive)}{Summarize patterns along the empirical
+#'     joint distribution (do not interpret as interventions).}
+#'   \item{Marginal what-if (model-based, non-causal)}{"What would the model predict if we set X_j = x?",
+#'     which may break empirical dependence and requires explicit support / off-manifold diagnostics.}
+#'   \item{Causal / recourse (intervention / action)}{Requires explicit causal assumptions and an action-set
+#'     (mutable features, constraints, costs). This package does \strong{not} implement causal identification;
+#'     requesting causal/recourse semantics triggers a hard stop.}
+#' }
 #'
 #' Users can provide a claim specification via `ctx$claim` (or `config = list(claim = ...)`).
 #' Conservative defaults are filled based on `purpose`.
 #'
+#' @name Gate0AClaim
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate0AClaim = R6::R6Class(
   "Gate0AClaim",
   inherit = Gate,

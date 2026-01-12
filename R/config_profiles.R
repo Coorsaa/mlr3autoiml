@@ -1,14 +1,22 @@
 # FILE: R/config_profiles.R
-#
-# Smart, dataset-dependent defaults for computational budgets and gate configs.
-#
-# High-level idea:
-# - profile = "high_resolution" (default): more stable / less noisy diagnostics
-# - profile = "fast": smaller samples and grids; suitable for iteration
-#
-# User values in ctx always override defaults.
 
-# @keywords internal
+#' @title Configuration Profiles for AutoIML
+#'
+#' @description
+#' Smart, dataset-dependent defaults for computational budgets and gate configurations.
+#'
+#' The package provides two main profiles:
+#' \itemize{
+#'   \item `"high_resolution"` (default): more stable / less noisy diagnostics with
+#'         larger samples and grids.
+#'   \item `"fast"`: smaller samples and grids; suitable for quick iteration and
+#'         exploratory use.
+#' }
+#'
+#' User values in `ctx` always override these defaults.
+#'
+#' @name config_profiles
+#' @keywords internal
 NULL
 
 .autoiml_default_profile = function(profile = c("high_resolution", "fast")) {

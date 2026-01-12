@@ -14,47 +14,47 @@ the computed Interpretation Readiness Level (IRL), and any gate artifacts
 (tables, intermediate objects, model surrogates, etc.) required for
 reproducibility and reporting.
 }
-\section{Fields}{
-
-\itemize{
-\item \code{task_id} :: \code{character(1)}\cr
-Task identifier (typically \code{task$id}).
-\item \code{learner_id} :: \code{character(1)}\cr
-Learner identifier (typically \code{learner$id}).
-\item \code{purpose} :: \code{character(1)}\cr
-Declared purpose used for gate selection and claim-scope text.
-\item \code{quick_start} :: \code{logical(1)}\cr
-Whether the reduced gate set was used.
-\item \code{irl} :: \code{list()}\cr
-Claim-scoped Interpretation Readiness Levels returned by \code{\link[=irl_from_gates]{irl_from_gates()}}.
-\item \code{claim_scope} :: \code{list()}\cr
-Human-readable claim-scope guidance derived from IRL and purpose.
-\item \code{gate_results} :: \code{list()}\cr
-List of \link{GateResult} objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
-\item \code{report} :: \link[data.table:data.table]{data.table::data.table}\cr
-Compact report card table (one row per gate).
-\item \code{timings} :: \code{list()} | \code{NULL}\cr
-Optional named list of timing information in seconds.
-\item \code{extras} :: \code{list()} | \code{NULL}\cr
-Optional free-form additional outputs.
-}
-}
-
-\section{Methods}{
-
-\itemize{
-\item \code{report_card()}\cr
-\verb{()} -> \link[data.table:data.table]{data.table::data.table}\cr
-Returns the report card table.
-}
-}
-
 \examples{
 \dontrun{
 # Typically returned by AutoIML$run():
 result$report_card()
 }
 
+}
+\section{Public fields}{
+\if{html}{\out{<div class="r6-fields">}}
+\describe{
+\item{\code{task_id}}{(\code{character(1)})
+Task identifier (typically \code{task$id}).}
+
+\item{\code{learner_id}}{(\code{character(1)})
+Learner identifier (typically \code{learner$id}).}
+
+\item{\code{purpose}}{(\code{character(1)})
+Declared purpose used for gate selection and claim-scope text.}
+
+\item{\code{quick_start}}{(\code{logical(1)})
+Whether the reduced gate set was used.}
+
+\item{\code{irl}}{(\code{list()})
+Claim-scoped Interpretation Readiness Levels returned by \code{\link[=irl_from_gates]{irl_from_gates()}}.}
+
+\item{\code{claim_scope}}{(\code{list()})
+Human-readable claim-scope guidance derived from IRL and purpose.}
+
+\item{\code{gate_results}}{(\code{list()})
+List of \link{GateResult} objects in gate order (G0A/G0B, G1..G6, G7A/G7B).}
+
+\item{\code{report}}{(\link[data.table:data.table]{data.table::data.table})
+Compact report card table (one row per gate).}
+
+\item{\code{timings}}{(\code{list()} | \code{NULL})
+Optional named list of timing information in seconds.}
+
+\item{\code{extras}}{(\code{list()} | \code{NULL})
+Optional free-form additional outputs.}
+}
+\if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -69,6 +69,7 @@ result$report_card()
 \if{html}{\out{<a id="method-AutoIMLResult-new"></a>}}
 \if{latex}{\out{\hypertarget{method-AutoIMLResult-new}{}}}
 \subsection{Method \code{new()}}{
+Create a new \code{AutoIMLResult} object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$new(
   task_id,
@@ -84,24 +85,67 @@ result$report_card()
 )}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{task_id}}{(\code{character(1)}) Task identifier.}
+
+\item{\code{learner_id}}{(\code{character(1)}) Learner identifier.}
+
+\item{\code{purpose}}{(\code{character(1)}) Declared purpose.}
+
+\item{\code{quick_start}}{(\code{logical(1)}) Whether quick_start mode was used.}
+
+\item{\code{irl}}{(\code{list()}) Interpretation Readiness Levels.}
+
+\item{\code{claim_scope}}{(\code{list()}) Claim-scope guidance.}
+
+\item{\code{gate_results}}{(\code{list()}) List of \link{GateResult} objects.}
+
+\item{\code{report}}{(\link[data.table:data.table]{data.table::data.table}) Report card table.}
+
+\item{\code{timings}}{(\code{list()} | \code{NULL}) Optional timing information.}
+
+\item{\code{extras}}{(\code{list()}) Optional additional outputs.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A new \code{AutoIMLResult} object.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-AutoIMLResult-report_card"></a>}}
 \if{latex}{\out{\hypertarget{method-AutoIMLResult-report_card}{}}}
 \subsection{Method \code{report_card()}}{
+Returns the report card table.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$report_card()}\if{html}{\out{</div>}}
 }
 
+\subsection{Returns}{
+A \link[data.table:data.table]{data.table::data.table} with one row per gate.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-AutoIMLResult-print"></a>}}
 \if{latex}{\out{\hypertarget{method-AutoIMLResult-print}{}}}
 \subsection{Method \code{print()}}{
+Print a summary of the result object.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$print(...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Ignored.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Invisibly returns \code{self}.
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-AutoIMLResult-clone"></a>}}

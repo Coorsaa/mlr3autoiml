@@ -1,12 +1,20 @@
-#' Gate 6: Multiplicity and transport
+#' @title Gate 6: Multiplicity and Transport
 #'
-#' Implements:
-#' - Multiplicity: performance across alternative model classes and a conservative
-#'   Rashomon set selection ("1-SE rule" by default).
-#' - Transportability: subgroup performance heterogeneity if a Task `group` role is set.
+#' @description
+#' Implements multiplicity (Rashomon effect) and transportability diagnostics.
 #'
+#' \strong{Multiplicity:} Evaluates performance across alternative model classes and
+#' applies a conservative Rashomon set selection using the 1-SE rule by default.
+#' When multiple models achieve near-tie performance, computes explanation dispersion
+#' via permutation importance rank correlations.
+#'
+#' \strong{Transportability:} Assesses subgroup performance heterogeneity if a Task
+#' `group` role is set, providing early warning for distribution shift issues.
+#'
+#' @name Gate6Multiplicity
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate6Multiplicity = R6::R6Class(
   "Gate6Multiplicity",
   inherit = Gate,

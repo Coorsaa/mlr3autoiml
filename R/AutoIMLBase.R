@@ -79,6 +79,8 @@ AutoIML = R6::R6Class(
     #'   Resampling strategy used for Gate 1 and related diagnostics.
     #' @param purpose (`character(1)`)
     #'   Intended use. Influences default thresholds and which gates are executed.
+    #' @param profile (`character(1)`)
+    #'   Configuration profile: `"high_resolution"` (default) or `"fast"`.
     #' @param quick_start (`logical(1)`)
     #'   If `TRUE`, reduce compute (fewer artifacts, smaller samples).
     #' @param seed (`integer(1)`)

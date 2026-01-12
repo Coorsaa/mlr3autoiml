@@ -1,25 +1,33 @@
 # FILE: R/gate_00b_measurement.R
-#' Gate 0B: Measurement / construct readiness
+
+#' @title Gate 0B: Measurement / Construct Readiness
 #'
-#' Screen whether measurement/construct considerations are sufficiently addressed
-#' **before** modeling and explanation.
+#' @description
+#' Screens whether measurement/construct considerations are sufficiently addressed
+#' \strong{before} modeling and explanation.
 #'
 #' This gate is deliberately conservative: many psychometric properties (reliability,
 #' invariance/comparability) cannot be inferred from the modeling dataset alone.
 #' Instead, users can provide a minimal measurement specification via `ctx$measurement`
 #' (or `config = list(measurement = list(...))`).
 #'
-#' What the gate can do automatically:
-#' - summarize missingness rates (feature-level) and flag high missingness
-#' - detect whether the task provides subgroup variables (via `ctx$sensitive_features`)
+#' @section Automatic Diagnostics:
+#' \itemize{
+#'   \item Summarize missingness rates (feature-level) and flag high missingness
+#'   \item Detect whether the task provides subgroup variables (via `ctx$sensitive_features`)
+#' }
 #'
-#' What requires user input:
-#' - reliability evidence (e.g., omega/alpha for scale scores, test-retest)
-#' - invariance/comparability evidence across relevant groups
-#' - whether predictors are composites/scale scores vs. single items vs. latent scores
+#' @section User Input Required:
+#' \itemize{
+#'   \item Reliability evidence (e.g., omega/alpha for scale scores, test-retest)
+#'   \item Invariance/comparability evidence across relevant groups
+#'   \item Whether predictors are composites/scale scores vs. single items vs. latent scores
+#' }
 #'
+#' @name Gate0BMeasurement
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate0BMeasurement = R6::R6Class(
   "Gate0BMeasurement",
   inherit = Gate,

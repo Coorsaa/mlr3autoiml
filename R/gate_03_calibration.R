@@ -1,23 +1,29 @@
 # FILE: R/gate_03_calibration.R
-#' Gate 3: Calibration and decision utility
+
+#' @title Gate 3: Calibration and Decision Utility
 #'
-#' Implements calibration and decision-utility diagnostics.
+#' @description
+#' Implements calibration and decision-utility diagnostics for classification tasks.
 #'
-#' Updated framework emphasis:
-#' - For **decision support**, calibration alone is insufficient: users should specify
-#'   decision utilities/costs (or a justified threshold policy) and evaluate
-#'   downstream consequences (utility curves / DCA).
+#' For \strong{decision support}, calibration alone is insufficient: users should specify
+#' decision utilities/costs (or a justified threshold policy) and evaluate
+#' downstream consequences (utility curves / DCA).
 #'
-#' Currently implemented:
-#' - Binary classification: calibration intercept/slope, ECE, reliability curve,
-#'   decision curve analysis (net benefit), and **cost-/utility-sensitive threshold sweep**.
-#' - Multiclass classification: one-vs-rest calibration/utility checks per class
-#'   (intercept/slope, ECE, reliability, OVR net benefit) plus overall logloss and
-#'   multiclass Brier score. (Cost-sensitive multiclass decision analysis is not yet
-#'   standardized; users can provide a cost matrix externally.)
+#' @section Currently Implemented:
+#' \describe{
+#'   \item{Binary classification}{Calibration intercept/slope, ECE, reliability curve,
+#'     decision curve analysis (net benefit), and cost-/utility-sensitive threshold sweep.}
+#'   \item{Multiclass classification}{One-vs-rest calibration/utility checks per class
+#'     (intercept/slope, ECE, reliability, OVR net benefit) plus overall logloss and
+#'     multiclass Brier score.}
+#'   \item{Regression}{Basic error metrics (calibration/utility mainly relevant for
+#'     probabilistic forecasts).}
+#' }
 #'
+#' @name Gate3Calibration
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate3Calibration = R6::R6Class(
   "Gate3Calibration",
   inherit = Gate,

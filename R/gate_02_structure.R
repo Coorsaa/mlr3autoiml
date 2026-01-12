@@ -1,21 +1,27 @@
 # FILE: R/gate_02_structure.R
-#' Gate 2: What is being summarized? (dependence & interactions)
+
+#' @title Gate 2: What is Being Summarized? (Dependence & Interactions)
 #'
+#' @description
 #' Produces dependence-aware global structure artifacts, focusing on:
-#' - Feature dependence screening (numeric correlation proxy)
-#' - Global effect curves (PDP/ICE and ALE)
-#' - Interaction screening (Friedman-Popescu H-statistic on a sampled grid)
-#' - Optional regionalization of heterogeneous effects (lightweight GADGET-style)
+#' \itemize{
+#'   \item Feature dependence screening (numeric correlation proxy)
+#'   \item Global effect curves (PDP/ICE and ALE)
+#'   \item Interaction screening (Friedman-Popescu H-statistic on a sampled grid)
+#'   \item Optional regionalization of heterogeneous effects (lightweight GADGET-style)
+#' }
 #'
-#' Notes:
-#' - PDP/ICE and ALE are intervention-style, model-agnostic summaries; interpret
-#'   cautiously under strong feature dependence and outside the data support.
-#' - ALE is generally preferred under strong dependence (Apley & Zhu).
-#' - PDP/ICE implementation uses an equidistant grid by default, mirroring 'iml'
-#'   defaults; ALE uses a quantile grid (also consistent with 'iml').
+#' @section Notes:
+#' PDP/ICE and ALE are intervention-style, model-agnostic summaries; interpret
+#' cautiously under strong feature dependence and outside the data support.
+#' ALE is generally preferred under strong dependence (Apley & Zhu).
+#' PDP/ICE implementation uses an equidistant grid by default, mirroring 'iml'
+#' defaults; ALE uses a quantile grid (also consistent with 'iml').
 #'
+#' @name Gate2Structure
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate2Structure = R6::R6Class(
   "Gate2Structure",
   inherit = Gate,

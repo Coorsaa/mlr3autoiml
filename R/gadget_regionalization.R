@@ -1,7 +1,19 @@
 # FILE: R/gadget_regionalization.R
-#
-# Internal GADGET-style regionalization for Gate 2.
-# Lightweight: avoids heavy deps; uses centered ICE matrices.
+
+#' @title GADGET-style Regionalization for Gate 2
+#'
+#' @description
+#' Internal lightweight GADGET-style regionalization used by Gate 2 to identify
+#' regions of heterogeneous feature effects. This implementation avoids heavy
+#' dependencies and uses centered ICE matrices.
+#'
+#' The regionalization recursively partitions the feature space to minimize
+#' within-region variance of effect curves, producing interpretable subgroup-specific
+#' effect summaries.
+#'
+#' @name gadget_regionalization
+#' @keywords internal
+NULL
 
 .autoiml_gadget_loss = function(pred_mat) {
   if (is.null(pred_mat) || nrow(pred_mat) == 0L) {

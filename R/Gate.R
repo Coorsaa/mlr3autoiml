@@ -1,22 +1,27 @@
-#' Gate
+#' @title Gate Base Class
 #'
-#' Abstract base class for diagnostic gates.
+#' @description
+#' Abstract base class for diagnostic gates in the AutoIML workflow.
 #'
-#' Gates operate on a context list that includes:
+#' Gates operate on a context environment that includes:
 #' \itemize{
-#'   \item \code{task}: \code{mlr3::Task}
-#'   \item \code{learner}: \code{mlr3::Learner} (cloned for safety)
-#'   \item \code{resampling}: \code{mlr3::Resampling}
-#'   \item \code{rr}: \code{mlr3::ResampleResult} (if already computed)
-#'   \item \code{final_model}: trained learner (optional)
-#'   \item \code{pred}: merged \code{mlr3::Prediction} object (optional)
-#'   \item \code{purpose}: scalar purpose
-#'   \item \code{quick_start}: logical
-#'   \item \code{seed}: integer seed (optional)
+#'   \item `task`: [mlr3::Task]
+#'   \item `learner`: [mlr3::Learner] (cloned for safety)
+#'   \item `resampling`: [mlr3::Resampling]
+#'   \item `rr`: [mlr3::ResampleResult] (if already computed)
+#'   \item `final_model`: trained learner (optional)
+#'   \item `pred`: merged [mlr3::Prediction] object (optional)
+#'   \item `purpose`: scalar purpose string
+#'   \item `quick_start`: logical flag
+#'   \item `seed`: integer seed (optional)
 #' }
 #'
+#' Concrete gate implementations inherit from this class and override the `run()` method.
+#'
+#' @name Gate
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate = R6::R6Class(
   "Gate",
   public = list(

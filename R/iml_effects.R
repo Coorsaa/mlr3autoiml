@@ -1,18 +1,27 @@
 # FILE: R/iml_effects.R
-#
-# Internal, model-agnostic effect and attribution computations.
-#
-# These helpers are intentionally lightweight and rely on:
-# - mlr3 learners for prediction
-# - data.table for efficient data manipulation
-#
-# Where feasible, the numerical definitions follow the reference implementation in
-# the 'iml' package (Christoph Molnar et al.), notably:
-# - PDP/ICE via intervention-style predictions on a feature grid
-# - ALE via accumulated local differences over quantile-based intervals and
-#   centering by the data-weighted average (Apley & Zhu style)
-#
-# @keywords internal
+
+#' @title Model-Agnostic Effect and Attribution Computations
+#'
+#' @description
+#' Internal, model-agnostic effect and attribution computations for Gate 2.
+#'
+#' These helpers are intentionally lightweight and rely on:
+#' \itemize{
+#'   \item mlr3 learners for prediction
+#'   \item data.table for efficient data manipulation
+#' }
+#'
+#' Where feasible, the numerical definitions follow the reference implementation in
+#' the
+#' 'iml' package (Christoph Molnar et al.), notably:
+#' \itemize{
+#'   \item PDP/ICE via intervention-style predictions on a feature grid
+#'   \item ALE via accumulated local differences over quantile-based intervals and
+#'         centering by the data-weighted average (Apley & Zhu style)
+#' }
+#'
+#' @name iml_effects
+#' @keywords internal
 NULL
 
 # ---- type casting helpers -------------------------------------------------

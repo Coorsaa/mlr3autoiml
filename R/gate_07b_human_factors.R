@@ -1,12 +1,28 @@
 # FILE: R/gate_07b_human_factors.R
-#' Gate 7B: Human-factors evaluation (decision support)
+
+#' @title Gate 7B: Human-Factors Evaluation (Decision Support)
 #'
+#' @description
 #' Explanations can change users' beliefs and decisions in unintended ways.
 #' This gate does not "run" a user study; it flags when human-factors evaluation
 #' is warranted and provides a lightweight checklist.
 #'
+#' @section When Triggered:
+#' The gate triggers a warning for high-stakes or decision-support purposes,
+#' recommending formal human-factors evaluation.
+#'
+#' @section Recommended Evaluation Tasks:
+#' \itemize{
+#'   \item Error detection (identify wrong model outputs)
+#'   \item Appropriate reliance / deferral
+#'   \item Consistency across cases
+#'   \item Robustness to misleading explanations (spurious patterns)
+#' }
+#'
+#' @name Gate7bHumanFactors
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate7bHumanFactors = R6::R6Class(
   "Gate7bHumanFactors",
   inherit = Gate,

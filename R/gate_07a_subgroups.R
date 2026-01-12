@@ -1,16 +1,29 @@
 # FILE: R/gate_07a_subgroups.R
-#' Gate 7A: Subgroup / measurement audit
+
+#' @title Gate 7A: Subgroup / Measurement Audit
 #'
+#' @description
 #' In the updated framework, subgroup audits are a default expectation for claims that
-#' might generalize to people/groups:
-#' - performance
-#' - calibration (and, for decision support, consequences / utility)
+#' might generalize to people/groups. This gate assesses:
+#' \itemize{
+#'   \item Subgroup-specific performance metrics
+#'   \item Subgroup-specific calibration (and, for decision support, consequences / utility)
+#' }
 #'
-#' This gate operates on *declared* subgroup variables (e.g., `ctx$sensitive_features`)
+#' The gate operates on \emph{declared} subgroup variables (e.g., `ctx$sensitive_features`)
 #' or `task$col_roles$stratum`.
 #'
+#' @section Binary Classification:
+#' Computes per-group AUC, Brier score, ECE, calibration intercept/slope, and
+#' (if utility/cost specification provided) expected utility or cost.
+#'
+#' @section Regression:
+#' Computes per-group RMSE.
+#'
+#' @name Gate7aSubgroups
 #' @keywords internal
-#' @noRd
+NULL
+
 Gate7aSubgroups = R6::R6Class(
   "Gate7aSubgroups",
   inherit = Gate,

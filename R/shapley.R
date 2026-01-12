@@ -1,17 +1,24 @@
 # FILE: R/shapley.R
-#
-# Shapley / "SHAP"-style attributions via an intervention-style construction
-# inspired by the 'iml' package's Shapley class.
-#
-# Updated framework note:
-# - "marginal" (interventional) Shapley breaks feature dependence by design and answers a
-#   model-based "what-if" question (holding other features to background draws).
-# - "conditional" Shapley aims to respect empirical dependence by sampling background rows
-#   conditional on the already-fixed feature coalition; this approximates an on-manifold /
-#   associational question. Conditional SHAP is nontrivial; here we provide a lightweight
-#   kNN conditional sampler as a pragmatic default.
-#
-# @keywords internal
+
+#' @title Shapley Value Computations
+#'
+#' @description
+#' Internal Shapley/SHAP-style attribution computations via an intervention-style
+#' construction inspired by the 'iml' package's Shapley class.
+#'
+#' The implementation supports two modes:
+#' \itemize{
+#'   \item `"marginal"` (interventional): breaks feature dependence by design and
+#'         answers a model-based "what-if" question (holding other features to
+#'         background draws). This matches the classic SHAP formulation.
+#'   \item `"conditional"`: aims to respect empirical dependence by sampling
+#'         background rows conditional on the already-fixed feature coalition.
+#'         This approximates an on-manifold / associational question using a
+#'         lightweight kNN conditional sampler.
+#' }
+#'
+#' @name shapley
+#' @keywords internal
 NULL
 
 # Predict a numeric matrix:
