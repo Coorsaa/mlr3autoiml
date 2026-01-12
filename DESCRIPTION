@@ -1,15 +1,15 @@
 Package: mlr3autoiml
 Type: Package
 Title: Automated Gate-Based Auditing for Interpretable Machine Learning in 'mlr3'
-Version: 0.0.0.9000
+Version: 0.0.1
 Authors@R: c(
     person("Stefan", "Coors", role = c("aut","cre")),
-    person("Clara", "Vetter", role = c("aut", "ctb")),
+    person("Clara", "Vetter", role = "aut"),
     person("Jonas", "Hauck", role = "aut"),
     person("Bernd", "Bischl", role = "aut"),
     person("Sven", "Hilbert", role = "aut")
   )
-Description: Implements a gate-based AutoIML workflow (G1-G7) for mlr3 Tasks and Learners.
+Description: Implements a gate-based AutoIML workflow (G0A/G0B, G1-G6, G7A/G7B) for mlr3 Tasks and Learners.
     Produces task- and data-dependent interpretability artifacts (ALE/ICE, interaction screening,
     calibration and decision utility incl. OVR for multiclass, faithfulness and stability checks,
     multiplicity and subgroup audits) with minimal dependencies.
@@ -18,7 +18,7 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.3.0)
 Imports:
     R6,
     data.table,

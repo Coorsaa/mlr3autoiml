@@ -1,8 +1,8 @@
 # mlr3autoiml
 
 `mlr3autoiml` is an **auditing and automation layer** for interpretable machine learning (IML)
-on top of the **mlr3 ecosystem**. It implements a **gate-based workflow** (G1–G7) and assigns
-**Interpretation Readiness Levels (IRL–0…3)** to scope the strength of permissible interpretive claims.
+on top of the **mlr3 ecosystem**. It implements a **gate-based workflow** (G0A/G0B, G1–G6, G7A/G7B) and assigns
+**claim-scoped Interpretation Readiness Levels (IRL-0…3)** to scope the strength of permissible interpretive claims.
 
 The design goal is to keep core dependencies small: the package builds on `mlr3`, `mlr3measures`,
 `mlr3misc`, `data.table`, `checkmate`, and `R6`. Optional integrations (pipelines, tuning, SHAP,
@@ -25,7 +25,7 @@ task = tsk("penguins")
 learner = lrn("classif.rpart", predict_type = "prob")
 resampling = rsmp("cv", folds = 5)
 
-res = AutoIML(
+res = AutoIML$new(
   task = task,
   learner = learner,
   resampling = resampling,
@@ -41,8 +41,8 @@ report_card(res)
 ## Status
 
 This is a scaffold that provides a working, end-to-end structure and core computations
-for Gates 1–3 and partial scaffolding for Gates 4–7. You can extend gates incrementally.
+for Gates 0–5 with additional scaffolding for Gates 6–7. You can extend gates incrementally.
 
 ## License
 
-MIT.
+LGPL-3.

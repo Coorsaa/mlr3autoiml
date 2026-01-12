@@ -2,19 +2,21 @@
 % Please edit documentation in R/report_card.R
 \name{report_card}
 \alias{report_card}
-\title{Report card for an AutoIML run}
+\title{AutoIML report card}
 \usage{
 report_card(x)
 }
 \arguments{
-\item{x}{AutoIML or AutoIMLResult}
+\item{x}{(\link{AutoIMLResult} | \link{AutoIML})\cr
+A completed result or an AutoIML runner.}
 }
 \value{
-data.table report card
+A \link[data.table:data.table]{data.table::data.table} with one row per gate.
 }
 \description{
-Summarize gate outcomes in a compact, tabular report card (one row per gate).
+Create a compact, audit-trail style report card (one row per gate) from an
+\link{AutoIMLResult}.
 
-This is a convenience extractor around the \code{gate_results} stored in an
-\link{AutoIMLResult} (or in an \link{AutoIML} object after \code{run()}).
+The report card includes the gate status, a short summary, and the achieved
+\strong{claim-scoped Interpretation Readiness Levels (IRL)}.
 }

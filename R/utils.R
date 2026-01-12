@@ -5,6 +5,69 @@ NULL
 
 `%||%` = function(a, b) if (!is.null(a)) a else b
 
+# ---- normalization helpers -----------------------------------------------
+# These keep the public API aligned with the paper terminology while
+# remaining tolerant to minor formatting differences.
+
+.autoiml_normalize_semantics = function(x, default = NA_character_) {
+  # Returns one of: "associational", "marginal", "causal".
+  # If `default` is NA and `x` is not recognized, returns NA.
+  if (is.null(x) || length(x) < 1L) {
+    return(default)
+  }
+  s_raw = as.character(x)[1L]
+  if (is.na(s_raw) || !nzchar(s_raw)) {
+    return(default)
+  }
+
+  s = tolower(s_raw)
+  s_us = gsub("[[:space:]-]+", "_", s)
+
+  # exact canonical values
+  if (s_us %in% c("associational", "marginal", "causal")) {
+    return(s_us)
+  }
+
+  # paper-aligned phrasing
+  if (grepl("causal", s) || grepl("recourse", s) || grepl("counterfactual", s)) {
+    return("causal")
+  }
+  if (grepl("marginal", s) || grepl("what[- ]?if", s) || grepl("interventional", s)) {
+    return("marginal")
+  }
+  if (grepl("associational", s) || grepl("on[- ]?manifold", s) || grepl("observational", s) || grepl("descriptive", s)) {
+    return("associational")
+  }
+
+  default
+}
+
+.autoiml_normalize_shap_mode = function(x, default = NA_character_) {
+  # Returns one of: "marginal", "conditional".
+  if (is.null(x) || length(x) < 1L) {
+    return(default)
+  }
+  s_raw = as.character(x)[1L]
+  if (is.na(s_raw) || !nzchar(s_raw)) {
+    return(default)
+  }
+
+  s = tolower(s_raw)
+  s_us = gsub("[[:space:]-]+", "_", s)
+
+  if (s_us %in% c("marginal", "conditional")) {
+    return(s_us)
+  }
+  if (s_us %in% c("interventional", "intervention")) {
+    return("marginal")
+  }
+  if (s_us %in% c("on_manifold", "onmanifold", "associational")) {
+    return("conditional")
+  }
+
+  default
+}
+
 .autoiml_clamp01 = function(p, eps = 1e-15) pmin(pmax(p, eps), 1 - eps)
 
 .autoiml_logit = function(p) {
@@ -344,12 +407,13 @@ NULL
     "sample_n", "max_features", "ice_keep_n",
     "grid_n", "grid_type",
     "ice_center",
-    "ale_bins", "trim",
+    "ale_bins",
     "cor_threshold",
     "hstat_max_features", "hstat_grid_n", "hstat_threshold",
+    "support_check",
     "regionalize", "regional_method",
     "gadget_max_depth", "gadget_min_bucket", "gadget_gamma",
-    "gadget_n_thresholds", "gadget_top_k"
+    "gadget_top_k"
   )
 
   allowed_calibration = c("thresholds", "bins")

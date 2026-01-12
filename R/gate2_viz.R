@@ -7,7 +7,7 @@
 #'
 #' Gate 2 assesses whether global effect summaries are likely to be misleading
 #' under feature dependence and/or heterogeneity. It computes global effect
-#' curves (PDP + ICE and ALE) and lightweight interaction diagnostics.
+#' curves (PDP + ICE and ALE), lightweight interaction diagnostics, and optional off-manifold support screening.
 #'
 #' The returned object is intended for programmatic reporting (tables); plotting
 #' is performed via [AutoIML] `$plot(type = ...)`.
@@ -25,6 +25,7 @@
 #' * `max_cor_pair`: Most correlated numeric feature pair (proxy for dependence).
 #' * `ice_spread_top`: Top ICE spread features (heterogeneity proxy).
 #' * `hstats_top`: Top interaction diagnostics (Friedman--Popescu H).
+#' * `support_check_flagged`: Off-manifold support flags for PDP grids (if computed).
 #'
 #' @export
 
@@ -55,11 +56,22 @@ gate2_tables = function(x, top_n = 10L) {
     hstats_top = a$hstats[is.finite(hstat)][order(-hstat)][seq_len(min(top_n, .N))]
   }
 
+  support_check_flagged = NULL
+  if (!is.null(a$support_check) && nrow(a$support_check) > 0L) {
+    dt = a$support_check[isTRUE(flag_off_support) & is.finite(ratio_to_baseline)]
+    if (nrow(dt) > 0L) {
+      support_check_flagged = dt[order(-ratio_to_baseline)][seq_len(min(top_n, .N))]
+    } else {
+      support_check_flagged = a$support_check[order(-ratio_to_baseline)][seq_len(min(top_n, .N))]
+    }
+  }
+
   list(
     metrics = m,
     recommendation = rec_dt,
     max_cor_pair = a$max_cor_pair,
     ice_spread_top = ice_spread_top,
-    hstats_top = hstats_top
+    hstats_top = hstats_top,
+    support_check_flagged = support_check_flagged
   )
 }

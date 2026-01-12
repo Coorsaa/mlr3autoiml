@@ -22,6 +22,7 @@ A \code{list()} containing (when available):
 \item \code{max_cor_pair}: Most correlated numeric feature pair (proxy for dependence).
 \item \code{ice_spread_top}: Top ICE spread features (heterogeneity proxy).
 \item \code{hstats_top}: Top interaction diagnostics (Friedman--Popescu H).
+\item \code{support_check_flagged}: Off-manifold support flags for PDP grids (if computed).
 }
 }
 \description{
@@ -29,7 +30,7 @@ Extract key Gate 2 (structure) tables and recommendations from an AutoIML run.
 
 Gate 2 assesses whether global effect summaries are likely to be misleading
 under feature dependence and/or heterogeneity. It computes global effect
-curves (PDP + ICE and ALE) and lightweight interaction diagnostics.
+curves (PDP + ICE and ALE), lightweight interaction diagnostics, and optional off-manifold support screening.
 
 The returned object is intended for programmatic reporting (tables); plotting
 is performed via \link{AutoIML} \verb{$plot(type = ...)}.

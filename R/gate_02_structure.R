@@ -40,6 +40,24 @@ Gate2Structure = R6::R6Class(
 
       cfg = ctx$structure %||% list()
 
+      # Claim semantics (set by Gate 0A; conservative default is associational/on-manifold)
+      claim = ctx$claim %||% list()
+      semantics = .autoiml_normalize_semantics(claim$semantics %||% "associational", default = "associational")
+
+      # Causal/recourse is a hard stop in this workflow (requires causal identification outside AutoIML).
+      if (identical(semantics, "causal")) {
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "skip",
+          summary = "Causal/recourse semantics requested: Gate 2 is skipped (hard stop). Use a causal estimation workflow before interpreting effects as actionable.",
+          metrics = data.table::data.table(semantics = semantics, recommended_effect_method = NA_character_),
+          artifacts = list(recommendation = list(semantics = semantics)),
+          messages = c("Hard stop: causal/recourse requires explicit causal assumptions and identification; AutoIML does not implement this.")
+        ))
+      }
+
       # --- computation budget knobs
       sample_n = as.integer(cfg$sample_n %||% 200L)
       max_features = as.integer(cfg$max_features %||% 5L)
@@ -312,6 +330,98 @@ Gate2Structure = R6::R6Class(
         }
       }
 
+
+      # --- optional support / off-manifold diagnostics --------------------------
+      # For interventional semantics, PDP-style summaries can become ill-posed when
+      # feature dependence makes many counterfactual combinations unlikely. We screen
+      # this via a lightweight kNN distance check on numeric features (requires FNN).
+      support_dt = NULL
+      support_available = FALSE
+      support_flag = FALSE
+      support_max_ratio = NA_real_
+      support_frac_flagged = NA_real_
+
+      support_cfg = cfg$support_check %||% list()
+      if (!is.list(support_cfg)) support_cfg <- list()
+
+      support_enabled = isTRUE(support_cfg$enabled %||% (semantics == "marginal"))
+      support_sample_n = as.integer(support_cfg$sample_n %||% min(200L, nrow(X)))
+      support_sample_n = max(30L, min(support_sample_n, nrow(X)))
+      support_ratio_threshold = as.numeric(support_cfg$ratio_threshold %||% 1.5)
+      support_k = as.integer(support_cfg$k %||% 2L)
+      support_k = max(1L, support_k)
+
+      if (isTRUE(support_enabled) && length(num_cols) >= 2L && requireNamespace("FNN", quietly = TRUE)) {
+        support_available = TRUE
+
+        Xnum = data.table::as.data.table(X)[, ..num_cols]
+        cc = stats::complete.cases(Xnum)
+        Xnum = Xnum[cc]
+
+        if (nrow(Xnum) >= 30L) {
+          mu = vapply(Xnum, function(z) mean(as.numeric(z), na.rm = TRUE), numeric(1))
+          sdv = vapply(Xnum, function(z) stats::sd(as.numeric(z), na.rm = TRUE), numeric(1))
+          sdv[!is.finite(sdv) | sdv <= 0] = 1
+
+          Xs = sweep(sweep(as.matrix(Xnum), 2, mu, "-"), 2, sdv, "/")
+          storage.mode(Xs) = "numeric"
+
+          # Baseline: within-sample nearest-neighbor distance (exclude self via k=2).
+          k_base = min(nrow(Xs), 2L)
+          nn_base = FNN::get.knnx(data = Xs, query = Xs, k = k_base)
+          base_nn1 = if (k_base >= 2L) nn_base$nn.dist[, 2L] else nn_base$nn.dist[, 1L]
+          base_med = stats::median(base_nn1, na.rm = TRUE)
+
+          eval_num = intersect(eval_feats, colnames(Xnum))
+
+          if (length(eval_num) > 0L && is.finite(base_med) && base_med > 0) {
+            idx = sample(seq_len(nrow(Xs)), size = min(support_sample_n, nrow(Xs)))
+            Q0 = Xs[idx, , drop = FALSE]
+            qn = nrow(Q0)
+
+            dt_list = list()
+
+            for (f in eval_num) {
+              col_i = match(f, colnames(Xnum))
+              if (is.na(col_i)) next
+              g = .autoiml_grid_1d_iml(X[[f]], grid_n = pd_grid_n, grid_type = pd_grid_type)
+              if (length(g) < 2L) next
+
+              g_scaled = (as.numeric(g) - mu[[f]]) / sdv[[f]]
+
+              Q_all = do.call(rbind, lapply(g_scaled, function(vs) {
+                Q2 = Q0
+                Q2[, col_i] = vs
+                Q2
+              }))
+
+              nn_q = FNN::get.knnx(data = Xs, query = Q_all, k = 1L)
+              d = as.numeric(nn_q$nn.dist[, 1L])
+
+              grp = rep(seq_along(g_scaled), each = qn)
+              med = tapply(d, grp, stats::median, na.rm = TRUE)
+              ratio = as.numeric(med) / base_med
+
+              dt_list[[f]] = data.table::data.table(
+                feature = f,
+                x = as.numeric(g),
+                median_nn_dist = as.numeric(med),
+                ratio_to_baseline = ratio,
+                flag_off_support = ratio >= support_ratio_threshold
+              )
+            }
+
+            support_dt = data.table::rbindlist(dt_list, fill = TRUE)
+
+            if (!is.null(support_dt) && nrow(support_dt) > 0L) {
+              support_max_ratio = max(support_dt$ratio_to_baseline, na.rm = TRUE)
+              support_frac_flagged = mean(support_dt$flag_off_support, na.rm = TRUE)
+              support_flag = isTRUE(any(support_dt$flag_off_support, na.rm = TRUE))
+            }
+          }
+        }
+      }
+
       # --- gate decision ----------------------------------------------------
       dependence_flag = isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)
       max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) max(ice_spread$ice_sd_mean, na.rm = TRUE) else NA_real_
@@ -319,24 +429,50 @@ Gate2Structure = R6::R6Class(
 
       interaction_flag = isTRUE(is.finite(max_hstat) && max_hstat >= hstat_threshold)
 
-      recommended_effect_method = if (dependence_flag) "ale" else "pdp"
+      # Recommendation depends on claim semantics.
+      recommended_effect_method = if (identical(semantics, "associational")) {
+        "ale"
+      } else {
+        # Marginal what-if semantics: PDP/ICE answers the model-based 'what-if' question.
+        "pdp"
+      }
+      fallback_effect_method = if (identical(semantics, "marginal")) "ale" else NA_character_
 
       status = "pass"
-      summary = "Dependence/heterogeneity assessed; global effect curves computed (PDP/ICE + ALE)."
-      if (dependence_flag || interaction_flag) {
+      summary = sprintf("Claim semantics=\"%s\": dependence/heterogeneity assessed; global effect curves computed (PDP/ICE + ALE).", semantics)
+
+      if (isTRUE(dependence_flag) || isTRUE(interaction_flag)) {
         status = "warn"
         summary = sprintf(
-          "Meaningful feature dependence and/or heterogeneity detected; prefer %s (with ICE spreads) over PDP and consider interaction-aware regionalization.",
-          toupper(recommended_effect_method)
+          "Claim semantics=\"%s\": dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives.",
+          semantics
         )
       }
 
+      # Under marginal what-if semantics, explicitly warn about off-support risk when detected.
+      if (identical(semantics, "marginal") && isTRUE(support_enabled)) {
+        if (!isTRUE(support_available)) {
+          status = "warn"
+          summary = paste0(summary, " Support diagnostics were requested but could not be computed (install 'FNN' and ensure numeric features).")
+        } else if (isTRUE(support_flag)) {
+          status = "warn"
+          summary = paste0(summary, " Off-manifold risk detected for some PDP grid points (see support_check table); marginal what-if interpretations may be driven by extrapolation.")
+        }
+      }
+
       recommendation = list(
+        semantics = semantics,
         recommended_effect_method = recommended_effect_method,
+        fallback_effect_method = fallback_effect_method,
         dependence_flag = dependence_flag,
         interaction_flag = interaction_flag,
         cor_threshold = cor_threshold,
         hstat_threshold = hstat_threshold,
+        support_enabled = isTRUE(support_enabled),
+        support_available = isTRUE(support_available),
+        support_flag = isTRUE(support_flag),
+        support_max_ratio = support_max_ratio,
+        support_frac_flagged = support_frac_flagged,
         regionalize = regionalize,
         regional_method_used = if (regional_method == "auto") recommended_effect_method else regional_method
       )
@@ -344,10 +480,17 @@ Gate2Structure = R6::R6Class(
       metrics = data.table::data.table(
         max_abs_cor = max_abs_cor,
         dependence_flag = dependence_flag,
+        semantics = semantics,
         recommended_effect_method = recommended_effect_method,
+        fallback_effect_method = fallback_effect_method,
         max_ice_sd_mean = max_ice_sd,
         max_hstat = max_hstat,
         interaction_flag = interaction_flag,
+        support_enabled = isTRUE(support_enabled),
+        support_available = isTRUE(support_available),
+        support_flag = isTRUE(support_flag),
+        support_max_ratio = support_max_ratio,
+        support_frac_flagged = support_frac_flagged,
         analyzed_numeric_features = length(eval_feats),
         sample_n = sample_n
       )
@@ -383,6 +526,7 @@ Gate2Structure = R6::R6Class(
         artifacts = list(
           recommendation = recommendation,
           max_cor_pair = cor_pairs,
+          support_check = support_dt,
           ice_spread = ice_spread,
           ice_curves = ice_curves,
           pd_curves = pd_curves,
@@ -392,7 +536,7 @@ Gate2Structure = R6::R6Class(
           gadget_regions = gadget_regions
         ),
         messages = c(
-          "PDP/ICE and ALE are model-agnostic but rely on intervention-style predictions; interpret with care under strong feature dependence and extrapolation.",
+          sprintf("Semantics=\"%s\": PDP/ICE answer marginal what-if (may extrapolate); ALE answers an on-manifold (associational) effect question.", semantics),
           "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects* rather than baseline risk differences."
         )
       )

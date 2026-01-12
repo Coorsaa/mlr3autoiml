@@ -27,107 +27,6 @@ Gate6Multiplicity = R6::R6Class(
       enabled = isTRUE(cfg$enabled)
 
       # ----------------------------
-      # Helpers
-      # ----------------------------
-      .primary_measure_id = function(task) {
-        if (inherits(task, "TaskRegr")) {
-          return("regr.rmse")
-        }
-        # Default to logloss for classification (works for multiclass)
-        return("classif.logloss")
-      }
-
-      .needs_prob = function(measure_id) {
-        measure_id %in% c("classif.logloss", "classif.auc", "classif.bbrier")
-      }
-
-      .select_features_for_importance = function(task, max_features = 15L) {
-        max_features = as.integer(max_features)
-        feats = task$feature_names
-        if (length(feats) <= max_features) {
-          return(feats)
-        }
-
-        ft = tryCatch(task$feature_types, error = function(e) NULL)
-        num = if (!is.null(ft)) ft$id[ft$type %in% c("numeric", "integer")] else feats
-        if (length(num) == 0L) {
-          return(utils::head(feats, max_features))
-        }
-
-        X = task$data(cols = num)
-        vars = vapply(num, function(f) stats::var(X[[f]], na.rm = TRUE), numeric(1))
-        num[order(vars, decreasing = TRUE)][seq_len(min(max_features, length(num)))]
-      }
-
-      .score_prediction = function(task, measure, truth, pred_prob = NULL, pred_response = NULL) {
-        if (inherits(task, "TaskRegr")) {
-          p = mlr3::PredictionRegr$new(row_ids = seq_along(truth), truth = truth, response = pred_response)
-          return(measure$score(p, task))
-        }
-
-        # Classification
-        if (!is.null(pred_prob)) {
-          prob = as.data.frame(pred_prob)
-          response = colnames(prob)[max.col(as.matrix(prob), ties.method = "first")]
-          p = mlr3::PredictionClassif$new(
-            row_ids = seq_along(truth),
-            truth = truth,
-            response = factor(response, levels = task$class_names),
-            prob = prob
-          )
-          return(measure$score(p, task))
-        }
-
-        # Fallback: response-only measures
-        p = mlr3::PredictionClassif$new(
-          row_ids = seq_along(truth),
-          truth = truth,
-          response = pred_response
-        )
-        measure$score(p, task)
-      }
-
-      .perm_importance = function(task, learner, rows, features, measure) {
-        # Evaluate on a fixed subset for comparability across learners
-        X = data.table::as.data.table(task$data(rows = rows, cols = features))
-        truth = task$truth(rows = rows)
-
-        # Baseline
-        p0 = learner$predict_newdata(X)
-        base_score = if (inherits(task, "TaskRegr")) {
-          .score_prediction(task, measure, truth, pred_response = p0$response)
-        } else {
-          .score_prediction(task, measure, truth, pred_prob = p0$prob)
-        }
-
-        out = vector("list", length(features))
-        minimize = isTRUE(measure$minimize)
-
-        for (j in seq_along(features)) {
-          f = features[j]
-          Xp = data.table::copy(X)
-          idx = sample.int(nrow(Xp))
-          data.table::set(Xp, j = f, value = Xp[[f]][idx])
-
-          p1 = learner$predict_newdata(Xp)
-          score1 = if (inherits(task, "TaskRegr")) {
-            .score_prediction(task, measure, truth, pred_response = p1$response)
-          } else {
-            .score_prediction(task, measure, truth, pred_prob = p1$prob)
-          }
-
-          delta = if (minimize) (score1 - base_score) else (base_score - score1)
-
-          out[[j]] = data.table::data.table(
-            feature = f,
-            importance = as.numeric(delta)
-          )
-        }
-
-        data.table::rbindlist(out)
-      }
-
-      # ----------------------------
       # 6a) Multiplicity (Rashomon)
       # ----------------------------
       perf_tbl = NULL
@@ -151,7 +50,7 @@ Gate6Multiplicity = R6::R6Class(
           resampling = ctx$resampling$clone(deep = TRUE)
           resampling$instantiate(task)
 
-          primary_id = ctx$primary_measure_id %||% .primary_measure_id(task)
+          primary_id = ctx$primary_measure_id %||% private$.primary_measure_id(task)
           msr = mlr3::msr(primary_id)
 
           # Compute fold scores per learner
@@ -160,7 +59,7 @@ Gate6Multiplicity = R6::R6Class(
             lr2 = lr$clone(deep = TRUE)
 
             # If measure needs probabilities, skip learners that cannot provide them.
-            if (inherits(task, "TaskClassif") && .needs_prob(primary_id)) {
+            if (inherits(task, "TaskClassif") && private$.needs_prob(primary_id)) {
               if ("prob" %in% lr2$predict_types) {
                 lr2$predict_type = "prob"
               } else {
@@ -222,7 +121,7 @@ Gate6Multiplicity = R6::R6Class(
           rows = sample(rows, importance_n)
         }
 
-        feats = .select_features_for_importance(task, max_features = importance_max_features)
+        feats = private$.select_features_for_importance(task, max_features = importance_max_features)
         msr = mlr3::msr(primary_id)
 
         imp_list = list()
@@ -233,12 +132,12 @@ Gate6Multiplicity = R6::R6Class(
           if (is.null(lr)) next
           lr2 = lr$clone(deep = TRUE)
 
-          if (inherits(task, "TaskClassif") && .needs_prob(primary_id) && "prob" %in% lr2$predict_types) {
+          if (inherits(task, "TaskClassif") && private$.needs_prob(primary_id) && "prob" %in% lr2$predict_types) {
             lr2$predict_type = "prob"
           }
 
           lr2$train(task)
-          imp_dt = .perm_importance(task, lr2, rows = rows, features = feats, measure = msr)
+          imp_dt = private$.perm_importance(task, lr2, rows = rows, features = feats, measure = msr)
           imp_dt[, learner_id := lid]
           imp_list[[lid]] = imp_dt
         }
@@ -353,6 +252,106 @@ Gate6Multiplicity = R6::R6Class(
           group_performance = transport_tbl
         )
       )
+    }
+  ),
+
+  private = list(
+    .primary_measure_id = function(task) {
+      if (inherits(task, "TaskRegr")) {
+        return("regr.rmse")
+      }
+      # Default to logloss for classification (works for multiclass)
+      return("classif.logloss")
+    },
+
+    .needs_prob = function(measure_id) {
+      measure_id %in% c("classif.logloss", "classif.auc", "classif.bbrier")
+    },
+
+    .select_features_for_importance = function(task, max_features = 15L) {
+      max_features = as.integer(max_features)
+      feats = task$feature_names
+      if (length(feats) <= max_features) {
+        return(feats)
+      }
+
+      ft = tryCatch(task$feature_types, error = function(e) NULL)
+      num = if (!is.null(ft)) ft$id[ft$type %in% c("numeric", "integer")] else feats
+      if (length(num) == 0L) {
+        return(utils::head(feats, max_features))
+      }
+
+      X = task$data(cols = num)
+      vars = vapply(num, function(f) stats::var(X[[f]], na.rm = TRUE), numeric(1))
+      num[order(vars, decreasing = TRUE)][seq_len(min(max_features, length(num)))]
+    },
+
+    .score_prediction = function(task, measure, truth, pred_prob = NULL, pred_response = NULL) {
+      if (inherits(task, "TaskRegr")) {
+        p = mlr3::PredictionRegr$new(row_ids = seq_along(truth), truth = truth, response = pred_response)
+        return(measure$score(p, task))
+      }
+
+      # Classification
+      if (!is.null(pred_prob)) {
+        prob = as.data.frame(pred_prob)
+        response = colnames(prob)[max.col(as.matrix(prob), ties.method = "first")]
+        p = mlr3::PredictionClassif$new(
+          row_ids = seq_along(truth),
+          truth = truth,
+          response = factor(response, levels = task$class_names),
+          prob = prob
+        )
+        return(measure$score(p, task))
+      }
+
+      # Fallback: response-only measures
+      p = mlr3::PredictionClassif$new(
+        row_ids = seq_along(truth),
+        truth = truth,
+        response = pred_response
+      )
+      measure$score(p, task)
+    },
+
+    .perm_importance = function(task, learner, rows, features, measure) {
+      # Evaluate on a fixed subset for comparability across learners
+      X = data.table::as.data.table(task$data(rows = rows, cols = features))
+      truth = task$truth(rows = rows)
+
+      # Baseline
+      p0 = learner$predict_newdata(X)
+      base_score = if (inherits(task, "TaskRegr")) {
+        private$.score_prediction(task, measure, truth, pred_response = p0$response)
+      } else {
+        private$.score_prediction(task, measure, truth, pred_prob = p0$prob)
+      }
+
+      out = vector("list", length(features))
+      minimize = isTRUE(measure$minimize)
+
+      for (j in seq_along(features)) {
+        f = features[j]
+        Xp = data.table::copy(X)
+        idx = sample.int(nrow(Xp))
+        data.table::set(Xp, j = f, value = Xp[[f]][idx])
+
+        p1 = learner$predict_newdata(Xp)
+        score1 = if (inherits(task, "TaskRegr")) {
+          private$.score_prediction(task, measure, truth, pred_response = p1$response)
+        } else {
+          private$.score_prediction(task, measure, truth, pred_prob = p1$prob)
+        }
+
+        delta = if (minimize) (score1 - base_score) else (base_score - score1)
+
+        out[[j]] = data.table::data.table(
+          feature = f,
+          importance = as.numeric(delta)
+        )
+      }
+
+      data.table::rbindlist(out)
     }
   )
 )

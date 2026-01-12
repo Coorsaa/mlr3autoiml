@@ -1,7 +1,7 @@
 #' @title mlr3autoiml: Automated Gate-Based Auditing for Interpretable Machine Learning in 'mlr3'
 #'
 #' @description
-#' `mlr3autoiml` implements a **gate-based AutoIML workflow (G1--G7)** for
+#' `mlr3autoiml` implements a **gate-based AutoIML workflow (G0A/G0B, G1--G6, G7A/G7B)** for
 #' [mlr3][mlr3::mlr3-package] tasks and learners.
 #'
 #' The package focuses on *interpretability readiness* and *diagnostic evidence*

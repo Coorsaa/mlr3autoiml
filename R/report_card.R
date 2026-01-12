@@ -1,44 +1,71 @@
 # FILE: R/report_card.R
 
-#' @title Report card for an AutoIML run
+#' @title AutoIML report card
 #'
 #' @description
-#' Summarize gate outcomes in a compact, tabular report card (one row per gate).
+#' Create a compact, audit-trail style report card (one row per gate) from an
+#' [AutoIMLResult].
 #'
-#' This is a convenience extractor around the `gate_results` stored in an
-#' [AutoIMLResult] (or in an [AutoIML] object after `run()`).
+#' The report card includes the gate status, a short summary, and the achieved
+#' **claim-scoped Interpretation Readiness Levels (IRL)**.
 #'
-#' @param x AutoIML or AutoIMLResult
-#' @return data.table report card
+#' @param x ([AutoIMLResult] | [AutoIML])\cr
+#'   A completed result or an AutoIML runner.
+#'
+#' @return A [data.table::data.table] with one row per gate.
 #' @export
 report_card = function(x) {
-  if (inherits(x, "AutoIML")) {
-    if (!is.null(x$result)) {
-      return(report_card(x$result))
-    }
-    stop("AutoIML has no result yet; call $run() first.", call. = FALSE)
+  res = if (inherits(x, "AutoIML")) x$result else x
+  if (!inherits(res, "AutoIMLResult")) {
+    stop("report_card() expects an AutoIML or AutoIMLResult.", call. = FALSE)
   }
 
-  if (inherits(x, "AutoIMLResult")) {
-    gates = x$gate_results
-    if (is.null(gates) || length(gates) == 0L) {
-      return(data.table::data.table())
-    }
+  gates = res$gate_results %||% list()
+  if (length(gates) == 0L) {
+    return(data.table::data.table())
+  }
 
-    dt = data.table::rbindlist(lapply(gates, function(gr) {
+  dt = data.table::rbindlist(
+    lapply(gates, function(gr) {
       data.table::data.table(
         gate_id = gr$gate_id,
         gate_name = gr$gate_name,
-        pdr = gr$pdr,
-        status = gr$status,
-        summary = gr$summary
+        pdr = gr$pdr %||% NA_character_,
+        status = gr$status %||% NA_character_,
+        summary = gr$summary %||% NA_character_
       )
-    }), fill = TRUE)
+    }),
+    fill = TRUE
+  )
 
-    dt[, irl := x$irl]
-    dt[, purpose := x$purpose]
-    return(dt[])
+  # Attach IRL fields (repeat across rows for convenience)
+  irl = res$irl
+  if (is.list(irl)) {
+    dt[, irl_overall := irl$overall %||% NA_character_]
+    dt[, irl_global := irl$global %||% NA_character_]
+    dt[, irl_local := irl$local %||% NA_character_]
+    dt[, irl_decision := irl$decision %||% NA_character_]
+  } else {
+    dt[, irl_overall := as.character(irl)]
+    dt[, irl_global := NA_character_]
+    dt[, irl_local := NA_character_]
+    dt[, irl_decision := NA_character_]
   }
 
-  stop("Unsupported input to report_card().", call. = FALSE)
+  dt[, purpose := res$purpose %||% NA_character_]
+  dt[, quick_start := isTRUE(res$quick_start)]
+
+  # If Gate 0 exists, attach claim semantics / stakes as convenience columns.
+  g0a = gates[["G0A"]]
+  g0b = gates[["G0B"]]
+  if (!is.null(g0a) && inherits(g0a$metrics, "data.table") && nrow(g0a$metrics) >= 1L) {
+    m0 = g0a$metrics[1L]
+    dt[, semantics := m0$semantics %||% NA_character_]
+    dt[, stakes := m0$stakes %||% NA_character_]
+    dt[, claim_global := m0$claim_global %||% NA]
+    dt[, claim_local := m0$claim_local %||% NA]
+    dt[, claim_decision := m0$claim_decision %||% NA]
+  }
+
+  dt[]
 }

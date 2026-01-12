@@ -2,7 +2,7 @@
 
 #' AutoIML: Gate-based AutoML/IML workflow
 #'
-#' `AutoIML` orchestrates a gate-based interpretability workflow (G1–G7) for
+#' `AutoIML` orchestrates a gate-based interpretability workflow (G0A, G0B, G1–G6, G7A, G7B) for
 #' [`mlr3`][mlr3::mlr3-package] tasks and learners. It produces a reproducible
 #' audit trail and data-/task-dependent interpretability artifacts.
 #'
@@ -61,7 +61,7 @@ AutoIML = R6::R6Class(
     ctx = NULL,
 
     #' @field gates (`list`)
-    #' List of gate objects to execute (G1..G7).
+    #' List of gate objects to execute (G0A..G7B).
     gates = NULL,
 
     #' @field result (`AutoIMLResult`)
@@ -84,7 +84,8 @@ AutoIML = R6::R6Class(
     #' @param seed (`integer(1)`)
     #'   Random seed for stochastic steps.
     #' @param config (`list`)
-    #'   Optional configuration list merged into `ctx`.
+    #'   Optional configuration list merged into `ctx`. You can provide a claim specification
+    #'   via `config = list(claim = list(...))`, which is validated in Gate 0.
     #' @return A new `AutoIML` object.
     initialize = function(task, learner, resampling,
       purpose = c("exploratory", "global_insight", "decision_support", "deployment"),
@@ -126,6 +127,22 @@ AutoIML = R6::R6Class(
       self$ctx$stability = list()
       self$ctx$multiplicity = list()
       self$ctx$human = list()
+
+      # Gate 0 / global config
+      self$ctx$claim = list()
+
+      # Gate 0B / measurement config (psychometrics & construct readiness)
+      self$ctx$measurement = list()
+
+      # Hard-stop flag (e.g., causal/recourse semantics without required assumptions)
+      self$ctx$hard_stop = FALSE
+      self$ctx$hard_stop_reason = NULL
+
+      # Local explanation defaults
+      self$ctx$shap = list()
+
+      # Optional: sensitive/subgroup features for Gate 7
+      if (is.null(self$ctx$sensitive_features)) self$ctx$sensitive_features = NULL
 
       # Apply user-supplied config list into ctx (shallow merge per top-level key)
       if (is.list(config) && length(config) > 0) {
@@ -193,21 +210,34 @@ AutoIML = R6::R6Class(
         gate_obj = self$gates[[i]]
         gstart = proc.time()[3]
 
-        gr = tryCatch(
-          gate_obj$run(ctx),
-          error = function(e) {
-            GateResult$new(
-              gate_id = gate_obj$id,
-              gate_name = gate_obj$name,
-              pdr = gate_obj$pdr,
-              status = "error",
-              summary = paste0("Gate failed with error: ", conditionMessage(e)),
-              metrics = NULL,
-              artifacts = list(),
-              messages = character()
-            )
-          }
-        )
+        if (isTRUE(ctx$hard_stop) && !(gate_obj$id %in% c("G0A", "G0B"))) {
+          gr = GateResult$new(
+            gate_id = gate_obj$id,
+            gate_name = gate_obj$name,
+            pdr = gate_obj$pdr,
+            status = "skip",
+            summary = paste0("Skipped due to hard stop in Gate 0: ", ctx$hard_stop_reason %||% "No reason provided."),
+            metrics = NULL,
+            artifacts = list(),
+            messages = character()
+          )
+        } else {
+          gr = tryCatch(
+            gate_obj$run(ctx),
+            error = function(e) {
+              GateResult$new(
+                gate_id = gate_obj$id,
+                gate_name = gate_obj$name,
+                pdr = gate_obj$pdr,
+                status = "error",
+                summary = paste0("Gate failed with error: ", conditionMessage(e)),
+                metrics = NULL,
+                artifacts = list(),
+                messages = character()
+              )
+            }
+          )
+        }
 
         gate_results[[i]] = gr
         names(gate_results)[[i]] = gate_obj$id
@@ -276,9 +306,12 @@ AutoIML = R6::R6Class(
     #'   Which tables to return. Currently supports `"all"` and gate-specific options.
     #' @param ... Additional arguments forwarded to table helpers.
     #' @return A named list of tables (usually `data.table`s).
-    tables = function(which = c("g2", "g6"), ...) {
+    tables = function(which = c("g2", "g0", "g6"), ...) {
       if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
       which = match.arg(which)
+      if (which == "g0") {
+        return(gate0_tables(self$result, ...))
+      }
       if (which == "g2") {
         return(gate2_tables(self$result, ...))
       }
@@ -299,8 +332,10 @@ AutoIML = R6::R6Class(
       cat("\n=== AutoIML Overview ===\n")
       cat("Task: ", res$task_id, " | Learner: ", res$learner_id, " | Resampling: ", self$resampling$id, "\n", sep = "")
       cat("Purpose: ", res$purpose, " | quick_start: ", res$quick_start, " | profile: ", self$profile, " | seed: ", self$seed, "\n", sep = "")
-      cat("IRL: ", res$irl, "\n", sep = "")
-      cat("Claim scope: ", res$claim_scope, "\n\n", sep = "")
+      irl_txt = .autoiml_format_irl(res$irl)
+      scope_txt = .autoiml_format_claim_scope(res$claim_scope)
+      cat("IRL: ", irl_txt, "\n", sep = "")
+      cat("Claim scope: ", scope_txt, "\n\n", sep = "")
 
       print(res$report)
 
@@ -397,15 +432,39 @@ AutoIML = R6::R6Class(
       cls = if (!is.null(class_label)) as.character(class_label) else NULL
       seed_use = seed %||% (ctx$seed %||% 1L)
 
-      .autoiml_shapley_iml(
+      # Semantics: default SHAP mode depends on the declared semantics (Gate 0A),
+      # but can be overridden via ctx$shap$mode.
+      sem = .autoiml_normalize_semantics(((ctx$claim %||% list())$semantics %||% "associational"), default = "associational")
+
+      shap_cfg = ctx$shap %||% list()
+      if (!is.list(shap_cfg)) shap_cfg <- list()
+
+      shap_mode = .autoiml_normalize_shap_mode(
+        shap_cfg$mode %||% if (identical(sem, "associational")) "conditional" else "marginal",
+        default = if (identical(sem, "associational")) "conditional" else "marginal"
+      )
+
+      cond_k = as.integer(shap_cfg$conditional_k %||% 5L)
+      cond_k = max(1L, cond_k)
+      cond_weighted = isTRUE(shap_cfg$conditional_weighted %||% TRUE)
+
+      dt = .autoiml_shapley_iml(
         task = task,
         model = model,
         x_interest = x_interest,
         background = background,
         sample_size = as.integer(sample_size),
         seed = as.integer(seed_use),
-        class_labels = cls
+        class_labels = cls,
+        mode = shap_mode,
+        conditional_k = cond_k,
+        conditional_weighted = cond_weighted
       )
+
+      # Attach declared claim semantics and SHAP mode for transparent reporting.
+      dt[, `:=`(claim_semantics = sem, shap_semantics = shap_mode)]
+
+      dt
     }
   ),
 
@@ -413,52 +472,42 @@ AutoIML = R6::R6Class(
     default_gates = function(purpose, quick_start) {
       # NOTE: quick_start is implemented by selecting fewer gates.
       gates = list(
+        Gate0AClaim$new(),
+        Gate0BMeasurement$new(),
         Gate1Validity$new(),
         Gate2Structure$new(),
         Gate3Calibration$new(),
         Gate4Faithfulness$new(),
         Gate5Stability$new(),
         Gate6Multiplicity$new(),
-        Gate7HumanFairness$new()
+        Gate7aSubgroups$new(),
+        Gate7bHumanFactors$new()
       )
 
       if (isTRUE(quick_start)) {
-        # Keep the runtime predictable: run preflight + core structure + minimal decision checks.
-        gates = gates[1:4]
+        # Quick-start (paper-aligned): minimal evidentiary path for
+        # exploratory insight / publication-grade descriptive claims.
+        # Always include stability and a minimal subgroup audit.
+        keep = c("G0A", "G0B", "G1", "G2", "G3", "G5", "G7A")
+
+        # If the declared purpose implies case-level or decision use,
+        # include faithfulness checks and human-factors prompts.
+        if (purpose %in% c("decision_support", "deployment")) {
+          keep = unique(c(keep, "G4", "G7B"))
+        }
+        gates = gates[vapply(gates, function(g) g$id %in% keep, logical(1L))]
       }
 
       gates
     },
 
     derive_irl = function(gate_results) {
-      # Simple heuristic mapping from gate statuses to an IML Readiness Level label.
-      sts = vapply(gate_results, function(gr) gr$status, character(1))
-      if (any(sts == "error")) {
-        return("IRL-0")
-      }
-      if (any(sts == "warn")) {
-        return("IRL-1")
-      }
-      "IRL-2"
+      irl_from_gates(gate_results)
     },
 
+    # Translate achieved IRL into conservative claim-scope statements.
     claim_scope = function(irl, purpose) {
-      if (irl == "IRL-0") {
-        return("Exploratory only: use for pipeline auditing and hypothesis generation; avoid substantive global/local claims.")
-      }
-      if (purpose == "global_insight") {
-        if (irl == "IRL-1") {
-          return("Cautious global insight: describe global model structure on observed support; avoid case-level guidance and causal language.")
-        }
-        return("Global insight: report effects/importance with diagnostics and uncertainty; still avoid causal language.")
-      }
-      if (purpose == "decision_support") {
-        if (irl == "IRL-1") {
-          return("Constrained decision support: require calibration/utility checks; use explanations as decision aids with conservative thresholds.")
-        }
-        return("Decision support: calibrated, utility-aware reporting; explanations may be used per case with documented limits.")
-      }
-      "Exploratory: emphasize diagnostics and limitations."
+      claim_scope_from_irl(irl = irl, purpose = purpose)
     }
   )
 )
