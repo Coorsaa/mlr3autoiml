@@ -50,3 +50,7 @@ rsconnect/
 
 # macOS files
 .DS_Store
+
+data/
+paper_artifacts/
+analysis/

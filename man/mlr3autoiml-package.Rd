@@ -6,7 +6,7 @@
 \alias{mlr3autoiml-package}
 \title{mlr3autoiml: Automated Gate-Based Auditing for Interpretable Machine Learning in 'mlr3'}
 \description{
-\code{mlr3autoiml} implements a \strong{gate-based AutoIML workflow (G1--G7)} for
+\code{mlr3autoiml} implements a \strong{gate-based AutoIML workflow (G0A/G0B, G1--G6, G7A/G7B)} for
 \link[mlr3:mlr3-package]{mlr3} tasks and learners.
 
 The package focuses on \emph{interpretability readiness} and \emph{diagnostic evidence}

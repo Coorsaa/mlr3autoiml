@@ -20,7 +20,7 @@ auto <- AutoIML$new(
 
 # Optional Gate 2 configuration (persisted in ctx)
 auto$ctx$structure$sample_n <- 200
-auto$ctx$structure$max_numeric_features <- 15
+auto$ctx$structure$max_features <- 15
 
 # Grid choices (to match 'iml' defaults):
 auto$ctx$structure$grid_n <- 10

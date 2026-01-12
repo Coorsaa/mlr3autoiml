@@ -45,11 +45,12 @@ autoiml = function(task,
   resampling = mlr3::rsmp("cv", folds = 5),
   purpose = c("exploratory", "global_insight", "decision_support", "deployment"),
   quick_start = TRUE,
-  seed = NULL,
+  seed = 1L,
   config = list(),
   verbose = FALSE
 ) {
   purpose = match.arg(purpose)
+  seed = as.integer(seed %||% 1L)
   AutoIML$new(
     task = task,
     learner = learner,

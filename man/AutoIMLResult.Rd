@@ -25,14 +25,12 @@ Learner identifier (typically \code{learner$id}).
 Declared purpose used for gate selection and claim-scope text.
 \item \code{quick_start} :: \code{logical(1)}\cr
 Whether the reduced gate set was used.
-\item \code{irl} :: \code{character(1)}\cr
-Interpretation Readiness Level label (e.g. \code{"IRL-1"}).
-\item \code{claim_scope} :: \code{character(1)}\cr
+\item \code{irl} :: \code{list()}\cr
+Claim-scoped Interpretation Readiness Levels returned by \code{\link[=irl_from_gates]{irl_from_gates()}}.
+\item \code{claim_scope} :: \code{list()}\cr
 Human-readable claim-scope guidance derived from IRL and purpose.
 \item \code{gate_results} :: \code{list()}\cr
-List of \link{GateResult} objects in gate order (G1..G7).
-\item \code{gates} :: \code{list()}\cr
-Alias for \code{gate_results} (kept for backwards compatibility).
+List of \link{GateResult} objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
 \item \code{report} :: \link[data.table:data.table]{data.table::data.table}\cr
 Compact report card table (one row per gate).
 \item \code{timings} :: \code{list()} | \code{NULL}\cr

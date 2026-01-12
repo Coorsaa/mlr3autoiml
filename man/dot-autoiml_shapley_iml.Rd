@@ -2,7 +2,7 @@
 % Please edit documentation in R/shapley.R
 \name{.autoiml_shapley_iml}
 \alias{.autoiml_shapley_iml}
-\title{Internal Shapley computation matching iml's intervention design}
+\title{Internal Shapley computation}
 \usage{
 .autoiml_shapley_iml(
   task,
@@ -11,7 +11,10 @@
   background,
   sample_size = 100L,
   seed = NULL,
-  class_labels = NULL
+  class_labels = NULL,
+  mode = c("marginal", "conditional"),
+  conditional_k = 5L,
+  conditional_weighted = TRUE
 )
 }
 \arguments{
@@ -28,17 +31,27 @@
 \item{seed}{optional integer seed}
 
 \item{class_labels}{optional character vector; subset classes for multiclass}
+
+\item{mode}{"marginal" or "conditional"}
+
+\item{conditional_k}{integer; k for kNN conditional sampling (only for mode="conditional")}
+
+\item{conditional_weighted}{logical; if TRUE, sample among kNN with weights 1/(dist+eps)}
 }
 \value{
 data.table with columns: class_label, feature, phi, phi_var, feature_value, sample_size
 }
 \description{
-This follows the 'iml' Shapley algorithm:
+\itemize{
+\item \code{mode = "marginal"} matches iml's interventional design.
+\item \code{mode = "conditional"} uses a lightweight kNN conditional sampler on the provided background data.
+}
+}
+\details{
+This follows a Monte Carlo Shapley scheme:
 \itemize{
 \item sample random permutations of features
-\item sample a background row for each permutation
-\item for each feature position in the permutation, build (with_k, without_k)
-instances and compute prediction differences
+\item for each feature position, estimate the marginal contribution via paired predictions
 }
 }
 \keyword{internal}

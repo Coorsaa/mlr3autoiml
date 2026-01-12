@@ -22,14 +22,12 @@
 #'   Declared purpose used for gate selection and claim-scope text.
 #' * `quick_start` :: `logical(1)`\cr
 #'   Whether the reduced gate set was used.
-#' * `irl` :: `character(1)`\cr
-#'   Interpretation Readiness Level label (e.g. `"IRL-1"`).
-#' * `claim_scope` :: `character(1)`\cr
+#' * `irl` :: `list()`\cr
+#'   Claim-scoped Interpretation Readiness Levels returned by [irl_from_gates()].
+#' * `claim_scope` :: `list()`\cr
 #'   Human-readable claim-scope guidance derived from IRL and purpose.
 #' * `gate_results` :: `list()`\cr
-#'   List of [GateResult] objects in gate order (G1..G7).
-#' * `gates` :: `list()`\cr
-#'   Alias for `gate_results` (kept for backwards compatibility).
+#'   List of [GateResult] objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
 #' * `report` :: [data.table::data.table]\cr
 #'   Compact report card table (one row per gate).
 #' * `timings` :: `list()` | `NULL`\cr
@@ -94,14 +92,14 @@ AutoIMLResult = R6::R6Class(
     print = function(...) {
       cat(sprintf("<AutoIMLResult task=%s learner=%s>\n", self$task_id, self$learner_id))
       cat(sprintf("  Purpose: %s (quick_start=%s)\n", self$purpose, self$quick_start))
-      cat(sprintf("  IRL: %s\n", self$irl))
+      cat(sprintf("  IRL: %s\n", .autoiml_format_irl(self$irl)))
       if (!is.null(self$report) && inherits(self$report, "data.table")) {
         cat("  Gates:\n")
         for (i in seq_len(nrow(self$report))) {
           cat(sprintf("   - %s: %s\n", self$report$gate_id[i], self$report$status[i]))
         }
       }
-      cat(sprintf("  Claim scope: %s\n", self$claim_scope))
+      cat(sprintf("  Claim scope: %s\n", .autoiml_format_claim_scope(self$claim_scope)))
       invisible(self)
     }
   )

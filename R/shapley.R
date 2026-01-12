@@ -1,7 +1,15 @@
 # FILE: R/shapley.R
 #
-# Shapley / "SHAP"-style attributions via the same intervention construction
-# used by the 'iml' package's Shapley class.
+# Shapley / "SHAP"-style attributions via an intervention-style construction
+# inspired by the 'iml' package's Shapley class.
+#
+# Updated framework note:
+# - "marginal" (interventional) Shapley breaks feature dependence by design and answers a
+#   model-based "what-if" question (holding other features to background draws).
+# - "conditional" Shapley aims to respect empirical dependence by sampling background rows
+#   conditional on the already-fixed feature coalition; this approximates an on-manifold /
+#   associational question. Conditional SHAP is nontrivial; here we provide a lightweight
+#   kNN conditional sampler as a pragmatic default.
 #
 # @keywords internal
 NULL
@@ -42,13 +50,14 @@ NULL
   stop("Unsupported task type for Shapley: ", class(task)[1L], call. = FALSE)
 }
 
-#' Internal Shapley computation matching iml's intervention design
+#' Internal Shapley computation
 #'
-#' This follows the 'iml' Shapley algorithm:
+#' * `mode = "marginal"` matches iml's interventional design.
+#' * `mode = "conditional"` uses a lightweight kNN conditional sampler on the provided background data.
+#'
+#' This follows a Monte Carlo Shapley scheme:
 #' - sample random permutations of features
-#' - sample a background row for each permutation
-#' - for each feature position in the permutation, build (with_k, without_k)
-#'   instances and compute prediction differences
+#' - for each feature position, estimate the marginal contribution via paired predictions
 #'
 #' @param task mlr3 task
 #' @param model trained mlr3 learner
@@ -57,6 +66,9 @@ NULL
 #' @param sample_size integer Monte Carlo sample size
 #' @param seed optional integer seed
 #' @param class_labels optional character vector; subset classes for multiclass
+#' @param mode "marginal" or "conditional"
+#' @param conditional_k integer; k for kNN conditional sampling (only for mode="conditional")
+#' @param conditional_weighted logical; if TRUE, sample among kNN with weights 1/(dist+eps)
 #'
 #' @return data.table with columns: class_label, feature, phi, phi_var, feature_value, sample_size
 #'
@@ -64,10 +76,17 @@ NULL
 .autoiml_shapley_iml = function(task, model, x_interest, background,
   sample_size = 100L,
   seed = NULL,
-  class_labels = NULL
+  class_labels = NULL,
+  mode = c("marginal", "conditional"),
+  conditional_k = 5L,
+  conditional_weighted = TRUE
 ) {
   if (is.null(seed)) seed = 1L
   set.seed(as.integer(seed))
+
+  mode = match.arg(mode)
+  conditional_k = as.integer(conditional_k)
+  conditional_k = max(1L, conditional_k)
 
   features = task$feature_names
   p = length(features)
@@ -122,24 +141,110 @@ NULL
 
   xi = x_interest[, features, with = FALSE]
 
+  # Precompute numeric SDs for conditional kNN scaling (cheap, background is small by design).
+  sd_scale = NULL
+  if (identical(mode, "conditional")) {
+    sd_scale = vapply(features, function(f) {
+      col = background[[f]]
+      if (is.numeric(col) || is.integer(col)) {
+        s = stats::sd(as.numeric(col), na.rm = TRUE)
+        if (!is.finite(s) || s <= 0) s = 1
+        return(as.numeric(s))
+      }
+      NA_real_
+    }, numeric(1L))
+  }
+
+  # Lightweight conditional sampler:
+  # sample a background row that is close to x_interest on the conditioning features.
+  sample_conditional_row = function(cond_features) {
+    if (length(cond_features) < 1L) {
+      return(background[sample.int(nrow(background), 1L), features, with = FALSE])
+    }
+
+    cond_features = intersect(cond_features, features)
+    if (length(cond_features) < 1L) {
+      return(background[sample.int(nrow(background), 1L), features, with = FALSE])
+    }
+
+    n_bg = nrow(background)
+    d = rep(0, n_bg)
+
+    for (f in cond_features) {
+      xv = xi[[f]][1L]
+      if (is.null(xv) || is.na(xv)) next
+
+      col = background[[f]]
+      if (is.numeric(col) || is.integer(col)) {
+        s = sd_scale[[f]]
+        if (!is.finite(s) || s <= 0) s = 1
+        dv = abs(as.numeric(col) - as.numeric(xv)) / s
+        dv[is.na(dv)] = 0
+        d = d + dv
+      } else {
+        dv = as.numeric(col != xv)
+        dv[is.na(dv)] = 0
+        d = d + dv
+      }
+    }
+
+    k = min(conditional_k, n_bg)
+    idx = order(d)[seq_len(k)]
+
+    if (isTRUE(conditional_weighted)) {
+      w = 1 / (d[idx] + 1e-6)
+      w = w / sum(w)
+      ii = sample(idx, size = 1L, prob = w)
+    } else {
+      ii = sample(idx, size = 1L)
+    }
+
+    background[ii, features, with = FALSE]
+  }
+
   for (m in seq_len(B)) {
     perm = sample.int(p, size = p, replace = FALSE)
 
-    bg = background[sample.int(nrow(background), 1L), features, with = FALSE]
-    current = data.table::copy(bg)
-
     rows = vector("list", 2L * p)
 
-    for (pos in seq_len(p)) {
-      without = data.table::copy(current)
+    if (identical(mode, "marginal")) {
+      # ---- interventional / marginal ("iml-style") -----------------------
+      bg = background[sample.int(nrow(background), 1L), features, with = FALSE]
+      current = data.table::copy(bg)
 
-      f = features[[perm[[pos]]]]
-      current[[f]] = xi[[f]]
+      for (pos in seq_len(p)) {
+        without = data.table::copy(current)
 
-      with = data.table::copy(current)
+        f = features[[perm[[pos]]]]
+        current[[f]] = xi[[f]]
 
-      rows[[2L * pos - 1L]] = with
-      rows[[2L * pos]] = without
+        with = data.table::copy(current)
+
+        rows[[2L * pos - 1L]] = with
+        rows[[2L * pos]] = without
+      }
+    } else {
+      # ---- conditional / on-manifold approximation ------------------------
+      for (pos in seq_len(p)) {
+        # coalition without the current feature
+        S0 = if (pos <= 1L) character(0) else features[perm[seq_len(pos - 1L)]]
+        # coalition including the current feature
+        S1 = features[perm[seq_len(pos)]]
+
+        bg0 = data.table::copy(sample_conditional_row(S0))
+        bg1 = data.table::copy(sample_conditional_row(S1))
+
+        # enforce coalition values
+        if (length(S0) > 0L) {
+          for (ff in S0) bg0[[ff]] = xi[[ff]]
+        }
+        if (length(S1) > 0L) {
+          for (ff in S1) bg1[[ff]] = xi[[ff]]
+        }
+
+        rows[[2L * pos - 1L]] = bg1
+        rows[[2L * pos]] = bg0
+      }
     }
 
     newdata = data.table::rbindlist(rows, use.names = TRUE, fill = FALSE)
@@ -203,6 +308,7 @@ NULL
 
   out = merge(out, feat_vals, by = "feature", all.x = TRUE)
   out[, sample_size := B]
-  data.table::setcolorder(out, c("class_label", "feature", "feature_value", "phi", "phi_var", "sample_size"))
+  out[, shap_mode := mode]
+  data.table::setcolorder(out, c("class_label", "feature", "feature_value", "phi", "phi_var", "sample_size", "shap_mode"))
   out[]
 }

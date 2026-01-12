@@ -2,24 +2,28 @@
 % Please edit documentation in R/IRL.R
 \name{irl_from_gates}
 \alias{irl_from_gates}
-\title{Compute Interpretation Readiness Level (IRL) from gate outcomes}
+\title{Compute Interpretation Readiness Levels (IRL) from gate outcomes}
 \usage{
 irl_from_gates(gates)
 }
 \arguments{
-\item{gates}{(\code{list()})\cr
-List of \link{GateResult} objects (typically G1..G7).}
+\item{gates}{(\code{list()})
+List of \link{GateResult} objects (typically G0A/G0B, G1–G6, G7A/G7B).}
 }
 \value{
-\code{character(1)} with one of \code{"IRL-0"}, \code{"IRL-1"}, \code{"IRL-2"}, \code{"IRL-3"}.
+\code{list()} with elements \code{overall}, \code{global}, \code{local}, \code{decision}, and \code{requested}.
 }
 \description{
-Map a set of gate outcomes to an Interpretation Readiness Level (IRL).
+Map gate outcomes to \strong{Interpretation Readiness Levels (IRL)}.
 
-IRL is computed \strong{only from achieved evidence} (gate outcomes), consistent with the
-paper's definition that levels are cumulative and claims must not exceed the highest level
-whose evidence requirements are met.
+In the revised framework, IRL is \strong{claim-scoped}:
+\itemize{
+\item \code{global}: readiness for global/descriptive summaries (effects, importance).
+\item \code{local}: readiness for case-level explanations.
+\item \code{decision}: readiness for threshold/utility-aware decision support.
+}
 
-The \code{purpose} argument is accepted for convenience (e.g., downstream claim-scope text),
-but it does \strong{not} cap the achieved IRL.
+The function returns a named list with IRLs per claim and an \code{overall} IRL
+computed conservatively as the minimum across the \strong{requested} claim scopes
+(derived from Gate 0A).
 }

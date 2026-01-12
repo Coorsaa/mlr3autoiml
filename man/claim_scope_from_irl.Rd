@@ -2,20 +2,21 @@
 % Please edit documentation in R/IRL.R
 \name{claim_scope_from_irl}
 \alias{claim_scope_from_irl}
-\title{Create a conservative claim-scope statement from IRL and purpose}
+\title{Create conservative claim-scope statements from claim-scoped IRL}
 \usage{
 claim_scope_from_irl(irl, purpose = "exploratory")
 }
 \arguments{
-\item{irl}{(\code{character(1)}) One of \code{"IRL-0"}, \code{"IRL-1"}, \code{"IRL-2"}, \code{"IRL-3"}.}
+\item{irl}{(\code{list()})
+Claim-scoped IRL list produced by \code{\link[=irl_from_gates]{irl_from_gates()}}.}
 
-\item{purpose}{(\code{character(1)}) One of \code{"exploratory"}, \code{"global_insight"},
-\code{"decision_support"}, \code{"deployment"}.}
+\item{purpose}{(\code{character(1)})
+One of \code{"exploratory"}, \code{"global_insight"}, \code{"decision_support"}, \code{"deployment"}.}
 }
 \value{
-\code{character(1)}.
+\code{list()}.
 }
 \description{
-Returns a short, human-readable statement describing what kinds of interpretation
-claims are defensible, given the achieved IRL and the declared purpose.
+Returns short, human-readable statements describing what kinds of interpretation
+claims are defensible, given achieved IRLs and the declared purpose.
 }
