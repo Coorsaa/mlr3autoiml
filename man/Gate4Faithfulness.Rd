@@ -16,8 +16,8 @@ prefer region-wise explanations and interaction-aware tools.
 }
 \section{Modes}{
 
-SHAP mode defaults to conditional (on-manifold) for associational semantics
-and marginal for what-if semantics.
+SHAP mode defaults to conditional (on-manifold) for within_support semantics
+and marginal for marginal model query semantics.
 }
 
 \keyword{internal}

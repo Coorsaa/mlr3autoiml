@@ -4,12 +4,13 @@
 #'
 #' @description
 #' Explanations can change users' beliefs and decisions in unintended ways.
-#' This gate does not "run" a user study; it flags when human-factors evaluation
-#' is warranted and provides a lightweight checklist.
+#' This gate does not "run" a user study; it validates whether explicit
+#' human-factors evidence is provided for high-stakes decision/deployment claims
+#' and provides a checklist for expected evidence elements.
 #'
 #' @section When Triggered:
-#' The gate triggers a warning for high-stakes or decision-support purposes,
-#' recommending formal human-factors evaluation.
+#' For high-stakes or decision/deployment claims, this gate requires explicit
+#' `human_factors_evidence` (in `ctx$claim` or `ctx`). If missing, status is `fail`.
 #'
 #' @section Recommended Evaluation Tasks:
 #' \itemize{
@@ -37,6 +38,17 @@ Gate7bHumanFactors = R6::R6Class(
 
     run = function(ctx) {
       claim = ctx$claim %||% list()
+      .autoiml_assert_known_names(
+        .autoiml_as_list(claim),
+        c(
+          "purpose", "claims", "semantics", "stakes", "audience",
+          "decision_spec", "actionability", "causal_assumptions", "human_factors_evidence",
+          "target_population", "setting", "time_horizon", "transport_boundary",
+          "intended_use", "intended_non_use", "prohibited_interpretations",
+          "decision_policy_rationale"
+        ),
+        "ctx$claim"
+      )
       purpose = claim$purpose %||% ctx$purpose %||% "exploratory"
       purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
@@ -60,7 +72,48 @@ Gate7bHumanFactors = R6::R6Class(
         ))
       }
 
-      # For high-stakes or decision support: warn and provide a checklist.
+      evidence = .autoiml_as_list(claim$human_factors_evidence %||% ctx$human_factors_evidence)
+      .autoiml_assert_known_names(
+        evidence,
+        c("participants", "task_design", "baseline", "outcomes", "analysis_summary", "artifacts"),
+        "ctx$claim$human_factors_evidence"
+      )
+
+      has_text = function(x) {
+        if (is.null(x)) {
+          return(FALSE)
+        }
+        vals = as.character(unlist(x, use.names = FALSE))
+        vals = vals[!is.na(vals)]
+        any(nzchar(trimws(vals)))
+      }
+
+      req_schema = c("participants", "task_design", "baseline", "outcomes", "analysis_summary")
+      missing_schema = req_schema[!vapply(req_schema, function(k) has_text(evidence[[k]]), logical(1L))]
+      has_evidence = length(missing_schema) == 0L
+
+      if (!isTRUE(has_evidence)) {
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "fail",
+          summary = "High-stakes decision/deployment use requires schema-complete human-factors evidence (participants, task_design, baseline, outcomes, analysis_summary).",
+          metrics = data.table::data.table(
+            required = TRUE,
+            provided = FALSE,
+            stakes = stakes,
+            purpose = purpose,
+            missing_schema_n = length(missing_schema)
+          ),
+          artifacts = list(missing_schema = missing_schema),
+          messages = c(
+            "Provide a schema-complete human-factors evidence object with participants, task design, baseline, outcomes, and analysis summary."
+          )
+        ))
+      }
+
+      # High-stakes: evidence provided, return pass and checklist for expected content.
       msgs = c(
         "If explanations will be shown to people (clinicians, participants, decision-makers), evaluate their effects on decision quality and trust calibration.",
         "Recommended evaluation tasks: (i) error detection (identify wrong model outputs), (ii) appropriate reliance / deferral, (iii) consistency across cases, (iv) robustness to misleading explanations (spurious patterns).",
@@ -71,10 +124,16 @@ Gate7bHumanFactors = R6::R6Class(
         gate_id = self$id,
         gate_name = self$name,
         pdr = self$pdr,
-        status = "warn",
-        summary = "Human-factors evaluation is warranted for the declared use (decision support / high stakes).",
-        metrics = data.table::data.table(required = TRUE, stakes = stakes, purpose = purpose),
-        artifacts = list(checklist = msgs),
+        status = "pass",
+        summary = "Human-factors evidence provided for high-stakes decision/deployment use.",
+        metrics = data.table::data.table(
+          required = TRUE,
+          provided = TRUE,
+          stakes = stakes,
+          purpose = purpose,
+          missing_schema_n = 0L
+        ),
+        artifacts = list(checklist = msgs, human_factors_evidence = evidence),
         messages = msgs
       )
     }

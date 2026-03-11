@@ -80,6 +80,15 @@ GateResult = R6::R6Class(
     #' @param messages (`character()` | `NULL`) Optional messages.
     initialize = function(gate_id, gate_name, pdr, status, summary,
       metrics = NULL, artifacts = NULL, messages = NULL) {
+      checkmate::assert_string(gate_id, min.chars = 1L)
+      checkmate::assert_string(gate_name, min.chars = 1L)
+      checkmate::assert_string(pdr, min.chars = 1L)
+      checkmate::assert_choice(status, c("pass", "warn", "fail", "skip", "error"))
+      checkmate::assert_string(summary, null.ok = TRUE)
+      if (!is.null(messages)) {
+        checkmate::assert_character(messages, any.missing = FALSE)
+      }
+
       self$gate_id = gate_id
       self$gate_name = gate_name
       self$pdr = pdr

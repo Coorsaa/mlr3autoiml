@@ -13,6 +13,9 @@
 #' The gate operates on \emph{declared} subgroup variables (e.g., `ctx$sensitive_features`)
 #' or `task$col_roles$stratum`.
 #'
+#' For high-stakes decision/deployment contexts, missing subgroup declarations are
+#' treated as a hard evidentiary failure.
+#'
 #' @section Binary Classification:
 #' Computes per-group AUC, Brier score, ECE, calibration intercept/slope, and
 #' (if utility/cost specification provided) expected utility or cost.
@@ -39,6 +42,17 @@ Gate7aSubgroups = R6::R6Class(
     run = function(ctx) {
       task = ctx$task
       claim = ctx$claim %||% list()
+      .autoiml_assert_known_names(
+        .autoiml_as_list(claim),
+        c(
+          "purpose", "claims", "semantics", "stakes", "audience",
+          "decision_spec", "actionability", "causal_assumptions", "human_factors_evidence",
+          "target_population", "setting", "time_horizon", "transport_boundary",
+          "intended_use", "intended_non_use", "prohibited_interpretations",
+          "decision_policy_rationale"
+        ),
+        "ctx$claim"
+      )
       purpose = claim$purpose %||% ctx$purpose %||% "exploratory"
       purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
@@ -50,6 +64,19 @@ Gate7aSubgroups = R6::R6Class(
       decision_claim = isTRUE(claims$decision %||% FALSE)
 
       decision_spec = (claim$decision_spec %||% list())
+      .autoiml_assert_known_names(.autoiml_as_list(decision_spec), c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
+
+      has_content = function(x) {
+        if (is.null(x)) {
+          return(FALSE)
+        }
+        vals = as.character(unlist(x, use.names = FALSE))
+        vals = vals[!is.na(vals)]
+        any(nzchar(trimws(vals)))
+      }
+
+      meas = .autoiml_as_list(ctx$measurement)
+      measurement_invariance_present = isTRUE(has_content(meas$invariance))
 
       # subgroup variables: explicit declaration preferred
       group_vars = ctx$sensitive_features %||% task$col_roles$stratum %||% character()
@@ -57,27 +84,55 @@ Gate7aSubgroups = R6::R6Class(
       group_vars = group_vars[nzchar(group_vars)]
 
       if (length(group_vars) < 1L) {
+        status = if (isTRUE(high_stakes)) "fail" else if (purpose != "exploratory") "warn" else "skip"
+        summary = if (isTRUE(high_stakes)) {
+          "High-stakes use requires declared subgroup variables (ctx$sensitive_features or task stratum roles)."
+        } else {
+          "No subgroup variables declared (ctx$sensitive_features or task stratum roles). Provide subgroup variables to audit heterogeneity and (for decision use) differential consequences."
+        }
+
         return(GateResult$new(
           gate_id = self$id,
           gate_name = self$name,
           pdr = self$pdr,
-          status = if (isTRUE(high_stakes) || purpose != "exploratory") "warn" else "skip",
-          summary = "No subgroup variables declared (ctx$sensitive_features or task stratum roles). Provide subgroup variables to audit heterogeneity and (for decision use) differential consequences.",
-          metrics = NULL
+          status = status,
+          summary = summary,
+          metrics = data.table::data.table(
+            required = isTRUE(high_stakes),
+            provided = FALSE,
+            stakes = stakes,
+            purpose = purpose
+          )
+        ))
+      }
+
+      if (isTRUE(high_stakes) && !isTRUE(measurement_invariance_present)) {
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "fail",
+          summary = "High-stakes subgroup claims require measurement comparability evidence (ctx$measurement$invariance).",
+          metrics = data.table::data.table(
+            required = TRUE,
+            provided = FALSE,
+            measurement_invariance_present = FALSE,
+            stakes = stakes,
+            purpose = purpose
+          )
         ))
       }
 
       pred = ctx$pred
-      in_sample = FALSE
       if (is.null(pred)) {
-        model = ctx$final_model
-        if (is.null(model)) {
-          model = ctx$learner$clone(deep = TRUE)
-          model$train(task)
-          ctx$final_model = model
-        }
-        pred = model$predict(task)
-        in_sample = TRUE
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "fail",
+          summary = "Gate 7A requires prediction artifacts from Gate 1.",
+          metrics = NULL
+        ))
       }
 
       Xg = data.table::as.data.table(task$data(cols = group_vars))
@@ -87,23 +142,22 @@ Gate7aSubgroups = R6::R6Class(
         y = pred$truth
         yhat = pred$response
 
-        out = data.table::rbindlist(lapply(group_vars, function(g) {
+        out = mlr3misc::map_dtr(group_vars, function(g) {
           gg = Xg[[g]]
           levs = unique(gg)
-          data.table::rbindlist(lapply(levs, function(lv) {
+          mlr3misc::map_dtr(levs, function(lv) {
             idx = which(gg == lv)
             data.table::data.table(
               group_var = g,
               group = as.character(lv),
               n = length(idx),
-              rmse = .autoiml_rmse(y[idx], yhat[idx])
+              rmse = sqrt(mean((y[idx] - yhat[idx])^2)) # Direct computation, no wrapper
             )
-          }), fill = TRUE)
-        }), fill = TRUE)
+          }, .fill = TRUE)
+        }, .fill = TRUE)
 
-        status = if (isTRUE(in_sample)) "warn" else "pass"
+        status = "pass"
         summary = "Subgroup audit computed (regression RMSE by group)."
-        if (isTRUE(in_sample)) summary = paste0(summary, " Note: predictions are in-sample.")
 
         return(GateResult$new(
           gate_id = self$id,
@@ -111,7 +165,7 @@ Gate7aSubgroups = R6::R6Class(
           pdr = self$pdr,
           status = status,
           summary = summary,
-          metrics = data.table::data.table(n_groups = nrow(out), n_group_vars = length(group_vars), in_sample = in_sample),
+          metrics = data.table::data.table(n_groups = nrow(out), n_group_vars = length(group_vars)),
           artifacts = list(subgroup = out),
           messages = c("Interpret subgroup differences cautiously: they can reflect sampling variability, construct non-comparability, and/or distribution shift.")
         ))
@@ -138,13 +192,8 @@ Gate7aSubgroups = R6::R6Class(
         p_hat = as.numeric(pred$prob[, pos])
 
         # Utility/cost spec (optional)
-        costs = (decision_spec$costs %||% list())
-        if (is.environment(costs)) costs <- as.list(costs)
-        if (!is.list(costs)) costs <- list()
-
-        utility = (decision_spec$utility %||% list())
-        if (is.environment(utility)) utility <- as.list(utility)
-        if (!is.list(utility)) utility <- list()
+        costs = .autoiml_as_list(decision_spec$costs)
+        utility = .autoiml_as_list(decision_spec$utility)
 
         costs$fp = as.numeric(costs$fp %||% NA_real_)
         costs$fn = as.numeric(costs$fn %||% NA_real_)
@@ -189,10 +238,10 @@ Gate7aSubgroups = R6::R6Class(
         }
 
         # group metrics
-        subgroup = data.table::rbindlist(lapply(group_vars, function(g) {
+        subgroup = mlr3misc::map_dtr(group_vars, function(g) {
           gg = Xg[[g]]
           levs = unique(gg)
-          data.table::rbindlist(lapply(levs, function(lv) {
+          mlr3misc::map_dtr(levs, function(lv) {
             idx = which(gg == lv)
             if (length(idx) < 5L) {
               return(NULL)
@@ -200,8 +249,10 @@ Gate7aSubgroups = R6::R6Class(
 
             cal = .autoiml_calibration_glm(truth01[idx], p_hat[idx])
             ece = .autoiml_ece_binary(truth01[idx], p_hat[idx], bins = 10L)
-            auc = .autoiml_auc(truth01[idx], p_hat[idx])
-            brier = .autoiml_brier(truth01[idx], p_hat[idx])
+            # Use mlr3measures directly for subgroup metrics
+            truth_sub = factor(truth01[idx], levels = c(0L, 1L))
+            auc = mlr3measures::auc(truth_sub, p_hat[idx], positive = "1")
+            brier = mlr3measures::bbrier(truth_sub, p_hat[idx], positive = "1")
             prev = mean(truth01[idx])
 
             out = data.table::data.table(
@@ -234,17 +285,83 @@ Gate7aSubgroups = R6::R6Class(
             }
 
             out
-          }), fill = TRUE)
-        }), fill = TRUE)
+          }, .fill = TRUE)
+        }, .fill = TRUE)
 
-        status = if (isTRUE(in_sample)) "warn" else "pass"
-        if (isTRUE(in_sample)) status <- "warn"
+        status = "pass"
 
         # Flag large subgroup calibration dispersion heuristically
         if (any(is.finite(subgroup$ece) & subgroup$ece > 0.10, na.rm = TRUE)) status <- "warn"
 
         summary = "Subgroup audit computed (binary classification performance + calibration; utility if specified)."
-        if (isTRUE(in_sample)) summary = paste0(summary, " Note: predictions are in-sample.")
+
+        subgroup_expl_stability = NULL
+        if (!is.null(ctx$final_model)) {
+          model = ctx$final_model
+          feat_types = tryCatch(task$feature_types, error = function(e) NULL)
+          num_feats = if (!is.null(feat_types)) {
+            intersect(feat_types$id[feat_types$type %in% c("numeric", "integer")], task$feature_names)
+          } else {
+            character(0)
+          }
+          num_feats = utils::head(num_feats, 3L)
+
+          score_prob = function(y01, p) {
+            y01 = as.integer(y01)
+            if (length(unique(y01)) >= 2L) {
+              yf = factor(y01, levels = c(0L, 1L))
+              return(mlr3measures::auc(yf, p, positive = "1"))
+            }
+            yf = factor(y01, levels = c(0L, 1L))
+            b = mlr3measures::bbrier(yf, p, positive = "1")
+            1 - b
+          }
+
+          expl_rows = list()
+          k = 0L
+
+          for (g in group_vars) {
+            gg = Xg[[g]]
+            levs = unique(gg)
+            for (lv in levs) {
+              idx = which(gg == lv)
+              if (length(idx) < 10L) next
+
+              Xsub = task$data(rows = pred$row_ids[idx], cols = task$feature_names)
+              ysub = truth01[idx]
+              psub = as.numeric(model$predict_newdata(Xsub)$prob[, pos])
+              base = score_prob(ysub, psub)
+
+              for (f in num_feats) {
+                Xperm = data.table::as.data.table(Xsub)
+                Xperm[[f]] = sample(Xperm[[f]])
+                pperm = as.numeric(model$predict_newdata(Xperm)$prob[, pos])
+                sperm = score_prob(ysub, pperm)
+
+                k = k + 1L
+                expl_rows[[k]] = data.table::data.table(
+                  group_var = g,
+                  group = as.character(lv),
+                  feature = f,
+                  importance = base - sperm
+                )
+              }
+            }
+          }
+
+          if (length(expl_rows) > 0L) {
+            subgroup_expl_stability = data.table::rbindlist(expl_rows, fill = TRUE)
+          }
+        }
+
+        expl_stability_summary = if (!is.null(subgroup_expl_stability) && nrow(subgroup_expl_stability) > 0L) {
+          subgroup_expl_stability[, .(
+            importance_mean = mean(importance, na.rm = TRUE),
+            importance_sd_across_groups = stats::sd(importance, na.rm = TRUE)
+          ), by = feature][order(-importance_mean)]
+        } else {
+          data.table::data.table()
+        }
 
         msgs = c(
           "If subgroup gaps are observed, consider (i) measurement non-comparability, (ii) differential missingness, (iii) label shift, (iv) model misspecification, and (v) decision policy differences."
@@ -264,9 +381,14 @@ Gate7aSubgroups = R6::R6Class(
             n_rows = task$nrow,
             utility_spec = utility_spec,
             thr_use = thr_use,
-            in_sample = in_sample
+            measurement_invariance_present = measurement_invariance_present,
+            explanation_stability_available = nrow(expl_stability_summary) > 0L
           ),
-          artifacts = list(subgroup = subgroup),
+          artifacts = list(
+            subgroup = subgroup,
+            subgroup_explanation_stability = subgroup_expl_stability,
+            subgroup_explanation_stability_summary = expl_stability_summary
+          ),
           messages = msgs
         ))
       }
@@ -275,27 +397,27 @@ Gate7aSubgroups = R6::R6Class(
       prob = .autoiml_pred_prob_matrix(pred, task)
       truth = pred$truth
 
-      subgroup = data.table::rbindlist(lapply(group_vars, function(g) {
+      subgroup = mlr3misc::map_dtr(group_vars, function(g) {
         gg = Xg[[g]]
         levs = unique(gg)
-        data.table::rbindlist(lapply(levs, function(lv) {
+        mlr3misc::map_dtr(levs, function(lv) {
           idx = which(gg == lv)
           if (length(idx) < 5L) {
             return(NULL)
           }
+          # Use mlr3measures directly for subgroup metrics
           data.table::data.table(
             group_var = g,
             group = as.character(lv),
             n = length(idx),
-            logloss = .autoiml_logloss_multiclass(truth[idx], prob[idx, , drop = FALSE]),
-            mbrier = .autoiml_mbrier(truth[idx], prob[idx, , drop = FALSE])
+            logloss = mlr3measures::logloss(truth[idx], prob[idx, , drop = FALSE]),
+            mbrier = mlr3measures::mbrier(truth[idx], prob[idx, , drop = FALSE])
           )
-        }), fill = TRUE)
-      }), fill = TRUE)
+        }, .fill = TRUE)
+      }, .fill = TRUE)
 
-      status = if (isTRUE(in_sample)) "warn" else "pass"
+      status = "pass"
       summary = "Subgroup audit computed (multiclass logloss/mbrier by group)."
-      if (isTRUE(in_sample)) summary = paste0(summary, " Note: predictions are in-sample.")
 
       GateResult$new(
         gate_id = self$id,
@@ -303,8 +425,16 @@ Gate7aSubgroups = R6::R6Class(
         pdr = self$pdr,
         status = status,
         summary = summary,
-        metrics = data.table::data.table(n_group_vars = length(group_vars), in_sample = in_sample),
-        artifacts = list(subgroup = subgroup),
+        metrics = data.table::data.table(
+          n_group_vars = length(group_vars),
+          measurement_invariance_present = measurement_invariance_present,
+          explanation_stability_available = FALSE
+        ),
+        artifacts = list(
+          subgroup = subgroup,
+          subgroup_explanation_stability = data.table::data.table(),
+          subgroup_explanation_stability_summary = data.table::data.table()
+        ),
         messages = c("Subgroup audit is descriptive: confirm whether measurement/comparability assumptions hold before attributing subgroup differences to substantive effects.")
       )
     }

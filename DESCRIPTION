@@ -1,9 +1,9 @@
 Package: mlr3autoiml
 Type: Package
 Title: Automated Gate-Based Auditing for Interpretable Machine Learning in 'mlr3'
-Version: 0.0.1
+Version: 0.0.3
 Authors@R: c(
-    person("Stefan", "Coors", role = c("aut","cre")),
+    person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
     person("Jonas", "Hauck", role = "aut"),
     person("Bernd", "Bischl", role = "aut"),
@@ -13,7 +13,7 @@ Description: Implements a gate-based AutoIML workflow (G0A/G0B, G1-G6, G7A/G7B) 
     Produces task- and data-dependent interpretability artifacts (ALE/ICE, interaction screening,
     calibration and decision utility incl. OVR for multiclass, faithfulness and stability checks,
     multiplicity and subgroup audits) with minimal dependencies.
-License: LGPL-3
+License: LGPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
@@ -23,6 +23,7 @@ Imports:
     R6,
     data.table,
     checkmate,
+    yaml,
     mlr3,
     mlr3misc,
     mlr3measures
@@ -30,13 +31,19 @@ Suggests:
     mlr3pipelines,
     mlr3learners,
     mlr3viz,
+    rpart,
+    iml,
+    lgr,
     ggplot2,
     ggforce,
     patchwork,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),
-    withr
+    withr,
+    future,
+    future.apply
+VignetteBuilder: knitr
 Config/testthat/edition: 3
 URL: https://github.com/coorsaa/mlr3autoiml, https://github.com/mlr-org/mlr3, https://mlr3.mlr-org.com
 BugReports: https://github.com/coorsaa/mlr3autoiml/issues

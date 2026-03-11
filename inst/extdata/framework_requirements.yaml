@@ -1,0 +1,137 @@
+version: 0.1.0
+updated: 2026-03-09
+requirements:
+  - id: G0A-CLAIM-SCOPE-001
+    gate: G0A
+    requirement_text: Claim card must declare claim scope (global/local/decision), semantics, audience, and stakes.
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability:
+      purpose: [exploratory, global_insight, decision_support, deployment]
+    artifact_fields: [claim, claim_card, purpose, claim_global, claim_local, claim_decision, semantics, audience, stakes]
+    tests_required: [T-G0A-001]
+
+  - id: G0A-DECISION-SPEC-002
+    gate: G0A
+    requirement_text: Decision-scoped claims must provide thresholds and utility/cost assumptions or an explicit warning/restriction.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability:
+      claims_decision: true
+    artifact_fields: [decision_spec, n_thresholds, has_utility]
+    tests_required: [T-G0A-002]
+
+  - id: G0A-CAUSAL-HARDSTOP-003
+    gate: G0A
+    requirement_text: Causal/recourse semantics require assumptions and actionability; if unsupported by workflow, trigger hard-stop safeguards.
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability:
+      semantics: [causal_recourse]
+    artifact_fields: [hard_stop, hard_stop_reason, has_actionability]
+    tests_required: [T-G0A-003]
+
+  - id: G0B-MEASUREMENT-001
+    gate: G0B
+    requirement_text: Measurement level, reliability, and comparability evidence must be screened before strong interpretation claims.
+    evidence_type: user_provided
+    severity_if_missing: warn
+    applicability:
+      purpose: [global_insight, decision_support, deployment]
+    artifact_fields: [measurement_level, has_reliability, has_invariance, has_groups]
+    tests_required: [T-G0B-001]
+
+  - id: G1-VALIDITY-001
+    gate: G1
+    requirement_text: Predictive adequacy must be established with honest resampling and out-of-sample metrics.
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability: {}
+    artifact_fields: [scores, rr]
+    tests_required: [T-G1-001]
+
+  - id: G2-SEMANTICS-SUPPORT-001
+    gate: G2
+    requirement_text: Global structure summaries must be semantics-labeled and accompanied by dependence/support diagnostics.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability: {}
+    artifact_fields: [semantics, recommendation, pd_curves, ale_curves, hstats]
+    tests_required: [T-G2-001]
+
+  - id: G3-CAL-UTILITY-001
+    gate: G3
+    requirement_text: Decision claims require calibration and utility/net-benefit evidence over relevant thresholds.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability:
+      claims_decision: true
+    artifact_fields: [reliability, dca, utility_curve, utility_spec]
+    tests_required: [T-G3-001]
+
+  - id: G4-FAITHFULNESS-001
+    gate: G4
+    requirement_text: Local/regional claims require faithfulness diagnostics aligned to declared semantics.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability:
+      claims_any: [local, decision]
+    artifact_fields: [shap_check, local_interaction_check, semantics, shap_mode]
+    tests_required: [T-G4-001]
+
+  - id: G5-STABILITY-001
+    gate: G5
+    requirement_text: Explanation stability under perturbation/resampling must be quantified.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability: {}
+    artifact_fields: [perm_importance, perm_importance_raw, any_unstable]
+    tests_required: [T-G5-001]
+
+  - id: G6-MULTIPLICITY-001
+    gate: G6
+    requirement_text: Multiplicity and transport should be probed, with explicit partial-coverage reporting when unavailable.
+    evidence_type: computed
+    severity_if_missing: warn
+    applicability:
+      purpose: [global_insight, decision_support, deployment]
+    artifact_fields: [alt_learner_performance, rashomon_set, group_performance, multiplicity_assessed, transport_assessed]
+    tests_required: [T-G6-001]
+
+  - id: G7A-SUBGROUPS-001
+    gate: G7A
+    requirement_text: Subgroup performance/calibration evidence must be produced (or explicitly fail for high-stakes contexts without subgroup declarations).
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability:
+      stakes: [high]
+    artifact_fields: [subgroup, n_group_vars]
+    tests_required: [T-G7A-001]
+
+  - id: G7B-HUMAN-001
+    gate: G7B
+    requirement_text: High-stakes audience-facing claims require external human-factors evidence metadata.
+    evidence_type: external_study
+    severity_if_missing: fail
+    applicability:
+      stakes: [high]
+    artifact_fields: [required, provided, human_factors_evidence]
+    tests_required: [T-G7B-001]
+
+  - id: IEL-CLAIM-SCOPED-001
+    gate: IEL
+    requirement_text: IEL must be claim-scoped (G/L/D) and conservative overall.
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability: {}
+    artifact_fields: [overall, global, local, decision, requested]
+    tests_required: [T-IEL-001]
+
+  - id: REPORT-CARD-001
+    gate: REPORT
+    requirement_text: Report card must expose gate status and claim-scoped IEL fields.
+    evidence_type: computed
+    severity_if_missing: fail
+    applicability: {}
+    artifact_fields: [gate_id, gate_name, pdr, status, summary, iel_overall, iel_global, iel_local, iel_decision]
+    tests_required: [T-REPORT-001]

@@ -18,6 +18,15 @@ test_that("Gate 2 produces expected artifacts and recommendations", {
   a = g2$artifacts
   expect_true(is.list(a))
   expect_true(all(c("pd_curves", "ice_curves", "ale_curves", "ice_spread", "hstats", "max_cor_pair") %in% names(a)))
+  if (!is.null(a$pd_curves) && data.table::is.data.table(a$pd_curves) && nrow(a$pd_curves) > 0L) {
+    expect_true("semantics_label" %in% names(a$pd_curves))
+  }
+  if (!is.null(a$ale_curves) && data.table::is.data.table(a$ale_curves) && nrow(a$ale_curves) > 0L) {
+    expect_true("semantics_label" %in% names(a$ale_curves))
+  }
+  if (!is.null(a$support_check) && data.table::is.data.table(a$support_check) && nrow(a$support_check) > 0L) {
+    expect_true(all(c("semantics_label", "support_ratio_threshold", "support_diag_available") %in% names(a$support_check)))
+  }
 
   # tables helper should include a non-empty recommendation table if artifacts$recommendation exists
   tabs = mlr3autoiml::gate2_tables(result)

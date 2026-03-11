@@ -13,9 +13,9 @@ The framework distinguishes three semantics families:
 \section{Semantics}{
 
 \describe{
-\item{Associational / on-manifold (descriptive)}{Summarize patterns along the empirical
+\item{Within-support associational (on-manifold / descriptive)}{Summarize patterns along the empirical
 joint distribution (do not interpret as interventions).}
-\item{Marginal what-if (model-based, non-causal)}{"What would the model predict if we set X_j = x?",
+\item{Marginal model query (model-based, non-causal)}{"What would the model predict if we set X_j = x?",
 which may break empirical dependence and requires explicit support / off-manifold diagnostics.}
 \item{Causal / recourse (intervention / action)}{Requires explicit causal assumptions and an action-set
 (mutable features, constraints, costs). This package does \strong{not} implement causal identification;

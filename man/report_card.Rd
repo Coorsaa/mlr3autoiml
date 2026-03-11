@@ -7,16 +7,16 @@
 report_card(x)
 }
 \arguments{
-\item{x}{(\link{AutoIMLResult} | \link{AutoIML})\cr
+\item{x}{(\link{AutoIMLResult} | \link{AutoIML})
 A completed result or an AutoIML runner.}
 }
 \value{
 A \link[data.table:data.table]{data.table::data.table} with one row per gate.
 }
 \description{
-Create a compact, audit-trail style report card (one row per gate) from an
+Create a compact, audit-ready report card (one row per gate) from an
 \link{AutoIMLResult}.
 
 The report card includes the gate status, a short summary, and the achieved
-\strong{claim-scoped Interpretation Readiness Levels (IRL)}.
+\strong{claim-scoped Interpretation Evidence Levels (IEL)}.
 }

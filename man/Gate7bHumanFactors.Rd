@@ -5,13 +5,14 @@
 \title{Gate 7B: Human-Factors Evaluation (Decision Support)}
 \description{
 Explanations can change users' beliefs and decisions in unintended ways.
-This gate does not "run" a user study; it flags when human-factors evaluation
-is warranted and provides a lightweight checklist.
+This gate does not "run" a user study; it validates whether explicit
+human-factors evidence is provided for high-stakes decision/deployment claims
+and provides a checklist for expected evidence elements.
 }
 \section{When Triggered}{
 
-The gate triggers a warning for high-stakes or decision-support purposes,
-recommending formal human-factors evaluation.
+For high-stakes or decision/deployment claims, this gate requires explicit
+\code{human_factors_evidence} (in \code{ctx$claim} or \code{ctx}). If missing, status is \code{fail}.
 }
 
 \section{Recommended Evaluation Tasks}{

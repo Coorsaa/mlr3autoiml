@@ -1,0 +1,65 @@
+version: 0.1.0
+updated: 2026-03-09
+levels: [IEL-0, IEL-1, IEL-2, IEL-3]
+scopes: [global, local, decision]
+
+rules:
+  - id: IEL-GLOBAL-1
+    scope: global
+    level: IEL-1
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G5, G7A]
+
+  - id: IEL-GLOBAL-2
+    scope: global
+    level: IEL-2
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G5, G6, G7A]
+
+  - id: IEL-GLOBAL-3
+    scope: global
+    level: IEL-3
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G5, G6, G7A, G7B]
+    conditions:
+      high_stakes: true
+
+  - id: IEL-LOCAL-1
+    scope: local
+    level: IEL-1
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G4, G5, G7A]
+
+  - id: IEL-LOCAL-2
+    scope: local
+    level: IEL-2
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7A]
+
+  - id: IEL-LOCAL-3
+    scope: local
+    level: IEL-3
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7A, G7B]
+    conditions:
+      high_stakes: true
+
+  - id: IEL-DECISION-1
+    scope: decision
+    level: IEL-1
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G3, G7A]
+
+  - id: IEL-DECISION-2
+    scope: decision
+    level: IEL-2
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G3, G4, G5, G7A]
+
+  - id: IEL-DECISION-3
+    scope: decision
+    level: IEL-3
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G3, G4, G5, G6, G7A, G7B]
+    conditions:
+      high_stakes: true

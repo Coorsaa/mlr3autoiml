@@ -27,31 +27,30 @@ NULL
     return(NULL)
   }
 
-  dt = gr$artifacts$alt_learner_performance
-  if (is.null(dt) || nrow(dt) == 0L) {
+  perf_dt = gr$artifacts$alt_learner_performance
+  if (is.null(perf_dt) || nrow(perf_dt) == 0L) {
     return(NULL)
   }
 
-  dt = data.table::as.data.table(dt)
-  measure_id = unique(dt$measure_id)[1L]
+  measure_id = unique(perf_dt$measure_id)[1L]
   minimize = tryCatch(mlr3::msr(measure_id)$minimize, error = function(e) TRUE)
 
   rash = gr$artifacts$rashomon_set
   if (!is.null(rash) && nrow(rash) > 0L) {
-    dt[, in_rashomon := learner_id %in% rash$learner_id]
+    perf_dt[, in_rashomon := learner_id %in% rash$learner_id]
   } else {
-    dt[, in_rashomon := FALSE]
+    perf_dt[, in_rashomon := FALSE]
   }
 
-  ord = if (minimize) order(dt$mean, decreasing = FALSE) else order(dt$mean, decreasing = TRUE)
-  dt[, learner_id := factor(learner_id, levels = dt$learner_id[ord])]
+  ord = if (minimize) order(perf_dt$mean, decreasing = FALSE) else order(perf_dt$mean, decreasing = TRUE)
+  perf_dt[, learner_id := factor(learner_id, levels = perf_dt$learner_id[ord])]
 
-  ggplot2::ggplot(dt, ggplot2::aes(x = mean, y = learner_id)) +
+  ggplot2::ggplot(perf_dt, ggplot2::aes(x = mean, y = learner_id)) +
     ggplot2::geom_errorbarh(ggplot2::aes(xmin = ci_low, xmax = ci_high)) +
     ggplot2::geom_point(ggplot2::aes(shape = in_rashomon), size = 2) +
     ggplot2::labs(
       title = "Gate 6: Alternative learner performance",
-      x = sprintf("%s (mean ± ~95%% CI)", measure_id),
+      x = sprintf("%s (mean +/- ~95%% CI)", measure_id),
       y = "Learner"
     )
 }
@@ -115,7 +114,7 @@ NULL
     ggplot2::facet_wrap(~learner_id, scales = "free_x") +
     ggplot2::labs(
       title = "Gate 6: Rashomon explanation dispersion (permutation importance)",
-      x = "Permutation importance (Δ in primary measure; positive = worse after permutation)",
+      x = "Permutation importance (change in primary measure; positive = worse after permutation)",
       y = "Feature"
     )
 }

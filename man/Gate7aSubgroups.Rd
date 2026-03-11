@@ -13,6 +13,9 @@ might generalize to people/groups. This gate assesses:
 
 The gate operates on \emph{declared} subgroup variables (e.g., \code{ctx$sensitive_features})
 or \code{task$col_roles$stratum}.
+
+For high-stakes decision/deployment contexts, missing subgroup declarations are
+treated as a hard evidentiary failure.
 }
 \section{Binary Classification}{
 
