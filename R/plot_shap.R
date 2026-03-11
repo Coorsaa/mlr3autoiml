@@ -124,7 +124,7 @@ NULL
     fx = as.numeric(pred_mat[1L, 1L])
   }
 
-  # Baseline: E[f(X)] ≈ f(x) - Σ phi  (sampling noise possible)
+  # Baseline: E[f(X)] ~= f(x) - sum(phi)  (sampling noise possible)
   phi_total = sum(dt$phi, na.rm = TRUE)
   base_value = fx - phi_total
 
@@ -146,9 +146,9 @@ NULL
   dt[, x_lab := sprintf("%+.3f", phi)]
   dt[, hjust := ifelse(phi >= 0, -0.1, 1.1)]
 
-  ttl = if (!is.null(cl)) sprintf("SHAP waterfall – %s", cl) else "SHAP waterfall"
+  ttl = if (!is.null(cl)) sprintf("SHAP waterfall - %s", cl) else "SHAP waterfall"
   subt = sprintf(
-    "E[f(X)] ≈ %.4f  |  f(x) = %.4f  |  ΣSHAP = %.4f  |  row_id = %s",
+    "E[f(X)] ~= %.4f  |  f(x) = %.4f  |  sum(SHAP) = %.4f  |  row_id = %s",
     base_value, fx, phi_total, as.character(row_id)
   )
 

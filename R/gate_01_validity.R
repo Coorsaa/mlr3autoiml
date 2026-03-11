@@ -34,6 +34,8 @@ Gate1Validity = R6::R6Class(
       task = ctx$task
       learner = ctx$learner$clone(deep = TRUE)
       resampling = ctx$resampling$clone(deep = TRUE)
+      validation_cfg = .autoiml_as_list(ctx$validation)
+      .autoiml_assert_known_names(validation_cfg, c("split_policy", "cluster_var", "time_var", "site_var"), "ctx$validation")
 
       preflight_msgs = character()
 
@@ -73,7 +75,7 @@ Gate1Validity = R6::R6Class(
         }
       }
 
-      if (!is.null(ctx$seed)) set.seed(ctx$seed)
+      if (!is.null(ctx$seed)) set.seed(.autoiml_gate_seed(ctx, self$id))
 
       # instantiate resampling (important for reproducibility)
       resampling$instantiate(task)
@@ -88,6 +90,53 @@ Gate1Validity = R6::R6Class(
       agg = rr$aggregate(measures)
       agg_dt = private$agg_to_dt(agg)
       pred = rr$prediction(predict_sets = "test")
+
+      measure_ids = vapply(measures, function(m) m$id, character(1L))
+      metric_cols = intersect(measure_ids, names(scores))
+      uncertainty = if (length(metric_cols) > 0L) {
+        data.table::rbindlist(lapply(metric_cols, function(mid) {
+          vals = as.numeric(scores[[mid]])
+          vals = vals[is.finite(vals)]
+          if (length(vals) < 1L) {
+            return(data.table::data.table(
+              measure_id = mid,
+              n = 0L,
+              mean = NA_real_,
+              sd = NA_real_,
+              se = NA_real_,
+              ci_low = NA_real_,
+              ci_high = NA_real_
+            ))
+          }
+          n = length(vals)
+          m = mean(vals)
+          s = if (n > 1L) stats::sd(vals) else NA_real_
+          se = if (n > 1L) s / sqrt(n) else NA_real_
+          tcrit = if (n > 1L) stats::qt(0.975, df = n - 1L) else NA_real_
+          ci = if (n > 1L && is.finite(se) && is.finite(tcrit)) tcrit * se else NA_real_
+          data.table::data.table(
+            measure_id = mid,
+            n = n,
+            mean = m,
+            sd = s,
+            se = se,
+            ci_low = if (is.finite(ci)) m - ci else NA_real_,
+            ci_high = if (is.finite(ci)) m + ci else NA_real_
+          )
+        }), fill = TRUE)
+      } else {
+        data.table::data.table()
+      }
+
+      split_policy = as.character(validation_cfg$split_policy %||% "resampling")
+      leakage_checklist = data.table::data.table(
+        split_policy = split_policy,
+        has_cluster_var = isTRUE(!is.null(validation_cfg$cluster_var) && nzchar(as.character(validation_cfg$cluster_var)[1L])),
+        has_time_var = isTRUE(!is.null(validation_cfg$time_var) && nzchar(as.character(validation_cfg$time_var)[1L])),
+        has_site_var = isTRUE(!is.null(validation_cfg$site_var) && nzchar(as.character(validation_cfg$site_var)[1L])),
+        preprocessing_nested = TRUE,
+        oof_predictions_available = !is.null(pred)
+      )
 
       # baseline: featureless learner if available
       baseline_msg = NULL
@@ -162,7 +211,17 @@ Gate1Validity = R6::R6Class(
         status = status,
         summary = summ,
         metrics = metrics,
-        artifacts = list(scores = scores, rr = rr),
+        artifacts = list(
+          scores = scores,
+          rr = rr,
+          uncertainty = uncertainty,
+          leakage_checklist = leakage_checklist,
+          validation_design = data.table::data.table(
+            resampling_id = resampling$id,
+            split_policy = split_policy,
+            n_splits = rr$iters
+          )
+        ),
         messages = c(baseline_msg, preflight_msgs)
       )
     }

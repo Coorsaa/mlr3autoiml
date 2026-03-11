@@ -40,25 +40,22 @@ Gate3Calibration = R6::R6Class(
       task = ctx$task
       purpose = ctx$purpose %||% "exploratory"
       cfg = ctx$calibration %||% list()
+      .autoiml_assert_known_names(cfg, c("thresholds", "bins"), "ctx$calibration")
 
       claim = ctx$claim %||% list()
       claims = (claim$claims %||% list())
       decision_claim = isTRUE(claims$decision %||% FALSE)
 
       decision_spec = (claim$decision_spec %||% list())
+      .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
       claim_thr = decision_spec$thresholds %||% NULL
       thresholds = claim_thr %||% cfg$thresholds %||% seq(0.01, 0.99, by = 0.01)
 
       bins = as.integer(cfg$bins %||% 10L)
 
       # Utility / cost specification (optional but expected for decision support)
-      costs = decision_spec$costs %||% list()
-      if (is.environment(costs)) costs <- as.list(costs)
-      if (!is.list(costs)) costs <- list()
-
-      utility = decision_spec$utility %||% list()
-      if (is.environment(utility)) utility <- as.list(utility)
-      if (!is.list(utility)) utility <- list()
+      costs = .autoiml_as_list(decision_spec$costs)
+      utility = .autoiml_as_list(decision_spec$utility)
 
       # normalize missing entries
       costs$tp = as.numeric(costs$tp %||% 0)
@@ -76,19 +73,29 @@ Gate3Calibration = R6::R6Class(
 
       utility_spec = if (isTRUE(has_utility)) "utility" else if (isTRUE(has_costs)) "costs" else "none"
 
-      pred = ctx$pred
-      in_sample = FALSE
+      thr_num = suppressWarnings(as.numeric(thresholds))
+      thr_num = thr_num[is.finite(thr_num) & thr_num > 0 & thr_num < 1]
+      thr_num = sort(unique(thr_num))
+      decision_range = data.table::data.table(
+        decision_claim = isTRUE(decision_claim),
+        utility_spec = utility_spec,
+        n_thresholds = length(thr_num),
+        thr_min = if (length(thr_num) > 0L) min(thr_num) else NA_real_,
+        thr_max = if (length(thr_num) > 0L) max(thr_num) else NA_real_
+      )
 
-      # fallback if Gate 1 didn't store oof predictions
+      pred = ctx$pred
       if (is.null(pred)) {
-        model = ctx$final_model
-        if (is.null(model)) {
-          model = ctx$learner$clone(deep = TRUE)
-          model$train(task)
-          ctx$final_model = model
-        }
-        pred = model$predict(task)
-        in_sample = TRUE
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "fail",
+          summary = "Gate 3 requires out-of-fold predictions from Gate 1.",
+          metrics = NULL,
+          artifacts = list(),
+          messages = c("Run Gate 1 validity before calibration/decision utility diagnostics.")
+        ))
       }
 
       # --------------------------------------------------------------------
@@ -96,19 +103,15 @@ Gate3Calibration = R6::R6Class(
       if (inherits(task, "TaskRegr")) {
         y = pred$truth
         yhat = pred$response
-        rmse = .autoiml_rmse(y, yhat)
+        # Use mlr3 Prediction scoring directly
+        rmse = pred$score(mlr3::msr("regr.rmse"))
 
-        status = if (isTRUE(in_sample)) "warn" else "pass"
-        summary = if (isTRUE(in_sample)) {
-          "Regression: basic error metrics computed on in-sample predictions (no OOF predictions available)."
-        } else {
-          "Regression: basic error metrics computed (calibration/utility mainly relevant for probabilistic forecasts)."
-        }
+        status = "pass"
+        summary = "Regression: basic error metrics computed (calibration/utility mainly relevant for probabilistic forecasts)."
 
         metrics = data.table::data.table(
           rmse = rmse,
-          n = length(y),
-          in_sample = in_sample
+          n = length(y)
         )
 
         return(GateResult$new(
@@ -145,9 +148,11 @@ Gate3Calibration = R6::R6Class(
 
         cal = .autoiml_calibration_glm(truth01, p_hat)
         ece = .autoiml_ece_binary(truth01, p_hat, bins = bins)
-        brier = .autoiml_brier(truth01, p_hat)
-        ll = .autoiml_logloss(truth01, p_hat)
-        auc = .autoiml_auc(truth01, p_hat)
+
+        # Use mlr3 Prediction scoring directly for standard metrics
+        brier = pred$score(mlr3::msr("classif.bbrier"))
+        ll = pred$score(mlr3::msr("classif.logloss"))
+        auc = pred$score(mlr3::msr("classif.auc"))
 
         rel = .autoiml_reliability_curve_binary(truth01, p_hat, bins = bins)
         dca = .autoiml_dca(truth01, p_hat, thresholds = thresholds)
@@ -166,7 +171,7 @@ Gate3Calibration = R6::R6Class(
 
         if (length(thr) >= 1L && (utility_spec != "none")) {
           n = length(truth01)
-          util_curve = data.table::rbindlist(lapply(thr, function(t) {
+          util_curve = mlr3misc::map_dtr(thr, function(t) {
             yhat = as.integer(p_hat >= t)
             tp = sum(yhat == 1L & truth01 == 1L)
             fp = sum(yhat == 1L & truth01 == 0L)
@@ -188,7 +193,7 @@ Gate3Calibration = R6::R6Class(
               out[, expected_utility := util_total / n]
             }
             out
-          }), fill = TRUE)
+          }, .fill = TRUE)
 
           if (utility_spec == "costs") {
             best = util_curve[which.min(expected_cost)][1L]
@@ -203,7 +208,6 @@ Gate3Calibration = R6::R6Class(
 
         # Heuristic gate decision
         status = "pass"
-        if (isTRUE(in_sample)) status <- "warn"
 
         # calibration concern heuristics
         if (is.finite(ece) && ece > 0.10) status <- "warn"
@@ -217,10 +221,6 @@ Gate3Calibration = R6::R6Class(
         }
 
         summary = "Binary calibration/utility checks computed (intercept/slope, ECE, reliability, net benefit, cost-/utility sweep)."
-        if (isTRUE(in_sample)) {
-          summary = paste0(summary, " Note: predictions are in-sample (no OOF predictions available).")
-        }
-
         metrics = data.table::data.table(
           task_type = "classif",
           nclass = nclass,
@@ -233,8 +233,7 @@ Gate3Calibration = R6::R6Class(
           cal_slope = cal$slope,
           utility_spec = utility_spec,
           opt_threshold = thr_opt,
-          opt_value = thr_opt_value,
-          in_sample = in_sample
+          opt_value = thr_opt_value
         )
 
         return(GateResult$new(
@@ -248,7 +247,8 @@ Gate3Calibration = R6::R6Class(
             reliability = rel,
             dca = dca,
             utility_curve = util_curve,
-            utility_spec = list(costs = costs, utility = utility, type = utility_spec)
+            utility_spec = list(costs = costs, utility = utility, type = utility_spec),
+            decision_range = decision_range
           ),
           messages = c(
             msgs,
@@ -262,18 +262,22 @@ Gate3Calibration = R6::R6Class(
       prob = .autoiml_pred_prob_matrix(pred, task)
       truth = pred$truth
 
-      overall_logloss = .autoiml_logloss_multiclass(truth, prob)
-      overall_mbrier = .autoiml_mbrier(truth, prob)
+      # Use mlr3 Prediction scoring for overall metrics
+      overall_logloss = pred$score(mlr3::msr("classif.logloss"))
+      overall_mbrier = pred$score(mlr3::msr("classif.mbrier"))
 
+      # Per-class one-vs-rest metrics (need manual computation for OvR AUC etc.)
       per_class = lapply(task$class_names, function(cl) {
         truth01 = as.integer(truth == cl)
         p_hat = as.numeric(prob[, cl])
 
         cal = .autoiml_calibration_glm(truth01, p_hat)
         ece = .autoiml_ece_binary(truth01, p_hat, bins = bins)
-        auc = .autoiml_auc(truth01, p_hat)
-        brier = .autoiml_brier(truth01, p_hat)
-        ll = .autoiml_logloss(truth01, p_hat)
+        # One-vs-rest AUC/Brier need custom computation (mlr3 doesn't provide OvR directly)
+        truth_factor = factor(truth01, levels = c(0L, 1L))
+        auc = mlr3measures::auc(truth_factor, p_hat, positive = "1")
+        brier = mlr3measures::bbrier(truth_factor, p_hat, positive = "1")
+        ll = mlr3measures::logloss(truth_factor, cbind("0" = 1 - p_hat, "1" = p_hat))
         prev = mean(truth01)
 
         rel = .autoiml_reliability_curve_binary(truth01, p_hat, bins = bins)
@@ -297,7 +301,7 @@ Gate3Calibration = R6::R6Class(
         )
       })
 
-      per_class_metrics = data.table::rbindlist(lapply(per_class, `[[`, "metrics"), fill = TRUE)
+      per_class_metrics = mlr3misc::map_dtr(per_class, `[[`, "metrics", .fill = TRUE)
       rel_list = setNames(lapply(seq_along(per_class), function(i) per_class[[i]]$reliability), task$class_names)
       dca_list = setNames(lapply(seq_along(per_class), function(i) per_class[[i]]$dca), task$class_names)
 
@@ -305,7 +309,6 @@ Gate3Calibration = R6::R6Class(
       slope_rng = range(per_class_metrics$cal_slope, na.rm = TRUE)
 
       status = "pass"
-      if (isTRUE(in_sample)) status <- "warn"
       if (is.finite(max_ece) && max_ece > 0.10) status <- "warn"
       if (all(is.finite(slope_rng)) && (slope_rng[1] < 0.7 || slope_rng[2] > 1.3)) status <- "warn"
 
@@ -316,9 +319,6 @@ Gate3Calibration = R6::R6Class(
       }
 
       summary = "Multiclass classification: one-vs-rest calibration and decision-utility checks computed per class."
-      if (isTRUE(in_sample)) {
-        summary = paste0(summary, " Note: predictions are in-sample (no OOF predictions available).")
-      }
 
       metrics = data.table::data.table(
         task_type = "classif",
@@ -328,8 +328,7 @@ Gate3Calibration = R6::R6Class(
         max_ece_ovr = max_ece,
         slope_min = slope_rng[1],
         slope_max = slope_rng[2],
-        utility_spec = utility_spec,
-        in_sample = in_sample
+        utility_spec = utility_spec
       )
 
       GateResult$new(
@@ -343,7 +342,8 @@ Gate3Calibration = R6::R6Class(
           per_class = per_class_metrics,
           reliability = rel_list,
           dca = dca_list,
-          utility_spec = list(costs = costs, utility = utility, type = utility_spec)
+          utility_spec = list(costs = costs, utility = utility, type = utility_spec),
+          decision_range = decision_range
         ),
         messages = c(
           msgs,

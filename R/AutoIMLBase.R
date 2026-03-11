@@ -171,7 +171,11 @@ AutoIML = R6::R6Class(
         summary = character()
       )
 
-      self$gates = private$default_gates(purpose = purpose, quick_start = quick_start)
+      self$gates = private$gate_plan_from_claim(
+        claim = self$ctx$claim,
+        purpose = purpose,
+        quick_start = quick_start
+      )
     },
 
     # ---- execution -------------------------------------------------------
@@ -202,80 +206,62 @@ AutoIML = R6::R6Class(
       # Strict config validation (early fail)
       .autoiml_validate_ctx(ctx)
 
+      self$gates = private$gate_plan_from_claim(
+        claim = ctx$claim,
+        purpose = ctx$purpose,
+        quick_start = ctx$quick_start
+      )
+
       gate_results = list()
       timings = numeric(0)
-
-      t0 = proc.time()[3]
+      run_log = data.table::data.table(
+        gate_id = character(),
+        gate_name = character(),
+        status = character(),
+        elapsed_sec = numeric(),
+        summary = character()
+      )
 
       for (i in seq_along(self$gates)) {
 
         gate_obj = self$gates[[i]]
-        gstart = proc.time()[3]
-
-        if (isTRUE(ctx$hard_stop) && !(gate_obj$id %in% c("G0A", "G0B"))) {
-          gr = GateResult$new(
-            gate_id = gate_obj$id,
-            gate_name = gate_obj$name,
-            pdr = gate_obj$pdr,
-            status = "skip",
-            summary = paste0("Skipped due to hard stop in Gate 0: ", ctx$hard_stop_reason %||% "No reason provided."),
-            metrics = NULL,
-            artifacts = list(),
-            messages = character()
-          )
-        } else {
-          gr = tryCatch(
-            gate_obj$run(ctx),
-            error = function(e) {
-              GateResult$new(
-                gate_id = gate_obj$id,
-                gate_name = gate_obj$name,
-                pdr = gate_obj$pdr,
-                status = "error",
-                summary = paste0("Gate failed with error: ", conditionMessage(e)),
-                metrics = NULL,
-                artifacts = list(),
-                messages = character()
-              )
-            }
-          )
-        }
+        out = private$execute_gate(gate_obj = gate_obj, ctx = ctx)
+        gr = out$result
 
         gate_results[[i]] = gr
         names(gate_results)[[i]] = gate_obj$id
 
-        gend = proc.time()[3]
-        timings[[gate_obj$id]] = gend - gstart
+        timings[[gate_obj$id]] = out$elapsed
+        run_log = data.table::rbindlist(list(
+          run_log,
+          data.table::data.table(
+            gate_id = gr$gate_id,
+            gate_name = gr$gate_name,
+            status = gr$status,
+            elapsed_sec = out$elapsed,
+            summary = gr$summary %||% NA_character_
+          )
+        ), fill = TRUE)
       }
 
-      irl = irl_from_gates(gate_results)
-      claim_scope = claim_scope_from_irl(irl = irl, purpose = self$purpose)
+      ctx$run_log = run_log
 
-      report = report_card(AutoIMLResult$new(
-        task_id = self$task$id,
-        learner_id = self$learner$id,
-        purpose = self$purpose,
-        quick_start = self$quick_start,
-        irl = irl,
-        claim_scope = claim_scope,
-        gate_results = gate_results,
-        report = data.table::data.table(), # placeholder; overwritten below
-        timings = timings,
-        extras = list()
-      ))
+      iel = iel_from_gates(gate_results)
+      claim_scope = claim_scope_from_iel(iel = iel, purpose = self$purpose)
 
       res = AutoIMLResult$new(
         task_id = self$task$id,
         learner_id = self$learner$id,
         purpose = self$purpose,
         quick_start = self$quick_start,
-        irl = irl,
+        iel = iel,
         claim_scope = claim_scope,
         gate_results = gate_results,
-        report = report,
+        report = data.table::data.table(),
         timings = timings,
-        extras = list(ctx = ctx)
+        extras = list(ctx = ctx, run_log = run_log)
       )
+      res$report = report_card(res)
 
       self$result = res
 
@@ -299,6 +285,36 @@ AutoIML = R6::R6Class(
     report_card = function() {
       if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
       self$result$report
+    },
+
+    #' @description
+    #' Return the extended requirement-level report card for the latest run.
+    #'
+    #' @return A `data.table` with one row per framework requirement.
+    report_card_extended = function() {
+      if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
+      report_card_extended(self$result)
+    },
+
+    #' @description
+    #' Export an audit bundle for the latest run.
+    #'
+    #' @param dir (`character(1)`) Output directory.
+    #' @param prefix (`character(1)`) Filename prefix.
+    #' @return Named list of exported file paths.
+    export_audit_bundle = function(dir = "autoiml_audit_bundle", prefix = "autoiml") {
+      if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
+      export_audit_bundle(self$result, dir = dir, prefix = prefix)
+    },
+
+    #' @description
+    #' Return guided next-step recommendations for the latest run.
+    #'
+    #' @param max_actions (`integer(1)`) Maximum number of actions.
+    #' @return Named list with summary, actions, and recommended plots.
+    guide = function(max_actions = 6L) {
+      if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
+      guide_workflow(self$result, max_actions = max_actions)
     },
 
     #' @description
@@ -334,9 +350,9 @@ AutoIML = R6::R6Class(
       cat("\n=== AutoIML Overview ===\n")
       cat("Task: ", res$task_id, " | Learner: ", res$learner_id, " | Resampling: ", self$resampling$id, "\n", sep = "")
       cat("Purpose: ", res$purpose, " | quick_start: ", res$quick_start, " | profile: ", self$profile, " | seed: ", self$seed, "\n", sep = "")
-      irl_txt = .autoiml_format_irl(res$irl)
+      iel_txt = .autoiml_format_iel(res$iel)
       scope_txt = .autoiml_format_claim_scope(res$claim_scope)
-      cat("IRL: ", irl_txt, "\n", sep = "")
+      cat("IEL: ", iel_txt, "\n", sep = "")
       cat("Claim scope: ", scope_txt, "\n\n", sep = "")
 
       print(res$report)
@@ -371,6 +387,7 @@ AutoIML = R6::R6Class(
     #'   - `"g2_ice_spread"`: Gate 2 ICE spread summary.
     #'   - `"g2_hstats"`: Gate 2 interaction screening (H-statistics).
     #'   - `"g2_gadget"`: Gate 2 regionalization summary (if available).
+    #'   - `"storyboard"`: Guided visual-first summary (G2 + G6 where available).
     #'   - `"shap_local"`: Local SHAP/Shapley breakdown for a selected row.
     #' @param ... Additional arguments forwarded to the selected plot helper.
     #' @return A `ggplot` object or a `patchwork` composition.
@@ -387,6 +404,7 @@ AutoIML = R6::R6Class(
         "g2_effect" = .autoiml_plot_g2_effect(self$result, ...),
         "g2_hstats" = .autoiml_plot_g2_hstats(self$result, ...),
         "g2_gadget" = .autoiml_plot_g2_gadget(self$result, ...),
+        "storyboard" = .autoiml_plot_storyboard(self$result, ...),
         "g6_performance" = .autoiml_plot_g6_performance(self$result, ...),
         "g6_group_performance" = .autoiml_plot_g6_group_performance(self$result, ...),
         "g6_rashomon_importance" = .autoiml_plot_g6_rashomon_importance(self$result, ...),
@@ -436,14 +454,14 @@ AutoIML = R6::R6Class(
 
       # Semantics: default SHAP mode depends on the declared semantics (Gate 0A),
       # but can be overridden via ctx$shap$mode.
-      sem = .autoiml_normalize_semantics(((ctx$claim %||% list())$semantics %||% "associational"), default = "associational")
+      sem = .autoiml_normalize_semantics(((ctx$claim %||% list())$semantics %||% "within_support"), default = "within_support")
 
       shap_cfg = ctx$shap %||% list()
       if (!is.list(shap_cfg)) shap_cfg <- list()
 
       shap_mode = .autoiml_normalize_shap_mode(
-        shap_cfg$mode %||% if (identical(sem, "associational")) "conditional" else "marginal",
-        default = if (identical(sem, "associational")) "conditional" else "marginal"
+        shap_cfg$mode %||% if (identical(sem, "within_support")) "conditional" else "marginal",
+        default = if (identical(sem, "within_support")) "conditional" else "marginal"
       )
 
       cond_k = as.integer(shap_cfg$conditional_k %||% 5L)
@@ -471,9 +489,8 @@ AutoIML = R6::R6Class(
   ),
 
   private = list(
-    default_gates = function(purpose, quick_start) {
-      # NOTE: quick_start is implemented by selecting fewer gates.
-      gates = list(
+    gate_registry = function() {
+      list(
         Gate0AClaim$new(),
         Gate0BMeasurement$new(),
         Gate1Validity$new(),
@@ -485,31 +502,98 @@ AutoIML = R6::R6Class(
         Gate7aSubgroups$new(),
         Gate7bHumanFactors$new()
       )
+    },
 
-      if (isTRUE(quick_start)) {
-        # Quick-start (paper-aligned): minimal evidentiary path for
-        # exploratory insight / publication-grade descriptive claims.
-        # Always include stability and a minimal subgroup audit.
-        keep = c("G0A", "G0B", "G1", "G2", "G3", "G5", "G7A")
+    gate_plan_from_claim = function(claim, purpose, quick_start) {
+      gates = private$gate_registry()
 
-        # If the declared purpose implies case-level or decision use,
-        # include faithfulness checks and human-factors prompts.
-        if (purpose %in% c("decision_support", "deployment")) {
-          keep = unique(c(keep, "G4", "G7B"))
-        }
-        gates = gates[vapply(gates, function(g) g$id %in% keep, logical(1L))]
+      claim = .autoiml_as_list(claim)
+      claim_flags = .autoiml_as_list(claim$claims)
+
+      want_global = isTRUE(claim_flags$global %||% TRUE)
+      want_local = isTRUE(claim_flags$local %||% FALSE)
+      want_decision = isTRUE(claim_flags$decision %||% FALSE)
+
+      stakes = tolower(as.character((claim$stakes %||% "medium")[1L]))
+      purpose_decision = purpose %in% c("decision_support", "deployment")
+      high_stakes = isTRUE(stakes == "high" || purpose_decision)
+
+      keep = c("G0A", "G0B", "G1", "G2", "G5", "G7A")
+
+      if (isTRUE(want_decision) || isTRUE(purpose_decision)) {
+        keep = unique(c(keep, "G3"))
       }
 
-      gates
+      if (isTRUE(want_local) || isTRUE(want_decision) || isTRUE(purpose_decision)) {
+        keep = unique(c(keep, "G4"))
+      }
+
+      if (!isTRUE(quick_start) || isTRUE(want_local) || isTRUE(want_decision)) {
+        keep = unique(c(keep, "G6"))
+      }
+
+      if (isTRUE(high_stakes)) {
+        keep = unique(c(keep, "G7B"))
+      }
+
+      gates[vapply(gates, function(g) g$id %in% keep, logical(1L))]
     },
 
-    derive_irl = function(gate_results) {
-      irl_from_gates(gate_results)
+    execute_gate = function(gate_obj, ctx) {
+      gstart = proc.time()[3]
+
+      out = if (isTRUE(ctx$hard_stop) && !(gate_obj$id %in% c("G0A", "G0B"))) {
+        GateResult$new(
+          gate_id = gate_obj$id,
+          gate_name = gate_obj$name,
+          pdr = gate_obj$pdr,
+          status = "skip",
+          summary = paste0("Skipped due to hard stop in Gate 0: ", ctx$hard_stop_reason %||% "No reason provided."),
+          metrics = NULL,
+          artifacts = list(),
+          messages = character()
+        )
+      } else {
+        tryCatch(
+          gate_obj$run(ctx),
+          error = function(e) {
+            GateResult$new(
+              gate_id = gate_obj$id,
+              gate_name = gate_obj$name,
+              pdr = gate_obj$pdr,
+              status = "error",
+              summary = paste0("Gate failed with error: ", conditionMessage(e)),
+              metrics = NULL,
+              artifacts = list(),
+              messages = character()
+            )
+          }
+        )
+      }
+
+      if (!inherits(out, "GateResult")) {
+        out = GateResult$new(
+          gate_id = gate_obj$id,
+          gate_name = gate_obj$name,
+          pdr = gate_obj$pdr,
+          status = "error",
+          summary = "Gate did not return a GateResult object.",
+          metrics = NULL,
+          artifacts = list(),
+          messages = character()
+        )
+      }
+
+      list(result = out, elapsed = proc.time()[3] - gstart)
     },
 
-    # Translate achieved IRL into conservative claim-scope statements.
-    claim_scope = function(irl, purpose) {
-      claim_scope_from_irl(irl = irl, purpose = purpose)
+    derive_iel = function(gate_results) {
+      iel_from_gates(gate_results)
+    },
+
+    # Translate achieved IEL into conservative claim-scope statements.
+    claim_scope = function(iel, purpose) {
+      claim_scope_from_iel(iel = iel, purpose = purpose)
     }
   )
 )

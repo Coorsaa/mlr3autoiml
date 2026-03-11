@@ -10,7 +10,7 @@
 Lightweight, print-friendly container returned by \link{AutoIML} and \code{\link[=autoiml]{autoiml()}}.
 
 An \link{AutoIMLResult} stores the executed gate outcomes (\link{GateResult} objects),
-the computed Interpretation Readiness Level (IRL), and any gate artifacts
+the computed Interpretation Evidence Level (IEL), and any gate artifacts
 (tables, intermediate objects, model surrogates, etc.) required for
 reproducibility and reporting.
 }
@@ -36,11 +36,11 @@ Declared purpose used for gate selection and claim-scope text.}
 \item{\code{quick_start}}{(\code{logical(1)})
 Whether the reduced gate set was used.}
 
-\item{\code{irl}}{(\code{list()})
-Claim-scoped Interpretation Readiness Levels returned by \code{\link[=irl_from_gates]{irl_from_gates()}}.}
+\item{\code{iel}}{(\code{list()})
+Claim-scoped Interpretation Evidence Levels returned by \code{\link[=iel_from_gates]{iel_from_gates()}}.}
 
 \item{\code{claim_scope}}{(\code{list()})
-Human-readable claim-scope guidance derived from IRL and purpose.}
+Human-readable claim-scope guidance derived from IEL and purpose.}
 
 \item{\code{gate_results}}{(\code{list()})
 List of \link{GateResult} objects in gate order (G0A/G0B, G1..G6, G7A/G7B).}
@@ -61,6 +61,9 @@ Optional free-form additional outputs.}
 \itemize{
 \item \href{#method-AutoIMLResult-new}{\code{AutoIMLResult$new()}}
 \item \href{#method-AutoIMLResult-report_card}{\code{AutoIMLResult$report_card()}}
+\item \href{#method-AutoIMLResult-report_card_extended}{\code{AutoIMLResult$report_card_extended()}}
+\item \href{#method-AutoIMLResult-export_audit_bundle}{\code{AutoIMLResult$export_audit_bundle()}}
+\item \href{#method-AutoIMLResult-guide}{\code{AutoIMLResult$guide()}}
 \item \href{#method-AutoIMLResult-print}{\code{AutoIMLResult$print()}}
 \item \href{#method-AutoIMLResult-clone}{\code{AutoIMLResult$clone()}}
 }
@@ -76,7 +79,7 @@ Create a new \code{AutoIMLResult} object.
   learner_id,
   purpose,
   quick_start,
-  irl,
+  iel,
   claim_scope,
   gate_results,
   report,
@@ -96,7 +99,7 @@ Create a new \code{AutoIMLResult} object.
 
 \item{\code{quick_start}}{(\code{logical(1)}) Whether quick_start mode was used.}
 
-\item{\code{irl}}{(\code{list()}) Interpretation Readiness Levels.}
+\item{\code{iel}}{(\code{list()}) Interpretation Evidence Levels.}
 
 \item{\code{claim_scope}}{(\code{list()}) Claim-scope guidance.}
 
@@ -125,6 +128,64 @@ Returns the report card table.
 
 \subsection{Returns}{
 A \link[data.table:data.table]{data.table::data.table} with one row per gate.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AutoIMLResult-report_card_extended"></a>}}
+\if{latex}{\out{\hypertarget{method-AutoIMLResult-report_card_extended}{}}}
+\subsection{Method \code{report_card_extended()}}{
+Returns the extended requirement-level report card.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$report_card_extended()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A \link[data.table:data.table]{data.table::data.table} with one row per framework requirement.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AutoIMLResult-export_audit_bundle"></a>}}
+\if{latex}{\out{\hypertarget{method-AutoIMLResult-export_audit_bundle}{}}}
+\subsection{Method \code{export_audit_bundle()}}{
+Export an audit bundle for reproducibility and reporting.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$export_audit_bundle(
+  dir = "autoiml_audit_bundle",
+  prefix = "autoiml"
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{dir}}{(\code{character(1)}) Output directory.}
+
+\item{\code{prefix}}{(\code{character(1)}) Filename prefix.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Named list of exported file paths.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AutoIMLResult-guide"></a>}}
+\if{latex}{\out{\hypertarget{method-AutoIMLResult-guide}{}}}
+\subsection{Method \code{guide()}}{
+Return guided next-step recommendations.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AutoIMLResult$guide(max_actions = 6L)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{max_actions}}{(\code{integer(1)}) Maximum number of actions.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Named list with summary, actions, and recommended plots.
 }
 }
 \if{html}{\out{<hr>}}

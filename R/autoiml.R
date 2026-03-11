@@ -30,6 +30,7 @@
 #'   If `TRUE`, prints a compact run summary after completion.
 #'
 #' @return [AutoIMLResult].
+#' @rdname autoiml_wrapper
 #' @export
 #'
 #' @examples
@@ -44,7 +45,7 @@ autoiml = function(task,
   learner,
   resampling = mlr3::rsmp("cv", folds = 5),
   purpose = c("exploratory", "global_insight", "decision_support", "deployment"),
-  quick_start = TRUE,
+  quick_start = FALSE,
   seed = 1L,
   config = list(),
   verbose = FALSE

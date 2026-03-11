@@ -6,12 +6,15 @@ test_that("AutoIML run returns AutoIMLResult with gate results and report card",
 
   expect_true(inherits(result, "AutoIMLResult"))
   expect_true(is.list(result$gate_results))
-  expect_true(all(c("G0A", "G0B", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B") %in% names(result$gate_results)))
 
-  # report card shape
-  rc = result$report_card
+  executed = names(result$gate_results)
+  expect_true(all(c("G0A", "G0B", "G1", "G2", "G5", "G6", "G7A") %in% executed))
+  expect_false(any(c("G3", "G4", "G7B") %in% executed))
+
+  # report_card is a method, not a field
+  rc = result$report_card()
   expect_true(data.table::is.data.table(rc))
-  expect_true(all(c("gate_id", "gate_name", "pdr", "status", "summary", "irl_overall", "purpose") %in% names(rc)))
+  expect_true(all(c("gate_id", "gate_name", "pdr", "status", "summary", "iel_overall", "purpose") %in% names(rc)))
   expect_gte(nrow(rc), 5L)
 
   # ctx should contain final model

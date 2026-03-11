@@ -26,4 +26,7 @@ test_that("AutoIML$plot produces ggplot/patchwork objects and does not accept no
   # SHAP plot (if implemented)
   p5 = auto$plot("shap_local", row_id = 1L, sample_size = 20L, background_n = 30L)
   expect_s3_class(p5, "ggplot")
+
+  p6 = auto$plot("storyboard")
+  expect_true(inherits(p6, "ggplot") || inherits(p6, "patchwork") || is.list(p6))
 })

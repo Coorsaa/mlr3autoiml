@@ -39,19 +39,37 @@ Gate2Structure = R6::R6Class(
       task = ctx$task
       model = ctx$final_model
       if (is.null(model)) {
-        model = ctx$learner$clone(deep = TRUE)
-        model$train(task)
-        ctx$final_model = model
+        return(GateResult$new(
+          gate_id = self$id,
+          gate_name = self$name,
+          pdr = self$pdr,
+          status = "fail",
+          summary = "Gate 2 requires a trained final model from Gate 1.",
+          metrics = NULL,
+          artifacts = list(),
+          messages = c("Run Gate 1 validity before Gate 2 structure diagnostics.")
+        ))
       }
 
       cfg = ctx$structure %||% list()
+      .autoiml_assert_known_names(
+        cfg,
+        c(
+          "sample_n", "max_features", "ice_keep_n",
+          "grid_n", "grid_type", "ice_center", "ale_bins",
+          "cor_threshold", "hstat_max_features", "hstat_grid_n", "hstat_threshold",
+          "regionalize", "regional_method", "gadget_max_depth", "gadget_min_bucket", "gadget_gamma", "gadget_top_k",
+          "support_check", "support_required_for_marginal"
+        ),
+        "ctx$structure"
+      )
 
-      # Claim semantics (set by Gate 0A; conservative default is associational/on-manifold)
+      # Claim semantics (set by Gate 0A; conservative default is within_support/associational)
       claim = ctx$claim %||% list()
-      semantics = .autoiml_normalize_semantics(claim$semantics %||% "associational", default = "associational")
+      semantics = .autoiml_normalize_semantics(claim$semantics %||% "within_support", default = "within_support")
 
       # Causal/recourse is a hard stop in this workflow (requires causal identification outside AutoIML).
-      if (identical(semantics, "causal")) {
+      if (identical(semantics, "causal_recourse")) {
         return(GateResult$new(
           gate_id = self$id,
           gate_name = self$name,
@@ -91,7 +109,7 @@ Gate2Structure = R6::R6Class(
       gadget_gamma = as.numeric(cfg$gadget_gamma %||% 0.00)
       gadget_top_k = as.integer(cfg$gadget_top_k %||% 2L)
 
-      set.seed(ctx$seed %||% 1L)
+      set.seed(.autoiml_gate_seed(ctx, self$id))
 
       feat = task$feature_names
       ft = task$feature_types
@@ -145,6 +163,7 @@ Gate2Structure = R6::R6Class(
       }
 
       # interaction screening helper (Friedman-Popescu H-statistic)
+      # Uses batched predictions for efficiency instead of nested loops
       compute_hstat_pair = function(Xs, f1, f2, class_label) {
         g1 = .autoiml_grid_1d_iml(Xs[[f1]], grid_n = hstat_grid_n, grid_type = "quantile")
         g2 = .autoiml_grid_1d_iml(Xs[[f2]], grid_n = hstat_grid_n, grid_type = "quantile")
@@ -152,30 +171,42 @@ Gate2Structure = R6::R6Class(
           return(NULL)
         }
 
+        n_obs = nrow(Xs)
         base = .autoiml_predict_score(model, Xs, task, class_of_interest = class_label)
         f0 = mean(base, na.rm = TRUE)
 
-        pd1 = sapply(g1, function(v) {
+        # Batch PD for feature 1: replicate data for each grid value
+        X1_list = lapply(g1, function(v) {
           X2 = data.table::copy(Xs)
-          X2 = .autoiml_set_feature_value(X2, task, f1, v)
-          mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
+          .autoiml_set_feature_value(X2, task, f1, v)
         })
+        X1_batch = data.table::rbindlist(X1_list, use.names = TRUE)
+        preds1_all = .autoiml_predict_score(model, X1_batch, task, class_of_interest = class_label)
+        preds1_mat = matrix(preds1_all, nrow = n_obs, ncol = length(g1))
+        pd1 = colMeans(preds1_mat, na.rm = TRUE)
 
-        pd2 = sapply(g2, function(v) {
+        # Batch PD for feature 2
+        X2_list = lapply(g2, function(v) {
           X2 = data.table::copy(Xs)
-          X2 = .autoiml_set_feature_value(X2, task, f2, v)
-          mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
+          .autoiml_set_feature_value(X2, task, f2, v)
         })
+        X2_batch = data.table::rbindlist(X2_list, use.names = TRUE)
+        preds2_all = .autoiml_predict_score(model, X2_batch, task, class_of_interest = class_label)
+        preds2_mat = matrix(preds2_all, nrow = n_obs, ncol = length(g2))
+        pd2 = colMeans(preds2_mat, na.rm = TRUE)
 
-        pd12 = matrix(NA_real_, nrow = length(g1), ncol = length(g2))
-        for (i in seq_along(g1)) {
-          for (j in seq_along(g2)) {
-            X2 = data.table::copy(Xs)
-            X2 = .autoiml_set_feature_value(X2, task, f1, g1[[i]])
-            X2 = .autoiml_set_feature_value(X2, task, f2, g2[[j]])
-            pd12[i, j] = mean(.autoiml_predict_score(model, X2, task, class_of_interest = class_label), na.rm = TRUE)
-          }
-        }
+        # Batch 2D PD: create all grid combinations in one batch
+        grid_idx = expand.grid(i = seq_along(g1), j = seq_along(g2))
+        X12_list = lapply(seq_len(nrow(grid_idx)), function(k) {
+          X2 = data.table::copy(Xs)
+          X2 = .autoiml_set_feature_value(X2, task, f1, g1[[grid_idx$i[k]]])
+          .autoiml_set_feature_value(X2, task, f2, g2[[grid_idx$j[k]]])
+        })
+        X12_batch = data.table::rbindlist(X12_list, use.names = TRUE)
+        preds12_all = .autoiml_predict_score(model, X12_batch, task, class_of_interest = class_label)
+        preds12_mat = matrix(preds12_all, nrow = n_obs, ncol = nrow(grid_idx))
+        pd12_vec = colMeans(preds12_mat, na.rm = TRUE)
+        pd12 = matrix(pd12_vec, nrow = length(g1), ncol = length(g2), byrow = FALSE)
 
         pd1c = pd1 - f0
         pd2c = pd2 - f0
@@ -276,7 +307,32 @@ Gate2Structure = R6::R6Class(
 
         if (length(top_feats) >= 2L && !is.null(cls_main)) {
           pairs = utils::combn(top_feats, 2, simplify = FALSE)
-          hlist = lapply(pairs, function(p) compute_hstat_pair(X, p[1], p[2], cls_main))
+
+          # Check if future.apply is available for parallel execution
+          # Note: Parallelization requires the package to be installed (not just loaded via
+          # devtools), so that worker processes can load it.
+          use_parallel = FALSE
+          if (requireNamespace("future.apply", quietly = TRUE) &&
+            requireNamespace("future", quietly = TRUE)) {
+            plan_info = future::plan()
+            is_sequential = inherits(plan_info, "sequential") ||
+              identical(class(plan_info)[1L], "sequential")
+            pkg_installed = "mlr3autoiml" %in% rownames(utils::installed.packages())
+            if (!is_sequential && pkg_installed) {
+              use_parallel = TRUE
+            }
+          }
+
+          if (use_parallel) {
+            hlist = future.apply::future_lapply(
+              pairs,
+              function(p) compute_hstat_pair(X, p[1], p[2], cls_main),
+              future.seed = TRUE,
+              future.packages = "mlr3autoiml"
+            )
+          } else {
+            hlist = lapply(pairs, function(p) compute_hstat_pair(X, p[1], p[2], cls_main))
+          }
           hstats = data.table::rbindlist(hlist, fill = TRUE)
         }
 
@@ -349,8 +405,10 @@ Gate2Structure = R6::R6Class(
 
       support_cfg = cfg$support_check %||% list()
       if (!is.list(support_cfg)) support_cfg <- list()
+      .autoiml_assert_known_names(support_cfg, c("enabled", "sample_n", "ratio_threshold", "k"), "ctx$structure$support_check")
 
-      support_enabled = isTRUE(support_cfg$enabled %||% (semantics == "marginal"))
+      support_enabled = isTRUE(support_cfg$enabled %||% (semantics == "marginal_model_query"))
+      support_required_for_marginal = isTRUE(cfg$support_required_for_marginal %||% TRUE)
       support_sample_n = as.integer(support_cfg$sample_n %||% min(200L, nrow(X)))
       support_sample_n = max(30L, min(support_sample_n, nrow(X)))
       support_ratio_threshold = as.numeric(support_cfg$ratio_threshold %||% 1.5)
@@ -428,6 +486,29 @@ Gate2Structure = R6::R6Class(
         }
       }
 
+      if (!is.null(pd_curves) && nrow(pd_curves) > 0L) {
+        pd_curves[, semantics_label := semantics]
+      }
+      if (!is.null(ice_curves) && nrow(ice_curves) > 0L) {
+        ice_curves[, semantics_label := semantics]
+      }
+      if (!is.null(ale_curves) && nrow(ale_curves) > 0L) {
+        ale_curves[, semantics_label := semantics]
+      }
+      if (!is.null(ice_spread) && nrow(ice_spread) > 0L) {
+        ice_spread[, semantics_label := semantics]
+      }
+      if (!is.null(hstats) && nrow(hstats) > 0L) {
+        hstats[, semantics_label := semantics]
+      }
+      if (!is.null(support_dt) && nrow(support_dt) > 0L) {
+        support_dt[, `:=`(
+          semantics_label = semantics,
+          support_ratio_threshold = support_ratio_threshold,
+          support_diag_available = TRUE
+        )]
+      }
+
       # --- gate decision ----------------------------------------------------
       dependence_flag = isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)
       max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) max(ice_spread$ice_sd_mean, na.rm = TRUE) else NA_real_
@@ -436,13 +517,13 @@ Gate2Structure = R6::R6Class(
       interaction_flag = isTRUE(is.finite(max_hstat) && max_hstat >= hstat_threshold)
 
       # Recommendation depends on claim semantics.
-      recommended_effect_method = if (identical(semantics, "associational")) {
+      recommended_effect_method = if (identical(semantics, "within_support")) {
         "ale"
       } else {
         # Marginal what-if semantics: PDP/ICE answers the model-based 'what-if' question.
         "pdp"
       }
-      fallback_effect_method = if (identical(semantics, "marginal")) "ale" else NA_character_
+      fallback_effect_method = if (identical(semantics, "marginal_model_query")) "ale" else NA_character_
 
       status = "pass"
       summary = sprintf("Claim semantics=\"%s\": dependence/heterogeneity assessed; global effect curves computed (PDP/ICE + ALE).", semantics)
@@ -455,14 +536,20 @@ Gate2Structure = R6::R6Class(
         )
       }
 
-      # Under marginal what-if semantics, explicitly warn about off-support risk when detected.
-      if (identical(semantics, "marginal") && isTRUE(support_enabled)) {
-        if (!isTRUE(support_available)) {
+      # Under marginal model query semantics, explicitly warn about off-support risk when detected.
+      if (identical(semantics, "marginal_model_query") && isTRUE(support_enabled)) {
+        if (isTRUE(support_required_for_marginal) && !isTRUE(support_available)) {
+          status = "fail"
+          summary = paste0(summary, " Marginal model query semantics require support diagnostics, but diagnostics could not be computed (install 'FNN' and ensure numeric features).")
+        } else if (!isTRUE(support_available)) {
           status = "warn"
           summary = paste0(summary, " Support diagnostics were requested but could not be computed (install 'FNN' and ensure numeric features).")
+        } else if (isTRUE(support_required_for_marginal) && (is.null(support_dt) || nrow(support_dt) < 1L)) {
+          status = "fail"
+          summary = paste0(summary, " Marginal model query semantics require non-empty support diagnostics.")
         } else if (isTRUE(support_flag)) {
           status = "warn"
-          summary = paste0(summary, " Off-manifold risk detected for some PDP grid points (see support_check table); marginal what-if interpretations may be driven by extrapolation.")
+          summary = paste0(summary, " Off-manifold risk detected for some PDP grid points (see support_check table); marginal model query interpretations may be driven by extrapolation.")
         }
       }
 
@@ -542,7 +629,7 @@ Gate2Structure = R6::R6Class(
           gadget_regions = gadget_regions
         ),
         messages = c(
-          sprintf("Semantics=\"%s\": PDP/ICE answer marginal what-if (may extrapolate); ALE answers an on-manifold (associational) effect question.", semantics),
+          sprintf("Semantics=\"%s\": PDP/ICE answer marginal model query (may extrapolate); ALE answers an on-manifold (associational) effect question.", semantics),
           "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects* rather than baseline risk differences."
         )
       )

@@ -143,9 +143,6 @@ NULL
 
   C = length(cls_keep)
 
-  sum_phi = matrix(0, nrow = p, ncol = C, dimnames = list(features, cls_keep))
-  sum_phi2 = matrix(0, nrow = p, ncol = C, dimnames = list(features, cls_keep))
-
   xi = x_interest[, features, with = FALSE]
 
   # Precompute numeric SDs for conditional kNN scaling (cheap, background is small by design).
@@ -209,7 +206,10 @@ NULL
     background[ii, features, with = FALSE]
   }
 
-  for (m in seq_len(B)) {
+  # Core function to compute one Monte Carlo iteration
+  # Returns a list with phi_contrib and phi2_contrib matrices
+  compute_one_mc_iteration = function(iter_seed) {
+    set.seed(iter_seed)
     perm = sample.int(p, size = p, replace = FALSE)
 
     rows = vector("list", 2L * p)
@@ -264,10 +264,54 @@ NULL
 
     diff = pred[with_idx, , drop = FALSE] - pred[without_idx, , drop = FALSE] # p x C
 
-    # Rows of diff correspond to permutation order -> accumulate into feature order via perm
-    sum_phi[perm, ] = sum_phi[perm, ] + diff
-    sum_phi2[perm, ] = sum_phi2[perm, ] + diff^2
+    # Organize by feature order using perm
+    phi_contrib = matrix(0, nrow = p, ncol = C)
+    phi2_contrib = matrix(0, nrow = p, ncol = C)
+    phi_contrib[perm, ] = diff
+    phi2_contrib[perm, ] = diff^2
+
+    list(phi = phi_contrib, phi2 = phi2_contrib)
   }
+
+  # Generate seeds for each iteration (reproducibility)
+  iter_seeds = seed + seq_len(B)
+
+  # Check if future.apply is available for parallel execution
+  # Note: Parallelization requires the package to be installed (not just loaded via
+  # devtools), so that worker processes can load it. We check if the package is in
+  # .libPaths() (i.e., actually installed) rather than just loaded.
+  use_parallel = FALSE
+  if (requireNamespace("future.apply", quietly = TRUE) &&
+    requireNamespace("future", quietly = TRUE)) {
+    plan_info = future::plan()
+    is_sequential = inherits(plan_info, "sequential") ||
+      identical(class(plan_info)[1L], "sequential")
+    # Check if package is truly installed (not just loaded via devtools)
+    pkg_installed = "mlr3autoiml" %in% rownames(utils::installed.packages())
+    if (!is_sequential && pkg_installed) {
+      use_parallel = TRUE
+    }
+  }
+
+  if (use_parallel) {
+    # Parallel execution via future.apply
+    # Export required functions explicitly
+    mc_results = future.apply::future_lapply(
+      iter_seeds,
+      compute_one_mc_iteration,
+      future.seed = TRUE,
+      future.packages = "mlr3autoiml"
+    )
+  } else {
+    # Sequential fallback
+    mc_results = lapply(iter_seeds, compute_one_mc_iteration)
+  }
+
+  # Aggregate results
+  sum_phi = Reduce(`+`, lapply(mc_results, `[[`, "phi"))
+  sum_phi2 = Reduce(`+`, lapply(mc_results, `[[`, "phi2"))
+  dimnames(sum_phi) = list(features, cls_keep)
+  dimnames(sum_phi2) = list(features, cls_keep)
 
   phi = sum_phi / B
   phi_var = matrix(NA_real_, nrow = p, ncol = C, dimnames = list(features, cls_keep))

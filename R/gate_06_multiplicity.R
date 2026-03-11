@@ -23,7 +23,7 @@ Gate6Multiplicity = R6::R6Class(
       super$initialize(
         id = "G6",
         name = "Multiplicity and transport",
-        pdr = "D→R"
+        pdr = "D->R"
       )
     },
 
@@ -32,7 +32,20 @@ Gate6Multiplicity = R6::R6Class(
       pred = ctx$pred
 
       cfg = ctx$multiplicity %||% list()
+      .autoiml_assert_known_names(
+        cfg,
+        c("enabled", "max_alt_learners", "rashomon_rule", "importance_n", "importance_max_features", "require_transport_for_high_stakes"),
+        "ctx$multiplicity"
+      )
       enabled = isTRUE(cfg$enabled)
+      benchmarkable_n = 0L
+      group_col = task$col_roles$group %||% character()
+      has_group_role = length(group_col) == 1L
+      claim = .autoiml_as_list(ctx$claim)
+      stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
+      purpose = as.character(claim$purpose %||% ctx$purpose %||% "exploratory")[1L]
+      high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
+      require_transport_for_high_stakes = isTRUE(cfg$require_transport_for_high_stakes %||% TRUE)
 
       # ----------------------------
       # 6a) Multiplicity (Rashomon)
@@ -45,6 +58,7 @@ Gate6Multiplicity = R6::R6Class(
       multiplicity_flag = NA
       primary_id = NA_character_
       rashomon_rule = cfg$rashomon_rule %||% "1se"
+      rashomon_threshold = NA_real_
 
       if (enabled) {
         # Ensure we have an alternative learner set.
@@ -60,9 +74,10 @@ Gate6Multiplicity = R6::R6Class(
 
           primary_id = ctx$primary_measure_id %||% private$.primary_measure_id(task)
           msr = mlr3::msr(primary_id)
+          need_prob = inherits(task, "TaskClassif") && private$.needs_prob(primary_id)
 
-          # Compute fold scores per learner
-          out = list()
+          # Filter and prepare learners for benchmarking
+          learners_to_benchmark = list()
           for (lr in ctx$alt_learners) {
             lr2 = lr$clone(deep = TRUE)
 
@@ -75,30 +90,63 @@ Gate6Multiplicity = R6::R6Class(
               }
             }
 
-            rr = mlr3::resample(task, lr2, resampling, store_models = FALSE)
-            sc = rr$score(list(msr))
-            v = sc[[primary_id]]
-            v = v[is.finite(v)]
-            if (length(v) < 2L) next
+            # Guard against per-learner training/prediction failures during benchmark
+            # (e.g., fold-specific factor-level issues in strict learners). Errors are
+            # encapsulated and mapped to a simple fallback learner.
+            fallback_lrn = tryCatch({
+              if (inherits(task, "TaskClassif")) {
+                mlr3::lrn("classif.featureless", predict_type = if (need_prob) "prob" else "response")
+              } else {
+                mlr3::lrn("regr.featureless")
+              }
+            }, error = function(e) NULL)
 
-            m = mean(v, na.rm = TRUE)
-            s = stats::sd(v, na.rm = TRUE)
-            se = s / sqrt(length(v))
-            ci = 1.96 * se
+            if (!is.null(fallback_lrn)) {
+              try(lr2$encapsulate(method = "evaluate", fallback = fallback_lrn), silent = TRUE)
+            }
 
-            out[[lr$id]] = data.table::data.table(
-              learner_id = lr$id,
-              measure_id = primary_id,
-              n_folds = length(v),
-              mean = as.numeric(m),
-              sd = as.numeric(s),
-              se = as.numeric(se),
-              ci_low = as.numeric(m - ci),
-              ci_high = as.numeric(m + ci)
-            )
+            learners_to_benchmark[[length(learners_to_benchmark) + 1L]] = lr2
           }
+          benchmarkable_n = length(learners_to_benchmark)
 
-          perf_tbl = data.table::rbindlist(out, fill = TRUE)
+          perf_tbl = NULL
+          bmr = NULL
+          if (length(learners_to_benchmark) >= 2L) {
+            # Use mlr3::benchmark for efficient parallel evaluation
+            # Store models to reuse for importance computation later
+            design = mlr3::benchmark_grid(
+              tasks = list(task),
+              learners = learners_to_benchmark,
+              resamplings = list(resampling)
+            )
+            bmr = mlr3::benchmark(design, store_models = TRUE)
+
+            # Aggregate fold scores per learner
+            scores_dt = bmr$score(list(msr))
+            perf_tbl = scores_dt[, {
+              v = get(primary_id)
+              v = v[is.finite(v)]
+              if (length(v) < 2L) {
+                NULL
+              } else {
+                m = mean(v, na.rm = TRUE)
+                s = stats::sd(v, na.rm = TRUE)
+                se = s / sqrt(length(v))
+                ci = 1.96 * se
+                data.table::data.table(
+                  # learner_id = learner_id[1L],
+                  measure_id = primary_id,
+                  n_folds = length(v),
+                  mean = as.numeric(m),
+                  sd = as.numeric(s),
+                  se = as.numeric(se),
+                  ci_low = as.numeric(m - ci),
+                  ci_high = as.numeric(m + ci)
+                )
+              }
+            }, by = learner_id] # [, !"learner_id"]
+            perf_tbl = as.data.table(perf_tbl)
+          }
           if (!is.null(perf_tbl) && nrow(perf_tbl) >= 2L) {
             minimize = isTRUE(msr$minimize)
 
@@ -108,6 +156,7 @@ Gate6Multiplicity = R6::R6Class(
 
             # 1-SE Rashomon rule by default
             threshold = if (minimize) (best_mean + best_se) else (best_mean - best_se)
+            rashomon_threshold = as.numeric(threshold)
             perf_tbl[, rashomon_threshold := threshold]
 
             perf_tbl[, in_rashomon := if (minimize) mean <= threshold else mean >= threshold]
@@ -119,13 +168,13 @@ Gate6Multiplicity = R6::R6Class(
       }
 
       # If we have a Rashomon set with >=2 learners: compute explanation dispersion via PFI
-      if (!is.null(rashomon_tbl) && nrow(rashomon_tbl) >= 2L) {
+      if (!is.null(rashomon_tbl) && nrow(rashomon_tbl) >= 2L && !is.null(bmr)) {
         importance_n = as.integer(cfg$importance_n %||% min(task$nrow, 800L))
         importance_max_features = as.integer(cfg$importance_max_features %||% 15L)
 
         rows = task$row_ids
         if (length(rows) > importance_n) {
-          set.seed(as.integer(ctx$seed %||% 1L))
+          set.seed(.autoiml_gate_seed(ctx, self$id))
           rows = sample(rows, importance_n)
         }
 
@@ -135,17 +184,27 @@ Gate6Multiplicity = R6::R6Class(
         imp_list = list()
         learners_in = rashomon_tbl$learner_id
 
-        for (lid in learners_in) {
-          lr = ctx$alt_learners[[which(vapply(ctx$alt_learners, function(x) x$id == lid, logical(1)))[1L]]]
-          if (is.null(lr)) next
-          lr2 = lr$clone(deep = TRUE)
+        # Extract trained learners from benchmark result
+        # bmr$score() returns a data.table with a 'learner' column containing trained learners
+        scores_dt = bmr$score()
 
-          if (inherits(task, "TaskClassif") && private$.needs_prob(primary_id) && "prob" %in% lr2$predict_types) {
-            lr2$predict_type = "prob"
+        # Build lookup: for each learner_id, get one trained learner from any fold
+        trained_learners = list()
+        for (lid in learners_in) {
+          # Get the first trained learner for this learner_id
+          idx = which(scores_dt$learner_id == lid)[1L]
+          if (!is.na(idx)) {
+            trained_learners[[lid]] = scores_dt$learner[[idx]]
+          }
+        }
+
+        for (lid in learners_in) {
+          lr_trained = trained_learners[[lid]]
+          if (is.null(lr_trained) || is.null(lr_trained$model)) {
+            next
           }
 
-          lr2$train(task)
-          imp_dt = private$.perm_importance(task, lr2, rows = rows, features = feats, measure = msr)
+          imp_dt = private$.perm_importance(task, lr_trained, rows = rows, features = feats, measure = msr)
           imp_dt[, learner_id := lid]
           imp_list[[lid]] = imp_dt
         }
@@ -178,13 +237,19 @@ Gate6Multiplicity = R6::R6Class(
         }
       }
 
+      explanation_multiplicity = data.table::data.table(
+        n_models_in_rashomon = if (!is.null(rashomon_tbl)) nrow(rashomon_tbl) else 0L,
+        n_features_compared = if (!is.null(imp_tbl)) data.table::uniqueN(imp_tbl$feature) else 0L,
+        median_kendall_tau = if (!is.null(rankcorr_tbl) && nrow(rankcorr_tbl) > 0L) stats::median(rankcorr_tbl$kendall_tau, na.rm = TRUE) else NA_real_,
+        min_kendall_tau = if (!is.null(rankcorr_tbl) && nrow(rankcorr_tbl) > 0L) min(rankcorr_tbl$kendall_tau, na.rm = TRUE) else NA_real_
+      )
+
       # ----------------------------
       # 6b) Transportability via group role
       # ----------------------------
       transport_tbl = NULL
       transport_flag = NA
 
-      group_col = task$col_roles$group %||% character()
       if (length(group_col) == 1L && !is.null(pred)) {
         groups = task$data(cols = group_col)[[group_col]]
 
@@ -212,8 +277,9 @@ Gate6Multiplicity = R6::R6Class(
         } else if (inherits(pred, "PredictionRegr")) {
           y = pred$truth
           yhat = pred$response
+          # Direct RMSE computation per group
           transport_tbl = data.table::data.table(group = groups, y = y, yhat = yhat)[
-            , .(n = .N, rmse = .autoiml_rmse(y, yhat)), by = group
+            , .(n = .N, rmse = sqrt(mean((y - yhat)^2))), by = group
           ]
           rng = range(transport_tbl$rmse, na.rm = TRUE)
           transport_flag = is.finite(rng[2] - rng[1]) &&
@@ -226,23 +292,68 @@ Gate6Multiplicity = R6::R6Class(
       # ----------------------------
       status = "pass"
       summary = "Multiplicity and transport checks did not raise major concerns (given available evidence)."
+      multiplicity_assessed = !is.null(perf_tbl)
+      transport_assessed = !is.null(transport_tbl)
 
       if (!enabled) {
         status = "skip"
-        summary = "Multiplicity/transport not assessed (ctx$multiplicity$enabled = FALSE)."
-      } else if (is.null(perf_tbl) && is.null(transport_tbl)) {
+        summary = "Multiplicity/transport disabled by configuration (ctx$multiplicity$enabled = FALSE)."
+      } else if (!multiplicity_assessed && !transport_assessed) {
         status = "skip"
-        summary = "Multiplicity/transport not assessed (provide ctx$alt_learners and/or set a Task group role)."
+        reasons = character()
+        if (benchmarkable_n < 2L) {
+          reasons = c(reasons, "Multiplicity not run: need at least two benchmarkable alternative learners")
+        }
+        if (!has_group_role) {
+          reasons = c(reasons, "Transport not run: Task group role is not set")
+        } else if (is.null(pred)) {
+          reasons = c(reasons, "Transport not run: missing prediction artifacts from Gate 1")
+        }
+        if (length(reasons) < 1L) {
+          reasons = "Multiplicity/transport not assessed due to insufficient evaluable artifacts"
+        }
+        summary = paste(reasons, collapse = "; ")
       } else if (isTRUE(multiplicity_flag) || isTRUE(transport_flag)) {
         status = "warn"
         summary = "Evidence of multiplicity (Rashomon set contains multiple near-tie models) and/or limited transportability across groups; scope interpretive claims accordingly."
+      } else if (!multiplicity_assessed || !transport_assessed) {
+        assessed = character()
+        not_assessed = character()
+        if (multiplicity_assessed) assessed = c(assessed, "multiplicity") else not_assessed = c(not_assessed, "multiplicity")
+        if (transport_assessed) assessed = c(assessed, "transport") else not_assessed = c(not_assessed, "transport")
+        summary = paste0(
+          "Partial Gate 6 coverage: assessed ", paste(assessed, collapse = " + "),
+          "; not assessed ", paste(not_assessed, collapse = " + "),
+          "."
+        )
+      }
+
+      if (isTRUE(high_stakes) && isTRUE(require_transport_for_high_stakes) && !isTRUE(transport_assessed)) {
+        status = "fail"
+        summary = "High-stakes claims require transport assessment in Gate 6, but transport evidence is missing."
       }
 
       metrics = data.table::data.table(
         multiplicity_flag = multiplicity_flag,
         transport_flag = transport_flag,
+        multiplicity_assessed = multiplicity_assessed,
+        transport_assessed = transport_assessed,
         primary_measure_id = primary_id,
-        rashomon_rule = rashomon_rule
+        rashomon_rule = rashomon_rule,
+        high_stakes = high_stakes,
+        require_transport_for_high_stakes = require_transport_for_high_stakes
+      )
+
+      rashomon_provenance = data.table::data.table(
+        enabled = enabled,
+        rashomon_rule = as.character(rashomon_rule),
+        rashomon_threshold = rashomon_threshold,
+        primary_measure_id = as.character(primary_id),
+        benchmarkable_n = benchmarkable_n,
+        n_alt_learners_declared = if (is.list(ctx$alt_learners)) length(ctx$alt_learners) else 0L,
+        importance_n = as.integer(cfg$importance_n %||% min(task$nrow, 800L)),
+        importance_max_features = as.integer(cfg$importance_max_features %||% 15L),
+        seed = as.integer(ctx$seed %||% NA_integer_)
       )
 
       GateResult$new(
@@ -257,7 +368,9 @@ Gate6Multiplicity = R6::R6Class(
           rashomon_set = rashomon_tbl,
           rashomon_importance = imp_tbl,
           rashomon_rankcorr = rankcorr_tbl,
-          group_performance = transport_tbl
+          group_performance = transport_tbl,
+          rashomon_provenance = rashomon_provenance,
+          explanation_multiplicity = explanation_multiplicity
         )
       )
     }
@@ -302,8 +415,8 @@ Gate6Multiplicity = R6::R6Class(
 
       # Classification
       if (!is.null(pred_prob)) {
-        prob = as.data.frame(pred_prob)
-        response = colnames(prob)[max.col(as.matrix(prob), ties.method = "first")]
+        prob = as.matrix(pred_prob)
+        response = colnames(prob)[max.col(prob, ties.method = "first")]
         p = mlr3::PredictionClassif$new(
           row_ids = seq_along(truth),
           truth = truth,
@@ -328,7 +441,7 @@ Gate6Multiplicity = R6::R6Class(
       truth = task$truth(rows = rows)
 
       # Baseline
-      p0 = learner$predict_newdata(X)
+      p0 = learner$predict_newdata(X, task = task)
       base_score = if (inherits(task, "TaskRegr")) {
         private$.score_prediction(task, measure, truth, pred_response = p0$response)
       } else {
@@ -344,7 +457,7 @@ Gate6Multiplicity = R6::R6Class(
         idx = sample.int(nrow(Xp))
         data.table::set(Xp, j = f, value = Xp[[f]][idx])
 
-        p1 = learner$predict_newdata(Xp)
+        p1 = learner$predict_newdata(Xp, task = task)
         score1 = if (inherits(task, "TaskRegr")) {
           private$.score_prediction(task, measure, truth, pred_response = p1$response)
         } else {

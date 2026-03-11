@@ -105,7 +105,9 @@ NULL
 
   top_n = as.integer(top_n)
   dt = dt[order(-ice_sd_mean)][seq_len(min(top_n, .N))]
-  dt[, feature := factor(feature, levels = rev(feature))]
+  # Use unique feature levels to avoid factor duplication errors
+  feat_levels = unique(dt$feature)
+  dt[, feature := factor(feature, levels = rev(feat_levels))]
 
   ggplot2::ggplot(dt, ggplot2::aes(x = ice_sd_mean, y = feature)) +
     ggplot2::geom_col() +

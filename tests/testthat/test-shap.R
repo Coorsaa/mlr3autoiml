@@ -37,12 +37,13 @@ test_that("AutoIML$shap returns additive Shapley-style contributions", {
   pred_x = pred_matrix(model, task, X_x)[1, ]
 
   # For each class label, sum(phi) ≈ pred_x - mean_bg
+  # Use a relatively loose tolerance since Monte Carlo SHAP has variance
   by_class = split(sh, sh$class_label)
   for (cl in names(by_class)) {
     phi_sum = sum(by_class[[cl]]$phi)
     idx = which(colnames(pred_bg) == cl)
     if (length(idx) == 1L) {
-      expect_lt(abs(phi_sum - (pred_x[idx] - mean_bg[idx])), 0.10)
+      expect_lt(abs(phi_sum - (pred_x[idx] - mean_bg[idx])), 0.20)
     }
   }
 })

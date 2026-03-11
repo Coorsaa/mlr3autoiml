@@ -238,7 +238,7 @@ NULL
   if (!all(is.na(dt$class_label))) {
     cl = unique(dt$class_label)
     cl = cl[!is.na(cl)]
-    if (length(cl) > 0L) title = paste0(title, " — class: ", cl[[1L]])
+    if (length(cl) > 0L) title = paste0(title, " - class: ", cl[[1L]])
   }
 
   ggplot2::ggplot(imp, ggplot2::aes(x = feature, y = mean_abs_phi)) +
@@ -351,7 +351,7 @@ NULL
   dt[, value_scaled := .autoiml_scale_feature_values(feature_value), by = feature]
   dt[!is.finite(value_scaled), value_scaled := NA_real_]
 
-  ttl = if (!is.null(class_label)) sprintf("SHAP beeswarm – %s", as.character(class_label)[1L]) else "SHAP beeswarm"
+  ttl = if (!is.null(class_label)) sprintf("SHAP beeswarm - %s", as.character(class_label)[1L]) else "SHAP beeswarm"
 
   p = ggplot2::ggplot(dt, ggplot2::aes(x = phi, y = feature_f, colour = value_scaled)) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5, linewidth = 0.3) +

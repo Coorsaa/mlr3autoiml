@@ -9,7 +9,6 @@ These include:
 \itemize{
 \item Normalization helpers for semantics and SHAP modes
 \item Prediction utilities for classification and regression
-\item Performance metrics (AUC, Brier, logloss, RMSE)
 \item Calibration helpers (ECE, reliability curves, calibration GLM)
 \item Decision curve analysis (DCA)
 \item GateResult resolution utilities

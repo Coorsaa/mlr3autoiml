@@ -11,6 +11,10 @@ This gate is deliberately conservative: many psychometric properties (reliabilit
 invariance/comparability) cannot be inferred from the modeling dataset alone.
 Instead, users can provide a minimal measurement specification via \code{ctx$measurement}
 (or \code{config = list(measurement = list(...))}).
+
+In high-stakes decision/deployment settings, missing critical measurement evidence
+(measurement level, reliability, and subgroup comparability when subgroup analyses
+are in scope) is treated as a failure.
 }
 \section{Automatic Diagnostics}{
 

@@ -58,7 +58,7 @@ NULL
     )
 
   if (isTRUE(include_baseline) && !is.null(g1$artifacts$baseline_rr)) {
-    base_scores = tryCatch(g1$artifacts$baseline_rr$score(mlr3measures::msr(measure)), error = function(e) NULL)
+    base_scores = tryCatch(g1$artifacts$baseline_rr$score(mlr3::msr(measure)), error = function(e) NULL)
     if (!is.null(base_scores) && "iteration" %in% names(base_scores)) {
       bdt = data.table::as.data.table(base_scores)[, .(iteration, value = get(measure))]
       p = p + ggplot2::geom_line(data = bdt, ggplot2::aes(x = iteration, y = value), linetype = 2)

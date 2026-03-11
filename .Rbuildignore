@@ -1,0 +1,13 @@
+^paper_artifacts$
+^analysis$
+^IML_ARTICLE$
+^Simulation_Study\.R$
+^mlr3autoiml\.zip$
+^data/PISA$
+^data/SHILD$
+^data/PISA/.*
+^data/SHILD/.*
+^\.venv_pdf$
+^\.venv_pdf/.*
+^\.github$
+^\.github/.*

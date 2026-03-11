@@ -102,7 +102,7 @@ NULL
     gadget_gamma = 0.00,
     gadget_top_k = 2L,
 
-    # Optional: off-manifold support screening for marginal what-if semantics (Gate 2)
+    # Optional: off-manifold support screening for marginal model query semantics (Gate 2)
     support_check = list(
       enabled = NULL,
       sample_n = min(200L, sample_n),
@@ -115,7 +115,9 @@ NULL
   stability = list(
     B = stability_B,
     max_features = stability_max_features,
-    grouping = NULL
+    grouping = NULL,
+    sanity_checks = TRUE,
+    instability_rel_sd_warn = 0.75
   )
 
   # ---- SHAP defaults ----------------------------------------------------
@@ -131,7 +133,8 @@ NULL
     # Rashomon selection rule: "1se" is conservative and data-driven.
     rashomon_rule = "1se",
     importance_n = min(n, if (profile == "fast") 300L else 800L),
-    importance_max_features = min(p, if (profile == "fast") 10L else 15L)
+    importance_max_features = min(p, if (profile == "fast") 10L else 15L),
+    require_transport_for_high_stakes = TRUE
   )
 
   list(
@@ -192,15 +195,39 @@ NULL
   base_id = base_learner$id %||% ""
   learner_ids = setdiff(learner_ids, base_id)
 
+  # Filter to learners actually available in the dictionary
+  available_ids = mlr3::mlr_learners$keys()
+  learner_ids = intersect(learner_ids, available_ids)
+
   for (id in learner_ids) {
-    lrn = mlr3::lrn(id)
+    lrn = tryCatch(mlr3::lrn(id), error = function(e) NULL)
+    if (is.null(lrn)) next
 
     if (is_classif && "prob" %in% lrn$predict_types) {
       lrn$predict_type = "prob"
     }
 
-    # Handle preprocessing (e.g., missing values) consistently
-    gl = as_learner(mlr3pipelines::ppl("robustify", learner = lrn, task = task) %>>% lrn)
+    # Handle preprocessing (e.g., missing values) consistently.
+    # For classif.log_reg, force factor encoding to avoid fold-specific
+    # factor-level prediction failures in multiplicity benchmarking.
+    if (identical(id, "classif.log_reg")) {
+      robustify_graph = mlr3pipelines::ppl(
+        "robustify",
+        learner = lrn,
+        task = task,
+        factors_to_numeric = TRUE,
+        impute_missings = TRUE
+      )
+      graph = mlr3pipelines::`%>>%`(
+        mlr3pipelines::`%>>%`(robustify_graph, mlr3pipelines::po("encode", id = "encode_logreg_safe", method = "one-hot")),
+        lrn
+      )
+    } else {
+      robustify_graph = mlr3pipelines::ppl("robustify", learner = lrn, task = task)
+      # Use mlr3pipelines::`%>>%` explicitly since it's in Suggests
+      graph = mlr3pipelines::`%>>%`(robustify_graph, lrn)
+    }
+    gl = mlr3::as_learner(graph)
     # capitalized aselearner id as gl id
     gl$id = toupper(gsub("_", " ", data.table::last(strsplit(id, ".", fixed = TRUE)[[1L]])))
     out[[id]] = gl
@@ -231,7 +258,7 @@ NULL
   ctx$multiplicity = utils::modifyList(defaults$multiplicity, ctx$multiplicity %||% list())
 
   # ---- Gate 0 / claim semantics defaults -----------------------------
-  # Conservative defaults: associational (on-manifold / descriptive) semantics unless explicitly set.
+  # Conservative defaults: within_support (associational / on-manifold / descriptive) semantics unless explicitly set.
   purpose = ctx$purpose %||% "exploratory"
   purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
@@ -245,7 +272,7 @@ NULL
 
   default_claim = list(
     claims = default_claims,
-    semantics = "associational",
+    semantics = "within_support",
     stakes = switch(
       purpose,
       "exploratory" = "low",

@@ -14,8 +14,8 @@
 #' prefer region-wise explanations and interaction-aware tools.
 #'
 #' @section Modes:
-#' SHAP mode defaults to conditional (on-manifold) for associational semantics
-#' and marginal for what-if semantics.
+#' SHAP mode defaults to conditional (on-manifold) for within_support semantics
+#' and marginal for marginal model query semantics.
 #'
 #' @name Gate4Faithfulness
 #' @keywords internal
@@ -39,23 +39,32 @@ Gate4Faithfulness = R6::R6Class(
           gate_id = self$id,
           gate_name = self$name,
           pdr = self$pdr,
-          status = "skip",
-          summary = "No trained final model found; run Gate 1 first.",
+          status = "fail",
+          summary = "Gate 4 requires a trained final model from Gate 1.",
           metrics = NULL
         ))
       }
 
       cfg = ctx$faithfulness %||% list()
       if (!is.list(cfg)) cfg <- list()
+      .autoiml_assert_known_names(
+        cfg,
+        c(
+          "r2_warn", "local_n", "shap_sample_size", "shap_background_n",
+          "interaction_check", "interaction_delta_sd", "interaction_strength_warn",
+          "shap_abs_error_warn"
+        ),
+        "ctx$faithfulness"
+      )
 
       # ---- Outputs ---------------------------------------------------------
       status = "pass"
       messages = character()
 
       # Semantics from Gate 0A (if present)
-      semantics = .autoiml_normalize_semantics((ctx$claim %||% list())$semantics %||% "associational", default = "associational")
+      semantics = .autoiml_normalize_semantics((ctx$claim %||% list())$semantics %||% "within_support", default = "within_support")
 
-      if (identical(semantics, "causal")) {
+      if (identical(semantics, "causal_recourse")) {
         return(GateResult$new(
           gate_id = self$id, gate_name = self$name, pdr = self$pdr,
           status = "skip",
@@ -82,13 +91,13 @@ Gate4Faithfulness = R6::R6Class(
         ))
       }
 
-      # SHAP mode defaults to conditional (on-manifold) for associational semantics and marginal otherwise.
+      # SHAP mode defaults to conditional (on-manifold) for within_support semantics and marginal otherwise.
       shap_cfg = ctx$shap %||% list()
       if (!is.list(shap_cfg)) shap_cfg <- list()
 
       shap_mode = .autoiml_normalize_shap_mode(
-        shap_cfg$mode %||% if (identical(semantics, "associational")) "conditional" else "marginal",
-        default = if (identical(semantics, "associational")) "conditional" else "marginal"
+        shap_cfg$mode %||% if (identical(semantics, "within_support")) "conditional" else "marginal",
+        default = if (identical(semantics, "within_support")) "conditional" else "marginal"
       )
 
       cond_k = as.integer(shap_cfg$conditional_k %||% 5L)
@@ -176,7 +185,7 @@ Gate4Faithfulness = R6::R6Class(
       rid = rid[rid >= 1L & rid <= n]
       if (length(rid) < 1L) rid = seq_len(n)
 
-      set.seed(as.integer(ctx$seed %||% 1L))
+      set.seed(.autoiml_gate_seed(ctx, self$id))
       check_rows = sample(rid, size = min(local_n, length(rid)))
 
       # Background sample for baseline expectations
@@ -319,6 +328,11 @@ Gate4Faithfulness = R6::R6Class(
       shap_mae = if (nrow(shap_check) > 0L) mean(shap_check$abs_error, na.rm = TRUE) else NA_real_
       shap_max = if (nrow(shap_check) > 0L) max(shap_check$abs_error, na.rm = TRUE) else NA_real_
 
+      if (nrow(shap_check) < 1L) {
+        status = "fail"
+        messages = c(messages, "No local Shapley diagnostics were produced; Gate 4 evidence is insufficient for local/decision claims.")
+      }
+
       # Warn if local accuracy is poor (usually indicates insufficient MC sample size or unstable model predictions).
       shap_warn = as.numeric(cfg$shap_abs_error_warn %||% if (inherits(task, "TaskClassif")) 0.05 else 0.10)
       if (is.finite(shap_max) && shap_max > shap_warn) {
@@ -336,8 +350,8 @@ Gate4Faithfulness = R6::R6Class(
       }
 
       # Semantics reminder: attribution mode and interpretation.
-      if (identical(semantics, "associational") && identical(shap_mode, "marginal")) {
-        messages = c(messages, "Note: claim semantics are associational/on-manifold, but SHAP was computed in marginal mode; interpret as model-based what-if attributions and check off-support risk.")
+      if (identical(semantics, "within_support") && identical(shap_mode, "marginal")) {
+        messages = c(messages, "Note: claim semantics are within_support/on-manifold, but SHAP was computed in marginal mode; interpret as marginal model query attributions and check off-support risk.")
       }
       if (identical(shap_mode, "conditional")) {
         messages = c(messages, "Conditional SHAP uses a kNN conditional sampler to approximate on-manifold attributions; it does not establish causality.")
@@ -355,6 +369,26 @@ Gate4Faithfulness = R6::R6Class(
         local_interaction_max = int_max
       )
 
+      perturbation_design = data.table::data.table(
+        semantics = semantics,
+        shap_mode = shap_mode,
+        background_n = nrow(bg),
+        local_n = local_n,
+        shap_sample_size = shap_sample_size,
+        conditional_k = cond_k,
+        conditional_weighted = cond_weighted,
+        interaction_check = isTRUE(cfg$interaction_check %||% TRUE),
+        interaction_delta_sd = as.numeric(cfg$interaction_delta_sd %||% 0.25)
+      )
+
+      surrogate_spec = data.table::data.table(
+        surrogate_family = "linear_model",
+        n_complete_rows = nrow(Xc),
+        n_features = length(task$feature_names),
+        surrogate_r2 = surrogate_r2,
+        surrogate_rmse = surrogate_rmse
+      )
+
       summary = sprintf("Faithfulness screened via linear surrogate (R^2=%.2f) and local additive checks (Shapley max error=%.3f).", surrogate_r2, shap_max)
 
       GateResult$new(
@@ -366,10 +400,12 @@ Gate4Faithfulness = R6::R6Class(
         metrics = metrics,
         artifacts = list(
           shap_check = shap_check,
-          local_interaction_check = interaction_check
+          local_interaction_check = interaction_check,
+          perturbation_design = perturbation_design,
+          surrogate_spec = surrogate_spec
         ),
         messages = c(
-          sprintf("Shapley mode used: %s (conditional ≈ on-manifold approximation; marginal ≈ interventional what-if).", shap_mode),
+          sprintf("Shapley mode used: %s (conditional ~= on-manifold approximation; marginal ~= interventional what-if).", shap_mode),
 
           "Faithfulness checks are diagnostics, not guarantees: they can miss complex feature interactions and distribution shift.",
           messages

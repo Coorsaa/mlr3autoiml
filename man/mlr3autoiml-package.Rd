@@ -9,7 +9,7 @@
 \code{mlr3autoiml} implements a \strong{gate-based AutoIML workflow (G0A/G0B, G1--G6, G7A/G7B)} for
 \link[mlr3:mlr3-package]{mlr3} tasks and learners.
 
-The package focuses on \emph{interpretability readiness} and \emph{diagnostic evidence}
+The package focuses on \emph{interpretability evidence} and \emph{diagnostic evidence}
 rather than hyperparameter optimization: it automatically computes
 task- and data-dependent IML artifacts (e.g., PDP/ICE vs. ALE selection under
 feature dependence), calibration/decision utility checks, faithfulness checks,
@@ -21,12 +21,12 @@ The main entry point is the \link{AutoIML} R6 class.
 \itemize{
 \item \link{AutoIML} for the main orchestrator.
 \item \code{\link[=autoiml]{autoiml()}} for a convenience wrapper.
-\item \code{\link[=irl_from_gates]{irl_from_gates()}} for Interpretation Readiness Level computation.
+\item \code{\link[=iel_from_gates]{iel_from_gates()}} for Interpretation Evidence Level computation (IEL).
 \item \code{\link[=report_card]{report_card()}} for audit trail summary.
 }
 }
 \author{
-\strong{Maintainer}: Stefan Coors
+\strong{Maintainer}: Stefan Coors \email{mail@stefancoors.de}
 
 Authors:
 \itemize{

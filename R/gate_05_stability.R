@@ -33,20 +33,22 @@ Gate5Stability = R6::R6Class(
       if (is.null(model)) {
         return(GateResult$new(
           gate_id = self$id, gate_name = self$name, pdr = self$pdr,
-          status = "skip",
-          summary = "No trained final model found; run Gate 1 first.",
+          status = "fail",
+          summary = "Gate 5 requires a trained final model from Gate 1.",
           metrics = NULL
         ))
       }
 
       stab = ctx$stability %||% list()
-      .autoiml_assert_known_names(stab, c("B", "max_features", "grouping"), "ctx$stability")
+      .autoiml_assert_known_names(stab, c("B", "max_features", "grouping", "sanity_checks", "instability_rel_sd_warn"), "ctx$stability")
 
       B = as.integer(stab$B %||% 25L)
       max_features = as.integer(stab$max_features %||% 10L)
       grouping = stab$grouping %||% NULL
+      sanity_checks = isTRUE(stab$sanity_checks %||% TRUE)
+      instability_rel_sd_warn = as.numeric(stab$instability_rel_sd_warn %||% 0.75)
 
-      set.seed(ctx$seed %||% 1L)
+      set.seed(.autoiml_gate_seed(ctx, self$id))
 
       feat_all = task$feature_names
       ft = task$feature_types
@@ -148,11 +150,11 @@ Gate5Stability = R6::R6Class(
       }
 
 
-      imp_list = vector("list", B)
-
       n_full = nrow(X_full)
 
-      for (b in seq_len(B)) {
+      # Core function to compute one bootstrap iteration
+      compute_bootstrap_iteration = function(b, seed_offset = 0L) {
+        set.seed(seed_offset + b)
         idx = sample.int(n_full, size = n_full, replace = TRUE)
 
         X = X_full[idx, , drop = FALSE]
@@ -185,12 +187,11 @@ Gate5Stability = R6::R6Class(
           s1 = apply(p1_mat, 2, function(col) scorer(y, col))
           imp = vapply(s1, function(v) private$importance_delta(base, v, task), numeric(1))
 
-          imp_dt = data.table::data.table(
+          data.table::data.table(
             bootstrap = b,
             feature = feat,
             importance = as.numeric(imp)
           )
-          imp_list[[b]] = imp_dt
         } else {
           g = length(groups)
           n = nrow(X)
@@ -221,13 +222,42 @@ Gate5Stability = R6::R6Class(
           imp = vapply(s1, function(v) private$importance_delta(base, v, task), numeric(1))
 
           group_names = vapply(groups, function(gr) paste(gr, collapse = "+"), character(1))
-          imp_dt = data.table::data.table(
+          data.table::data.table(
             bootstrap = b,
             feature = group_names,
             importance = as.numeric(imp)
           )
-          imp_list[[b]] = imp_dt
         }
+      }
+
+      # Check if future.apply is available for parallel execution
+      # Note: Parallelization requires the package to be installed (not just loaded via
+      # devtools), so that worker processes can load it.
+      use_parallel = FALSE
+      if (requireNamespace("future.apply", quietly = TRUE) &&
+        requireNamespace("future", quietly = TRUE)) {
+        plan_info = future::plan()
+        is_sequential = inherits(plan_info, "sequential") ||
+          identical(class(plan_info)[1L], "sequential")
+        pkg_installed = "mlr3autoiml" %in% rownames(utils::installed.packages())
+        if (!is_sequential && pkg_installed) {
+          use_parallel = TRUE
+        }
+      }
+
+      boot_seed = as.integer(ctx$seed %||% 1L)
+
+      if (use_parallel) {
+        # Parallel execution via future.apply
+        imp_list = future.apply::future_lapply(
+          seq_len(B),
+          function(b) compute_bootstrap_iteration(b, boot_seed),
+          future.seed = TRUE,
+          future.packages = "mlr3autoiml"
+        )
+      } else {
+        # Sequential fallback
+        imp_list = lapply(seq_len(B), function(b) compute_bootstrap_iteration(b, boot_seed))
       }
 
       perm_imp = data.table::rbindlist(imp_list, fill = TRUE)
@@ -249,7 +279,53 @@ Gate5Stability = R6::R6Class(
 
       # stability flag: high relative variability
       rel_sd = perm_imp_summary[, importance_sd / (abs(importance_mean) + 1e-8)]
-      unstable = any(is.finite(rel_sd) & rel_sd > 0.75)
+      unstable = any(is.finite(rel_sd) & rel_sd > instability_rel_sd_warn)
+
+      max_rel_sd = if (length(rel_sd) > 0L && any(is.finite(rel_sd))) max(rel_sd[is.finite(rel_sd)], na.rm = TRUE) else NA_real_
+      stability_tier = if (!is.finite(max_rel_sd)) {
+        "unknown"
+      } else if (max_rel_sd <= 0.40) {
+        "stable"
+      } else if (max_rel_sd <= instability_rel_sd_warn) {
+        "partially_stable"
+      } else {
+        "unstable"
+      }
+
+      sanity_dt = data.table::data.table(
+        task_type = class(task)[1L],
+        check = "label_randomization",
+        baseline_score = NA_real_,
+        randomized_score = NA_real_,
+        sanity_pass = NA
+      )
+
+      if (isTRUE(sanity_checks)) {
+        set.seed(.autoiml_gate_seed(ctx, paste0(self$id, "_sanity")))
+        y_rand = sample(y_full)
+        baseline_score = scorer(y_full, p_full)
+        random_score = scorer(y_rand, p_full)
+
+        sanity_pass = if (inherits(task, "TaskRegr")) {
+          isTRUE(is.finite(random_score) && is.finite(baseline_score) && random_score >= baseline_score * 1.05)
+        } else if (inherits(task, "TaskClassif") && length(task$class_names) == 2L) {
+          isTRUE(is.finite(random_score) && random_score <= 0.60)
+        } else {
+          isTRUE(is.finite(random_score) && is.finite(baseline_score) && random_score <= baseline_score)
+        }
+
+        sanity_dt = data.table::data.table(
+          task_type = class(task)[1L],
+          check = "label_randomization",
+          baseline_score = baseline_score,
+          randomized_score = random_score,
+          sanity_pass = sanity_pass
+        )
+
+        if (!isTRUE(sanity_pass)) {
+          unstable = TRUE
+        }
+      }
 
       status = if (unstable) "warn" else "pass"
       summary = if (unstable) {
@@ -267,14 +343,19 @@ Gate5Stability = R6::R6Class(
         metrics = data.table::data.table(
           B = B,
           n_features = nrow(perm_imp_summary),
-          any_unstable = unstable
+          any_unstable = unstable,
+          max_rel_sd = max_rel_sd,
+          stability_tier = stability_tier,
+          sanity_checks = sanity_checks,
+          sanity_pass = if (nrow(sanity_dt) > 0L) isTRUE(sanity_dt$sanity_pass[[1L]]) else NA
         ),
         artifacts = list(
           perm_importance = perm_imp_summary,
           perm_importance_raw = perm_imp,
           perf_ci = ci_dt,
           grouping_used = if (isTRUE(group_mode)) groups else NULL,
-          grouping_auto = if (exists("auto_grouping")) auto_grouping else FALSE
+          grouping_auto = if (exists("auto_grouping")) auto_grouping else FALSE,
+          sanity_check_result = sanity_dt
         ),
         messages = c(
           "Permutation stability is a heuristic: correlated features and strong model regularization can blur attributions."
@@ -287,14 +368,15 @@ Gate5Stability = R6::R6Class(
 
     primary_scorer = function(task) {
       if (inherits(task, "TaskRegr")) {
-        return(function(y, yhat) .autoiml_rmse(y, yhat))
+        # Direct computation: RMSE
+        return(function(y, yhat) sqrt(mean((y - yhat)^2)))
       }
       if (inherits(task, "TaskClassif")) {
         if (length(task$class_names) == 2L) {
           pos = task$positive %||% task$class_names[2L]
           return(function(y, p) {
-            y01 = as.integer(y == pos)
-            .autoiml_auc(y01, p)
+            y01 = factor(as.integer(y == pos), levels = c(0L, 1L))
+            mlr3measures::auc(y01, p, positive = "1")
           })
         }
         # multiclass fallback: mean prob of true class (higher is better)
