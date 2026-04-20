@@ -54,3 +54,6 @@ rsconnect/
 data/
 paper_artifacts/
 analysis/
+IML_ARTICLE/
+*.pdf
+Simulation_Study.R
