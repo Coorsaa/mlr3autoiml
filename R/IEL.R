@@ -268,29 +268,64 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 # @keywords internal
 .autoiml_eval_iel_rule = function(rule, gate_map, high_stakes = FALSE) {
   rule = .autoiml_as_list(rule)
-  req_gates = as.character(unlist(rule$required_gates %||% character(), use.names = FALSE))
+  req_gates  = as.character(unlist(rule$required_gates %||% character(), use.names = FALSE))
   req_status = as.character(unlist(rule$requires_any_status_in %||% c("pass", "warn"), use.names = FALSE))
+  req_keys   = .autoiml_as_list(rule$requires_artifact_keys)  # named list: gate_id -> required keys
 
+  # condition: high_stakes
   cond = .autoiml_as_list(rule$conditions)
   if (length(cond) > 0L && !is.null(cond$high_stakes)) {
-    need_hs = isTRUE(cond$high_stakes)
-    if (need_hs && !isTRUE(high_stakes)) {
+    if (isTRUE(cond$high_stakes) && !isTRUE(high_stakes)) {
       return(list(matched = FALSE, reason = "high_stakes_condition_not_met"))
     }
   }
 
+  # presence of required gates
   missing_gates = req_gates[!vapply(req_gates, function(g) !is.null(gate_map[[g]]), logical(1L))]
   if (length(missing_gates) > 0L) {
     return(list(matched = FALSE, reason = paste0("missing_gates:", paste(missing_gates, collapse = ","))))
   }
 
+  # status check
   bad_status = req_gates[!vapply(req_gates, function(g) {
     st = as.character(gate_map[[g]]$status %||% "")
     st %in% req_status
   }, logical(1L))]
-
   if (length(bad_status) > 0L) {
     return(list(matched = FALSE, reason = paste0("status_mismatch:", paste(bad_status, collapse = ","))))
+  }
+
+  # NEW: artifact-key check -- per-gate, required keys must exist in $artifacts
+  if (length(req_keys) > 0L) {
+    bad_artifacts = character()
+    for (gid in names(req_keys)) {
+      gobj = gate_map[[gid]]
+      if (is.null(gobj)) {
+        bad_artifacts = c(bad_artifacts, paste0(gid, ":<gate_missing>"))
+        next
+      }
+      arts = .autoiml_as_list(gobj$artifacts)
+      keys_needed = as.character(unlist(req_keys[[gid]], use.names = FALSE))
+      missing_keys = keys_needed[!keys_needed %in% names(arts)]
+      # Also reject keys whose value is NULL or empty list/data.frame
+      empty_keys = vapply(keys_needed, function(k) {
+        if (!k %in% names(arts)) return(FALSE)  # already reported as missing
+        v = arts[[k]]
+        if (is.null(v)) return(TRUE)
+        if (is.data.frame(v) && nrow(v) == 0L) return(TRUE)
+        if (is.list(v) && length(v) == 0L) return(TRUE)
+        FALSE
+      }, logical(1L))
+      empty_now = keys_needed[empty_keys]
+      bad = unique(c(missing_keys, empty_now))
+      if (length(bad) > 0L) {
+        bad_artifacts = c(bad_artifacts, paste0(gid, ":", paste(bad, collapse = "+")))
+      }
+    }
+    if (length(bad_artifacts) > 0L) {
+      return(list(matched = FALSE,
+                  reason = paste0("missing_artifact_keys:", paste(bad_artifacts, collapse = ","))))
+    }
   }
 
   list(matched = TRUE, reason = "matched")
