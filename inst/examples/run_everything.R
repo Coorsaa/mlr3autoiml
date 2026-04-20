@@ -42,9 +42,16 @@ result <- auto$run(verbose = TRUE)
 # --- Overview ----------------------------------------------------------
 auto$overview()
 
-# --- Tables ------------------------------------------------------------
+# --- Report card + reader-facing guide --------------------------------
 auto$report_card()
 
+guide <- auto$guide(max_actions = 6L)
+print(guide$summary)
+print(guide$trust_summary)
+print(guide$model_story)
+print(guide$reader_questions[1:5])
+
+# --- Tables ------------------------------------------------------------
 g2_tables <- auto$tables("g2")
 str(g2_tables, max.level = 1)
 

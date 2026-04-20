@@ -128,7 +128,8 @@ report_card_extended = function(x) {
 #'
 #' @description
 #' Exports compact and extended report cards plus core reproducibility artifacts
-#' (gate results, IEL, claim scope, session info, and traceability status).
+#' (gate results, IEL, claim scope, session info, traceability status, and the
+#' reader-facing guide outputs).
 #'
 #' @param x ([AutoIMLResult] | [AutoIML])
 #'   A completed result or an AutoIML runner.
@@ -153,9 +154,16 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
   rc = report_card(res)
   rce = report_card_extended(res)
   tr = .autoiml_traceability_status()
+  guide = guide_workflow(res, max_actions = 8L)
 
   p_report = file.path(dir, paste0(prefix, "_report_card.csv"))
   p_report_ext = file.path(dir, paste0(prefix, "_report_card_extended.csv"))
+  p_guide_summary = file.path(dir, paste0(prefix, "_guide_summary.csv"))
+  p_guide_actions = file.path(dir, paste0(prefix, "_guide_actions.csv"))
+  p_trust_summary = file.path(dir, paste0(prefix, "_trust_summary.csv"))
+  p_model_story = file.path(dir, paste0(prefix, "_model_story.csv"))
+  p_reader_questions = file.path(dir, paste0(prefix, "_reader_questions.csv"))
+  p_recommended_plots = file.path(dir, paste0(prefix, "_recommended_plots.txt"))
   p_gate_results = file.path(dir, paste0(prefix, "_gate_results.rds"))
   p_iel = file.path(dir, paste0(prefix, "_iel.rds"))
   p_claim_scope = file.path(dir, paste0(prefix, "_claim_scope.rds"))
@@ -164,6 +172,13 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
 
   data.table::fwrite(rc, p_report)
   data.table::fwrite(rce, p_report_ext)
+  data.table::fwrite(guide$summary, p_guide_summary)
+  data.table::fwrite(guide$actions, p_guide_actions)
+  data.table::fwrite(guide$trust_summary, p_trust_summary)
+  data.table::fwrite(guide$model_story, p_model_story)
+  data.table::fwrite(guide$reader_questions, p_reader_questions)
+  writeLines(unique(as.character(guide$recommended_plots)), p_recommended_plots)
+
   saveRDS(res$gate_results, p_gate_results)
   saveRDS(res$iel, p_iel)
   saveRDS(res$claim_scope, p_claim_scope)
@@ -175,6 +190,12 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
   list(
     report_card = p_report,
     report_card_extended = p_report_ext,
+    guide_summary = p_guide_summary,
+    guide_actions = p_guide_actions,
+    trust_summary = p_trust_summary,
+    model_story = p_model_story,
+    reader_questions = p_reader_questions,
+    recommended_plots = p_recommended_plots,
     gate_results = p_gate_results,
     iel = p_iel,
     claim_scope = p_claim_scope,

@@ -14,10 +14,12 @@ A completed result or an AutoIML runner.}
 Maximum number of actions returned.}
 }
 \value{
-Named list with \code{summary}, \code{actions}, and \code{recommended_plots}.
+Named list with \code{summary}, \code{actions}, \code{recommended_plots},
+\code{trust_summary}, \code{model_story}, and \code{reader_questions}.
 }
 \description{
 Produces a compact, machine-readable guide with actionable next steps,
-recommended visualizations, and current claim constraints derived from gate
-outcomes, IEL, and claim semantics.
+recommended visualizations, current claim constraints, and reader-facing
+answers to common interpretation questions derived from gate outcomes, IEL,
+and claim semantics.
 }
