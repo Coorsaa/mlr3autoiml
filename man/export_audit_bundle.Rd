@@ -21,5 +21,6 @@ Named list of exported file paths.
 }
 \description{
 Exports compact and extended report cards plus core reproducibility artifacts
-(gate results, IEL, claim scope, session info, and traceability status).
+(gate results, IEL, claim scope, session info, traceability status, and the
+reader-facing guide outputs).
 }
