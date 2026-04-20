@@ -90,21 +90,6 @@ Gate6Multiplicity = R6::R6Class(
               }
             }
 
-            # Guard against per-learner training/prediction failures during benchmark
-            # (e.g., fold-specific factor-level issues in strict learners). Errors are
-            # encapsulated and mapped to a simple fallback learner.
-            fallback_lrn = tryCatch({
-              if (inherits(task, "TaskClassif")) {
-                mlr3::lrn("classif.featureless", predict_type = if (need_prob) "prob" else "response")
-              } else {
-                mlr3::lrn("regr.featureless")
-              }
-            }, error = function(e) NULL)
-
-            if (!is.null(fallback_lrn)) {
-              try(lr2$encapsulate(method = "evaluate", fallback = fallback_lrn), silent = TRUE)
-            }
-
             learners_to_benchmark[[length(learners_to_benchmark) + 1L]] = lr2
           }
           benchmarkable_n = length(learners_to_benchmark)

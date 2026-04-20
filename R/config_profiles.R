@@ -168,7 +168,6 @@ NULL
   } else if (is_binary) {
     learner_ids = c(
       "classif.featureless",
-      "classif.log_reg",
       "classif.rpart",
       "classif.ranger",
       "classif.xgboost",
@@ -207,28 +206,10 @@ NULL
       lrn$predict_type = "prob"
     }
 
-    # Handle preprocessing (e.g., missing values) consistently.
-    # For classif.log_reg, force factor encoding to avoid fold-specific
-    # factor-level prediction failures in multiplicity benchmarking.
-    if (identical(id, "classif.log_reg")) {
-      robustify_graph = mlr3pipelines::ppl(
-        "robustify",
-        learner = lrn,
-        task = task,
-        factors_to_numeric = TRUE,
-        impute_missings = TRUE
-      )
-      graph = mlr3pipelines::`%>>%`(
-        mlr3pipelines::`%>>%`(robustify_graph, mlr3pipelines::po("encode", id = "encode_logreg_safe", method = "one-hot")),
-        lrn
-      )
-    } else {
-      robustify_graph = mlr3pipelines::ppl("robustify", learner = lrn, task = task)
-      # Use mlr3pipelines::`%>>%` explicitly since it's in Suggests
-      graph = mlr3pipelines::`%>>%`(robustify_graph, lrn)
-    }
+    robustify_graph = mlr3pipelines::pipeline_robustify(task = task, learner = lrn)
+    graph = mlr3pipelines::`%>>%`(robustify_graph, mlr3pipelines::po("learner", learner = lrn))
+
     gl = mlr3::as_learner(graph)
-    # capitalized aselearner id as gl id
     gl$id = toupper(gsub("_", " ", data.table::last(strsplit(id, ".", fixed = TRUE)[[1L]])))
     out[[id]] = gl
   }
