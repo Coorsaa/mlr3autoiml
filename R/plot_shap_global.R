@@ -80,16 +80,24 @@ NULL
   background_n = 200L,
   seed = NULL
 ) {
-  if (!inherits(auto, "AutoIML")) {
-    stop("Expected an AutoIML object.", call. = FALSE)
+  if (inherits(auto, "AutoIML")) {
+    if (is.null(auto$result)) stop("No result yet; call $run() first.", call. = FALSE)
+    ctx = auto$ctx
+    learner_id = auto$learner$id %||% NA_character_
+    seed_default = auto$seed
+  } else if (is.list(auto) && is.environment(auto$ctx)) {
+    ctx = auto$ctx
+    learner_obj = auto[["learner"]]
+    learner_id = learner_obj$id %||% auto[["learner_id"]] %||% NA_character_
+    seed_default = auto[["seed"]] %||% ctx$seed
+  } else {
+    stop("Expected an AutoIML object or auto-like object with `ctx`.", call. = FALSE)
   }
-  if (is.null(auto$result)) stop("No result yet; call $run() first.", call. = FALSE)
 
   if (!requireNamespace("data.table", quietly = TRUE)) {
     stop("Package 'data.table' is required.", call. = FALSE)
   }
 
-  ctx = auto$ctx
   task = ctx$task
   model = ctx$final_model
   if (is.null(model)) stop("No trained final model found. Run $run() first.", call. = FALSE)
@@ -98,7 +106,7 @@ NULL
 
   seed_use = seed
   if (is.null(seed_use)) seed_use = ctx$seed
-  if (is.null(seed_use)) seed_use = auto$seed
+  if (is.null(seed_use)) seed_use = seed_default
   if (is.null(seed_use)) seed_use = 1L
   seed_use = as.integer(seed_use)
 
@@ -118,7 +126,7 @@ NULL
   if (cacheable) {
     key = paste0(
       "shap_global|task=", task$id,
-      "|learner=", auto$learner$id,
+      "|learner=", learner_id,
       "|cls=", if (is.null(cls)) "__regr__" else cls,
       "|n_rows=", as.integer(n_rows),
       "|B=", as.integer(sample_size),
@@ -279,6 +287,11 @@ NULL
 
   # .autoiml_shap_sample_dt() only needs `$ctx`
   auto_like = if (inherits(result, "AutoIML")) result else list(ctx = ctx)
+  if (!inherits(result, "AutoIML")) {
+    auto_like$result = result
+    auto_like$learner_id = result$learner_id
+    auto_like$seed = ctx$seed %||% seed
+  }
 
   dt = .autoiml_shap_sample_dt(
     auto = auto_like,

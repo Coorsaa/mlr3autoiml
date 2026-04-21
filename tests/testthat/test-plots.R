@@ -30,3 +30,19 @@ test_that("AutoIML$plot produces ggplot/patchwork objects and does not accept no
   p6 = auto$plot("storyboard")
   expect_true(inherits(p6, "ggplot") || inherits(p6, "patchwork") || is.list(p6))
 })
+
+test_that("cached global SHAP accepts AutoIMLResult", {
+  auto = get_auto_iris(quick_start = FALSE)
+
+  dt = mlr3autoiml:::.autoiml_shap_global_cached(
+    result = auto$result,
+    class_label = auto$task$class_names[[1L]],
+    sample_rows = 5L,
+    sample_size = 5L,
+    background_n = 10L,
+    seed = 1L
+  )
+
+  expect_true(data.table::is.data.table(dt))
+  expect_gt(nrow(dt), 0L)
+})
