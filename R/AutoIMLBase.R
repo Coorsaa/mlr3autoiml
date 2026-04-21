@@ -125,6 +125,8 @@ AutoIML = R6::R6Class(
       # Dedicated per-gate configuration lists
       self$ctx$structure = list()
       self$ctx$calibration = list()
+      self$ctx$validation = list()
+      self$ctx$plausible_values = list()
       self$ctx$faithfulness = list()
       self$ctx$stability = list()
       self$ctx$multiplicity = list()
@@ -315,6 +317,18 @@ AutoIML = R6::R6Class(
     guide = function(max_actions = 6L) {
       if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
       guide_workflow(self$result, max_actions = max_actions)
+    },
+
+    #' @description
+    #' Return the current planned gate sequence implied by the configured claim.
+    #'
+    #' @return A list of gate objects in execution order.
+    gate_plan = function() {
+      private$gate_plan_from_claim(
+        claim = self$ctx$claim,
+        purpose = self$ctx$purpose %||% self$purpose,
+        quick_start = self$ctx$quick_start %||% self$quick_start
+      )
     },
 
     #' @description

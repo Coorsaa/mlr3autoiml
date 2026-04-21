@@ -77,8 +77,11 @@ Gate1Validity = R6::R6Class(
 
       if (!is.null(ctx$seed)) set.seed(.autoiml_gate_seed(ctx, self$id))
 
-      # instantiate resampling (important for reproducibility)
-      resampling$instantiate(task)
+      # instantiate resampling only when no fixed split instance was supplied
+      has_instance = tryCatch(as.integer(resampling$iters) > 0L, error = function(e) FALSE)
+      if (!isTRUE(has_instance)) {
+        resampling$instantiate(task)
+      }
 
       # choose default measures
       measures = private$default_measures(task)
@@ -90,6 +93,92 @@ Gate1Validity = R6::R6Class(
       agg = rr$aggregate(measures)
       agg_dt = private$agg_to_dt(agg)
       pred = rr$prediction(predict_sets = "test")
+
+      # ---- Plausible-values pooling (Rubin's rules), v0.0.5 ----
+      # If the user passes additional plausible-value targets via
+      #   ctx$plausible_values$pv_tasks  : list of mlr3 TaskRegr (one per extra PV)
+      # we train one extra resample per PV and pool per-fold metrics across PVs
+      # using Rubin's rules on the same instantiated resampling splits:
+      #   T = W + (1 + 1/m) * B
+      pv_pool = NULL
+      pv_cfg = .autoiml_as_list(ctx$plausible_values)
+      .autoiml_assert_known_names(pv_cfg, c("pv_tasks"), "ctx$plausible_values")
+      pv_tasks = pv_cfg$pv_tasks %||% list()
+      if (inherits(pv_tasks, "Task")) pv_tasks = list(pv_tasks)
+      if (!is.list(pv_tasks)) {
+        stop("ctx$plausible_values$pv_tasks must be NULL, a TaskRegr, or a list of TaskRegr objects.", call. = FALSE)
+      }
+      if (length(pv_tasks) > 0L && !inherits(task, "TaskRegr")) {
+        stop("ctx$plausible_values$pv_tasks is only supported for regression tasks.", call. = FALSE)
+      }
+      if (length(pv_tasks) > 0L) {
+        base_row_ids = task$row_ids
+        base_features = task$feature_names
+        per_pv_scores = vector("list", length = length(pv_tasks) + 1L)
+        per_pv_scores[[1L]] = scores
+        for (k in seq_along(pv_tasks)) {
+          tk = pv_tasks[[k]]
+          if (!inherits(tk, "TaskRegr")) {
+            stop(sprintf("ctx$plausible_values$pv_tasks[[%d]] must inherit from TaskRegr.", k), call. = FALSE)
+          }
+          if (!identical(tk$row_ids, base_row_ids)) {
+            stop(sprintf("ctx$plausible_values$pv_tasks[[%d]] must use the same row_ids as ctx$task so Gate 1 can reuse the instantiated resampling splits.", k), call. = FALSE)
+          }
+          if (!identical(tk$feature_names, base_features)) {
+            stop(sprintf("ctx$plausible_values$pv_tasks[[%d]] must use the same feature set as ctx$task.", k), call. = FALSE)
+          }
+
+          # Reuse the exact same instantiated folds as the primary task so
+          # between-PV variance reflects outcome uncertainty rather than new split noise.
+          rsk = resampling$clone(deep = TRUE)
+          rrk = mlr3::resample(tk, learner, rsk, store_models = FALSE, store_backends = FALSE)
+          per_pv_scores[[k + 1L]] = rrk$score(measures)
+        }
+        pool_rows = vector("list", length = length(measures))
+        names(pool_rows) = vapply(measures, function(m) m$id, character(1L))
+        for (mid in vapply(measures, function(m) m$id, character(1L))) {
+          pv_fold_means = vapply(per_pv_scores, function(s) {
+            v = as.numeric(s[[mid]])
+            v = v[is.finite(v)]
+            if (length(v) < 1L) return(NA_real_)
+            mean(v)
+          }, numeric(1L))
+          pv_fold_within_var = vapply(per_pv_scores, function(s) {
+            v = as.numeric(s[[mid]])
+            v = v[is.finite(v)]
+            if (length(v) < 2L) return(NA_real_)
+            stats::var(v) / length(v)
+          }, numeric(1L))
+
+          pv_fold_means = pv_fold_means[is.finite(pv_fold_means)]
+          pv_fold_within_var = pv_fold_within_var[is.finite(pv_fold_within_var)]
+
+          m_pv = length(pv_fold_means)
+          mean_val = if (m_pv > 0L) mean(pv_fold_means) else NA_real_
+          within_var = if (length(pv_fold_within_var) > 0L) mean(pv_fold_within_var) else NA_real_
+          between_var = if (m_pv > 1L) stats::var(pv_fold_means) else 0
+          total_var = if (is.finite(within_var)) within_var + (1 + 1 / max(m_pv, 1L)) * between_var else NA_real_
+          se_pooled = if (is.finite(total_var) && total_var >= 0) sqrt(total_var) else NA_real_
+          df_pooled = private$rubin_df(within_var = within_var, between_var = between_var, m = m_pv)
+          tcrit = if (is.finite(df_pooled)) stats::qt(0.975, df = df_pooled) else stats::qnorm(0.975)
+          ci_delta = if (is.finite(se_pooled) && is.finite(tcrit)) tcrit * se_pooled else NA_real_
+
+          pool_rows[[mid]] = data.table::data.table(
+            measure_id = mid,
+            n_pv = m_pv,
+            pooled_mean = mean_val,
+            pooled_se = se_pooled,
+            within_var = within_var,
+            between_var = as.numeric(between_var),
+            total_var = total_var,
+            df = df_pooled,
+            ci_low = if (is.finite(ci_delta)) mean_val - ci_delta else NA_real_,
+            ci_high = if (is.finite(ci_delta)) mean_val + ci_delta else NA_real_
+          )
+        }
+        pv_pool = data.table::rbindlist(pool_rows, fill = TRUE)
+      }
+      # ---- end PV pooling ----
 
       measure_ids = vapply(measures, function(m) m$id, character(1L))
       metric_cols = intersect(measure_ids, names(scores))
@@ -220,7 +309,8 @@ Gate1Validity = R6::R6Class(
             resampling_id = resampling$id,
             split_policy = split_policy,
             n_splits = rr$iters
-          )
+          ),
+          pv_pool = pv_pool   # NULL unless ctx$plausible_values$pv_tasks supplied
         ),
         messages = c(baseline_msg, preflight_msgs)
       )
@@ -244,6 +334,23 @@ Gate1Validity = R6::R6Class(
 
       # fallback
       tryCatch(data.table::as.data.table(x), error = function(e) NULL)
+    },
+
+    rubin_df = function(within_var, between_var, m) {
+      if (!is.numeric(m) || length(m) != 1L || m < 1L) {
+        return(NA_real_)
+      }
+      if (!is.finite(between_var) || between_var <= 0 || m <= 1L) {
+        return(Inf)
+      }
+      if (is.finite(within_var) && within_var > 0) {
+        rel_increase = ((1 + 1 / m) * between_var) / within_var
+        if (is.finite(rel_increase) && rel_increase > 0) {
+          return((m - 1) * (1 + 1 / rel_increase)^2)
+        }
+        return(Inf)
+      }
+      m - 1
     },
 
     default_measures = function(task) {

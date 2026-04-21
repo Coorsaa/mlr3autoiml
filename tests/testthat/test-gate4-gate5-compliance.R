@@ -39,8 +39,10 @@ test_that("Gate4 emits perturbation and surrogate artifacts for local/decision c
   res = auto$run(verbose = FALSE)
   g4 = res$gate_results[["G4"]]
   expect_true(g4$status %in% c("pass", "warn", "fail"))
+  expect_true("faithfulness_summary" %in% names(g4$artifacts))
   expect_true("perturbation_design" %in% names(g4$artifacts))
   expect_true("surrogate_spec" %in% names(g4$artifacts))
+  expect_true(data.table::is.data.table(g4$artifacts$faithfulness_summary))
   expect_true(data.table::is.data.table(g4$artifacts$perturbation_design))
   expect_true(data.table::is.data.table(g4$artifacts$surrogate_spec))
 })

@@ -22,6 +22,37 @@ test_that("Gate1Validity emits uncertainty and leakage checklist artifacts", {
 })
 
 
+test_that("Gate1Validity pools plausible values on identical resampling splits", {
+  g1 = mlr3autoiml:::Gate1Validity$new()
+
+  task = make_task_mtcars_regr()
+  learner = make_learner_regr_rpart()
+  resampling = make_resampling_cv(folds = 3L)
+
+  dt_pv2 = mtcars
+  dt_pv2$mpg = dt_pv2$mpg + 1
+  task_pv2 = mlr3::as_task_regr(mpg ~ ., data = dt_pv2, id = "mtcars_regr_pv2")
+
+  ctx = list(
+    task = task,
+    learner = learner,
+    resampling = resampling,
+    seed = 1L,
+    validation = list(split_policy = "cv"),
+    plausible_values = list(pv_tasks = list(task_pv2))
+  )
+
+  out = g1$run(ctx)
+  pv_pool = out$artifacts$pv_pool
+
+  expect_true(out$status %in% c("pass", "warn"))
+  expect_true(data.table::is.data.table(pv_pool))
+  expect_setequal(pv_pool$measure_id, c("regr.rmse", "regr.rsq"))
+  expect_true(all(pv_pool$n_pv == 2L))
+  expect_true(all(c("total_var", "df", "ci_low", "ci_high") %in% names(pv_pool)))
+})
+
+
 test_that("Gate3Calibration emits decision_range artifact", {
   task = make_task_iris_binary()
   learner = make_learner_classif_rpart()

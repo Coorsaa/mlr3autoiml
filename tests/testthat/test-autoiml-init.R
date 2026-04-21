@@ -25,6 +25,8 @@ test_that("AutoIML initializes and applies config", {
   expect_equal(auto$ctx$structure$max_features, 2L)
   expect_true(is.list(auto$ctx$calibration))
   expect_equal(auto$ctx$calibration$n_bins, 8L)
+  expect_true(is.list(auto$ctx$validation))
+  expect_true(is.list(auto$ctx$plausible_values))
 
   # wrapper should return AutoIMLResult
   res = mlr3autoiml::autoiml(
