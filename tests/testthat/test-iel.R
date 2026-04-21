@@ -44,15 +44,28 @@ test_that("iel_from_gates returns claim-scoped IEL list", {
   expect_equal(iel1$global, "IEL-1")
   expect_equal(iel1$overall, "IEL-1")
 
-  g_lvl2 = c(g_lvl1, list(
-    G6 = make_gr("G6", "pass")
+  g_lvl2 = g_lvl1
+  g_lvl2$G2 = make_gr("G2", "pass", artifacts = list(
+    ale_curves = data.table::data.table(feature = "x", x = 1, ale = 0),
+    hstats = data.table::data.table(feature = "x", hstat = 0.1)
+  ))
+  g_lvl2$G5 = make_gr("G5", "pass", artifacts = list(
+    perm_importance = data.table::data.table(feature = "x", importance = 0.1)
+  ))
+  g_lvl2$G6 = make_gr("G6", "pass", artifacts = list(
+    rashomon_set = data.table::data.table(learner_id = "lr", mean = 0.1)
   ))
   iel2 = mlr3autoiml::iel_from_gates(g_lvl2)
   expect_equal(iel2$global, "IEL-2")
   expect_equal(iel2$overall, "IEL-2")
 
-  g_lvl3 = c(g_lvl2, list(
-    G7B = make_gr("G7B", "pass")
+  g_lvl3 = g_lvl2
+  g_lvl3$G6 = make_gr("G6", "pass", artifacts = list(
+    rashomon_set = data.table::data.table(learner_id = "lr", mean = 0.1),
+    shift_assessment = data.table::data.table(group = "a", metric = 0.1)
+  ))
+  g_lvl3$G7B = make_gr("G7B", "pass", artifacts = list(
+    human_factors_evidence = list(usability_test = "completed")
   ))
   iel3 = mlr3autoiml::iel_from_gates(g_lvl3)
   expect_equal(iel3$global, "IEL-2")
@@ -73,6 +86,39 @@ test_that("iel_from_gates returns claim-scoped IEL list", {
   g_fail$G1 = make_gr("G1", "fail")
   iel0 = mlr3autoiml::iel_from_gates(g_fail)
   expect_equal(iel0$overall, "IEL-0")
+})
+
+test_that("iel_from_gates enforces artifact evidence for upgraded levels", {
+  make_gr = function(id, status, artifacts = NULL) {
+    mlr3autoiml::GateResult$new(
+      gate_id = id,
+      gate_name = id,
+      pdr = "P",
+      status = status,
+      summary = "",
+      artifacts = artifacts
+    )
+  }
+
+  claim_art = list(claim = list(
+    claims = list(global = TRUE, local = FALSE, decision = FALSE),
+    stakes = "medium",
+    purpose = "global_insight"
+  ))
+
+  gates = list(
+    G0A = make_gr("G0A", "pass", artifacts = claim_art),
+    G0B = make_gr("G0B", "pass"),
+    G1 = make_gr("G1", "pass"),
+    G2 = make_gr("G2", "pass"),
+    G5 = make_gr("G5", "pass"),
+    G6 = make_gr("G6", "pass"),
+    G7A = make_gr("G7A", "pass")
+  )
+
+  iel = mlr3autoiml::iel_from_gates(gates)
+  expect_equal(iel$global, "IEL-1")
+  expect_true(any(grepl("missing_artifact_keys", iel$iel_justification$global$reason, fixed = TRUE)))
 })
 
 test_that("claim_scope_from_iel expects claim-scoped IEL list", {

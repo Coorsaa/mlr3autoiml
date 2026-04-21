@@ -264,7 +264,20 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 }
 
 
-# Declarative IEL rule evaluation (Milestone E)
+# Declarative IEL rule evaluation (Milestone E + artifact-key extension, v0.0.5)
+#
+# Supports two per-rule checks:
+#   1. Status check: gate_map[gid]$status must be in `requires_any_status_in`
+#      (defaults to c("pass", "warn")).
+#   2. Artifact-key check (NEW in 0.0.5): when `requires_artifact_keys` is
+#      present in a rule (schema v0.3.0+), the listed keys must exist and be
+#      non-empty in gate_map[gid]$artifacts. Empty data.frames, NULL,
+#      zero-length atomic vectors, and zero-length lists are rejected.
+#
+# This ensures the declarative IEL ceiling reflects substantive evidence
+# (faithfulness curves, rashomon set, recalibration evaluation, ...) rather
+# than merely the gate's pass/warn status.
+#
 # @keywords internal
 .autoiml_eval_iel_rule = function(rule, gate_map, high_stakes = FALSE) {
   rule = .autoiml_as_list(rule)
@@ -295,7 +308,7 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
     return(list(matched = FALSE, reason = paste0("status_mismatch:", paste(bad_status, collapse = ","))))
   }
 
-  # NEW: artifact-key check -- per-gate, required keys must exist in $artifacts
+  # NEW: artifact-key check - per-gate, required keys must exist and be non-empty
   if (length(req_keys) > 0L) {
     bad_artifacts = character()
     for (gid in names(req_keys)) {
@@ -307,13 +320,15 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
       arts = .autoiml_as_list(gobj$artifacts)
       keys_needed = as.character(unlist(req_keys[[gid]], use.names = FALSE))
       missing_keys = keys_needed[!keys_needed %in% names(arts)]
-      # Also reject keys whose value is NULL or empty list/data.frame
+      # Reject keys whose value is NULL or empty list/data.frame/vector
       empty_keys = vapply(keys_needed, function(k) {
         if (!k %in% names(arts)) return(FALSE)  # already reported as missing
         v = arts[[k]]
         if (is.null(v)) return(TRUE)
         if (is.data.frame(v) && nrow(v) == 0L) return(TRUE)
-        if (is.list(v) && length(v) == 0L) return(TRUE)
+        if (!is.list(v) && length(v) == 0L) return(TRUE)
+        if (is.character(v) && length(v) == 1L && !nzchar(v)) return(TRUE)
+        if (is.list(v) && !is.data.frame(v) && length(v) == 0L) return(TRUE)
         FALSE
       }, logical(1L))
       empty_now = keys_needed[empty_keys]

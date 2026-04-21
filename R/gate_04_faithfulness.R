@@ -207,6 +207,16 @@ Gate4Faithfulness = R6::R6Class(
       shap_check = data.table::data.table()
       interaction_check = data.table::data.table()
 
+      cast_like_feature = function(values, template) {
+        if (is.integer(template)) {
+          return(as.integer(round(values)))
+        }
+        if (is.numeric(template)) {
+          return(as.numeric(values))
+        }
+        values
+      }
+
       for (r in check_rows) {
         x0 = task$data(rows = r, cols = task$feature_names)
 
@@ -294,8 +304,8 @@ Gate4Faithfulness = R6::R6Class(
               ))
 
               # (lo1, lo2), (hi1, lo2), (lo1, hi2), (hi1, hi2)
-              grid[[f1]] = c(lo1, hi1, lo1, hi1)
-              grid[[f2]] = c(lo2, lo2, hi2, hi2)
+              grid[[f1]] = cast_like_feature(c(lo1, hi1, lo1, hi1), X[[f1]])
+              grid[[f2]] = cast_like_feature(c(lo2, lo2, hi2, hi2), X[[f2]])
 
               pred_grid = .autoiml_predict_matrix(task, model, grid)
               fg = if (is.null(cls_keep)) as.numeric(pred_grid[, 1L]) else as.numeric(pred_grid[, cls_keep])
@@ -381,6 +391,20 @@ Gate4Faithfulness = R6::R6Class(
         interaction_delta_sd = as.numeric(cfg$interaction_delta_sd %||% 0.25)
       )
 
+      faithfulness_summary = data.table::data.table(
+        semantics = semantics,
+        shap_mode = shap_mode,
+        score = score_name,
+        n_local_checks = nrow(shap_check),
+        n_interaction_checks = nrow(interaction_check),
+        surrogate_r2 = surrogate_r2,
+        surrogate_rmse = surrogate_rmse,
+        shap_mae = shap_mae,
+        shap_max_abs_error = shap_max,
+        local_interaction_mean = int_mean,
+        local_interaction_max = int_max
+      )
+
       surrogate_spec = data.table::data.table(
         surrogate_family = "linear_model",
         n_complete_rows = nrow(Xc),
@@ -400,6 +424,7 @@ Gate4Faithfulness = R6::R6Class(
         metrics = metrics,
         artifacts = list(
           shap_check = shap_check,
+          faithfulness_summary = faithfulness_summary,
           local_interaction_check = interaction_check,
           perturbation_design = perturbation_design,
           surrogate_spec = surrogate_spec

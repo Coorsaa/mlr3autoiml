@@ -454,15 +454,19 @@ NULL
   )
 
   allowed_calibration = c("thresholds", "bins")
+  allowed_validation = c("split_policy", "cluster_var", "time_var", "site_var")
+  allowed_plausible_values = c("pv_tasks")
 
   allowed_stability = c("B", "max_features", "grouping", "sanity_checks", "instability_rel_sd_warn")
   allowed_multiplicity = c(
-    "enabled", "max_alt_learners", "rashomon_rule", "importance_n", "importance_max_features",
-    "require_transport_for_high_stakes"
+    "enabled", "max_alt_learners", "rashomon_rule", "epsilon", "importance_n", "importance_max_features",
+    "require_transport_for_high_stakes", "group_col", "transport_mode", "transport_measure_id"
   )
 
   if (!is.null(ctx$structure)) .autoiml_assert_known_names(ctx$structure, allowed_structure, "ctx$structure")
   if (!is.null(ctx$calibration)) .autoiml_assert_known_names(ctx$calibration, allowed_calibration, "ctx$calibration")
+  if (!is.null(ctx$validation)) .autoiml_assert_known_names(ctx$validation, allowed_validation, "ctx$validation")
+  if (!is.null(ctx$plausible_values)) .autoiml_assert_known_names(ctx$plausible_values, allowed_plausible_values, "ctx$plausible_values")
   if (!is.null(ctx$stability)) .autoiml_assert_known_names(ctx$stability, allowed_stability, "ctx$stability")
   if (!is.null(ctx$multiplicity)) .autoiml_assert_known_names(ctx$multiplicity, allowed_multiplicity, "ctx$multiplicity")
 
@@ -656,6 +660,25 @@ NULL
     st = as.character(unlist(r$requires_any_status_in %||% character(), use.names = FALSE))
     if (length(st) < 1L || any(!st %in% allowed_status)) {
       out$errors = c(out$errors, paste0(tag, " requires_any_status_in must be subset of {pass,warn}"))
+    }
+
+    req_keys = r$requires_artifact_keys %||% NULL
+    if (!is.null(req_keys)) {
+      if (!is.list(req_keys) || length(req_keys) < 1L || is.null(names(req_keys)) || any(!nzchar(names(req_keys)))) {
+        out$errors = c(out$errors, paste0(tag, " requires_artifact_keys must be a named list of gate ids -> artifact keys"))
+      } else {
+        bad_gate_refs = setdiff(names(req_keys), rg)
+        if (length(bad_gate_refs) > 0L) {
+          out$errors = c(out$errors, paste0(tag, " requires_artifact_keys references gates not listed in required_gates: ", paste(bad_gate_refs, collapse = ", ")))
+        }
+
+        for (gid in names(req_keys)) {
+          keys = as.character(unlist(req_keys[[gid]], use.names = FALSE))
+          if (length(keys) < 1L || any(!nzchar(keys))) {
+            out$errors = c(out$errors, paste0(tag, " requires_artifact_keys$", gid, " must contain non-empty artifact key names"))
+          }
+        }
+      }
     }
   }
 
