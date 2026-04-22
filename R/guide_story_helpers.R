@@ -1,4 +1,5 @@
 #' @title Internal story helpers for `guide_workflow()`
+#' @name guide_story_helpers
 #' @keywords internal
 NULL
 
@@ -265,12 +266,12 @@ NULL
 
   perf = data.table::copy(perf)
   perf[, learner_id := as.character(learner_id)]
-  perf[, complexity_rank := vapply(learner_id, .autoiml_complexity_rank, numeric(1L))]
-  perf[, complexity_bucket := vapply(learner_id, .autoiml_complexity_bucket, character(1L))]
+  data.table::set(perf, j = "complexity_rank", value = vapply(perf[["learner_id"]], .autoiml_complexity_rank, numeric(1L)))
+  data.table::set(perf, j = "complexity_bucket", value = vapply(perf[["learner_id"]], .autoiml_complexity_bucket, character(1L)))
   perf[, in_rashomon := if ("in_rashomon" %in% names(perf)) as.logical(in_rashomon) else learner_id %in% as.character(rashomon$learner_id %||% character())]
 
   best = .autoiml_pick_best_row(perf, minimize = minimize)
-  simple = perf[complexity_bucket == "simple"]
+  simple = perf[perf[["complexity_bucket"]] == "simple"]
   best_simple = .autoiml_pick_best_row(simple, minimize = minimize)
 
   simple_in_rashomon = FALSE
@@ -349,6 +350,13 @@ NULL
   iel_global = as.character(res$iel$global %||% NA_character_)
   iel_local = as.character(res$iel$local %||% NA_character_)
   iel_decision = as.character(res$iel$decision %||% NA_character_)
+  requested = as.character(res$iel$requested %||% c("global"))
+  scope_label = function(scope, iel) {
+    if (!scope %in% requested) {
+      return("not requested")
+    }
+    .autoiml_scope_support_label(iel)
+  }
 
   answer = "Performance alone is never enough to trust interpretations."
   if (identical(g1_status, "fail")) {
@@ -358,11 +366,11 @@ NULL
   } else if (identical(g1_status, "pass")) {
     answer = paste0(
       "Not from performance alone. Predictive adequacy is in place, but the usable interpretation scope is still constrained by the later gates: global = ",
-      .autoiml_scope_support_label(iel_global),
+      scope_label("global", iel_global),
       ", local = ",
-      .autoiml_scope_support_label(iel_local),
+      scope_label("local", iel_local),
       ", decision = ",
-      .autoiml_scope_support_label(iel_decision),
+      scope_label("decision", iel_decision),
       "."
     )
   }
@@ -373,7 +381,7 @@ NULL
   } else if (identical(g4_status, "warn") || identical(g5_status, "warn") || identical(g6_status, "warn")) {
     next_step = "Keep global claims ahead of local case narratives, and report robustness limits explicitly."
   }
-  if (identical(iel_decision, "IEL-0") || identical(g3_status, "warn") || identical(g3_status, "fail")) {
+  if ("decision" %in% requested && (identical(iel_decision, "IEL-0") || identical(g3_status, "warn") || identical(g3_status, "fail"))) {
     next_step = paste0(next_step, " Do not convert the score into thresholded decisions until calibration and utility evidence are in place.")
   }
 
@@ -404,6 +412,7 @@ NULL
   model_story = .autoiml_model_story(res)
   claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %||% list())
   semantics = as.character(claim$semantics %||% NA_character_)[1L]
+  requested = as.character(res$iel$requested %||% c("global"))
   g0b = .autoiml_get_gate_result(res, "G0B")
   g2 = .autoiml_get_gate_result(res, "G2")
   g4 = .autoiml_get_gate_result(res, "G4")
@@ -459,7 +468,9 @@ NULL
     data.table::data.table(
       question_id = "case_level_claims",
       reader_question = "Can I make case-level claims from the local explanations?",
-      short_answer = if (identical(res$iel$local %||% "IEL-0", "IEL-0")) {
+      short_answer = if (!"local" %in% requested) {
+        "Not part of the current Claim and Semantics Card: no case-level claim is being made."
+      } else if (identical(res$iel$local %||% "IEL-0", "IEL-0")) {
         "No. Local case-level claims are not yet supported by the current evidence pattern."
       } else {
         paste0("Only with guardrails. Local claims are ", .autoiml_scope_support_label(res$iel$local), ".")
@@ -471,7 +482,9 @@ NULL
     data.table::data.table(
       question_id = "decision_use",
       reader_question = "Can I turn the model into thresholded decisions or interventions?",
-      short_answer = if (identical(res$iel$decision %||% "IEL-0", "IEL-0")) {
+      short_answer = if (!"decision" %in% requested) {
+        "Not part of the current Claim and Semantics Card: the workflow is not currently supporting thresholded decisions or interventions."
+      } else if (identical(res$iel$decision %||% "IEL-0", "IEL-0")) {
         "No. Decision use is blocked until calibration, thresholds, utility assumptions, and subgroup consequences are justified."
       } else {
         paste0("Only within the explicitly evaluated decision range, because decision evidence is ", .autoiml_scope_support_label(res$iel$decision), ".")
@@ -525,7 +538,9 @@ NULL
     data.table::data.table(
       question_id = "subgroups_and_measurement",
       reader_question = "Can I generalize the interpretation across subgroups, and do measurement issues matter here?",
-      short_answer = if (identical(g7a$status %||% NA_character_, "pass")) {
+      short_answer = if (is.null(g7a)) {
+        "Subgroup and audience auditing are not part of the current claim scope, so no broad subgroup generalization should be made."
+      } else if (identical(g7a$status %||% NA_character_, "pass")) {
         "Only cautiously. Subgroup auditing exists, but subgroup differences still depend on measurement comparability and construct quality."
       } else {
         "Not yet. Subgroup-facing interpretation needs both subgroup audits and explicit measurement/comparability information."

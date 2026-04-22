@@ -79,6 +79,7 @@ Latest result produced by \verb{$run()}.}
 \item \href{#method-AutoIML-report_card_extended}{\code{AutoIML$report_card_extended()}}
 \item \href{#method-AutoIML-export_audit_bundle}{\code{AutoIML$export_audit_bundle()}}
 \item \href{#method-AutoIML-guide}{\code{AutoIML$guide()}}
+\item \href{#method-AutoIML-gate_plan}{\code{AutoIML$gate_plan()}}
 \item \href{#method-AutoIML-tables}{\code{AutoIML$tables()}}
 \item \href{#method-AutoIML-overview}{\code{AutoIML$overview()}}
 \item \href{#method-AutoIML-plot}{\code{AutoIML$plot()}}
@@ -231,6 +232,19 @@ Return guided next-step recommendations for the latest run.
 }
 \subsection{Returns}{
 Named list with summary, actions, and recommended plots.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-AutoIML-gate_plan"></a>}}
+\if{latex}{\out{\hypertarget{method-AutoIML-gate_plan}{}}}
+\subsection{Method \code{gate_plan()}}{
+Return the current planned gate sequence implied by the configured claim.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{AutoIML$gate_plan()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+A list of gate objects in execution order.
 }
 }
 \if{html}{\out{<hr>}}

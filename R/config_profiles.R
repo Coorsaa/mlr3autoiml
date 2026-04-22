@@ -247,8 +247,8 @@ NULL
     purpose,
     "exploratory" = list(global = TRUE, local = FALSE, decision = FALSE),
     "global_insight" = list(global = TRUE, local = FALSE, decision = FALSE),
-    "decision_support" = list(global = TRUE, local = TRUE, decision = TRUE),
-    "deployment" = list(global = TRUE, local = TRUE, decision = TRUE)
+    "decision_support" = list(global = TRUE, local = FALSE, decision = TRUE),
+    "deployment" = list(global = TRUE, local = FALSE, decision = TRUE)
   )
 
   default_claim = list(

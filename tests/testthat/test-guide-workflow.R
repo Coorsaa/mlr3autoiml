@@ -9,6 +9,7 @@ test_that("guide_workflow returns actionable structure", {
   expect_true(is.list(g1))
   expect_true(all(c("summary", "actions", "recommended_plots") %in% names(g1)))
   expect_true(data.table::is.data.table(g1$summary))
+  expect_true("requested_scopes" %in% names(g1$summary))
   expect_true(data.table::is.data.table(g1$actions))
   expect_true(is.character(g1$recommended_plots))
 

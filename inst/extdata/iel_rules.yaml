@@ -1,106 +1,183 @@
-version: 0.3.0
-updated: 2026-04-17
+version: 0.4.0
+updated: 2026-04-21
 levels: [IEL-0, IEL-1, IEL-2, IEL-3]
 scopes: [global, local, decision]
 
-# CHANGE LOG (vs v0.2.0):
-# - Added optional `requires_artifact_keys`: per-rule requirement that named
-#   artifact fields exist on the gate's GateResult. This lets the IEL ceiling
-#   reflect substantive evidence (faithfulness, multiplicity, recalibration
-#   pre/post), not just gate-level pass/warn status.
-# - The old `requires_any_status_in` semantics is preserved.
-# - Evaluator should check both lists; missing artifact keys -> rule does
-#   not match. Implementation in R/IEL.R:.autoiml_eval_iel_rule().
+# Rules are aligned to the manuscript's simplified backbone:
+# claim card -> core path -> triggered additional gates -> claim-scoped IEL.
 #
-# Motivation: with the old rules, a gate that runs but produces only a thin
-# artifact (e.g. G4 ran the SHAP check but did not record the perturbation
-# design or faithfulness summary) still permits IEL-2L. The artifact-key
-# requirement aligns the IEL ceiling with the paper's per-level evidence
-# rubric in Section 5 / Appendix.
+# Important consequences for the automation:
+# - Global and local claims do NOT require Gate 7 by default.
+# - Decision claims do require subgroup auditing (G7A), but Gate 7B is only
+#   required for user-facing / non-technical audiences.
+# - Upper IEL tiers require stronger gate statuses (pass, not merely warn)
+#   where the manuscript treats the corresponding evidence as decisive.
+# - Gate 6 is only universal for IEL-3, not for IEL-2.
 
 rules:
   - id: IEL-GLOBAL-1
     scope: global
     level: IEL-1
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G5, G7A]
+    required_gates: [G0A, G0B, G1, G2, G5]
+    gate_status_requirements:
+      G1: [pass]
 
   - id: IEL-GLOBAL-2
     scope: global
     level: IEL-2
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G5, G6, G7A]
+    required_gates: [G0A, G0B, G1, G2, G5]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G5: [pass]
     requires_artifact_keys:
-      G2: [ale_curves, hstats]
+      G2: [recommendation, ale_curves]
       G5: [perm_importance]
-      G6: [rashomon_set]
 
   - id: IEL-GLOBAL-3
     scope: global
     level: IEL-3
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G5, G6, G7A, G7B]
+    required_gates: [G0A, G0B, G1, G2, G5, G6]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G5: [pass]
+      G6: [pass]
     requires_artifact_keys:
+      G2: [recommendation, ale_curves]
+      G5: [perm_importance]
       G6: [rashomon_set, shift_assessment]
-      G7B: [human_factors_evidence]
-    conditions:
-      high_stakes: true
 
   - id: IEL-LOCAL-1
     scope: local
     level: IEL-1
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G4, G5, G7A]
+    required_gates: [G0A, G0B, G1, G2, G4, G5]
+    gate_status_requirements:
+      G1: [pass]
+    requires_artifact_keys:
+      G4: [shap_check, perturbation_design]
 
   - id: IEL-LOCAL-2
     scope: local
     level: IEL-2
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7A]
+    required_gates: [G0A, G0B, G1, G2, G4, G5]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G4: [pass]
+      G5: [pass]
     requires_artifact_keys:
-      G4: [shap_check, faithfulness_summary, perturbation_design]
-      G6: [explanation_multiplicity]
+      G4: [shap_check, faithfulness_summary, perturbation_design, local_interaction_check]
 
-  - id: IEL-LOCAL-3
+  - id: IEL-LOCAL-3-TECH
     scope: local
     level: IEL-3
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7A, G7B]
+    required_gates: [G0A, G0B, G1, G2, G4, G5, G6]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G4: [pass]
+      G5: [pass]
+      G6: [pass]
+    requires_artifact_keys:
+      G4: [shap_check, faithfulness_summary, perturbation_design, local_interaction_check]
+      G6: [explanation_multiplicity, shift_assessment]
+    conditions:
+      user_facing: false
+
+  - id: IEL-LOCAL-3-USER
+    scope: local
+    level: IEL-3
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7B]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G4: [pass]
+      G5: [pass]
+      G6: [pass]
+      G7B: [pass]
     requires_artifact_keys:
       G4: [shap_check, faithfulness_summary, perturbation_design, local_interaction_check]
       G6: [explanation_multiplicity, shift_assessment]
       G7B: [human_factors_evidence]
     conditions:
-      high_stakes: true
+      user_facing: true
 
   - id: IEL-DECISION-1
     scope: decision
     level: IEL-1
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G3, G7A]
+    required_gates: [G0A, G0B, G1, G2, G3, G5, G7A]
+    gate_status_requirements:
+      G1: [pass]
+      G3: [pass]
     requires_artifact_keys:
       G3: [reliability, dca]
+      G7A: [subgroup]
 
   - id: IEL-DECISION-2
     scope: decision
     level: IEL-2
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G3, G4, G5, G7A]
+    required_gates: [G0A, G0B, G1, G2, G3, G5, G7A]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G3: [pass]
+      G5: [pass]
+      G7A: [pass]
     requires_artifact_keys:
       G3: [reliability, dca, utility_curve, utility_spec]
-      G4: [shap_check, faithfulness_summary, perturbation_design]
       G5: [perm_importance]
+      G7A: [subgroup]
 
-  - id: IEL-DECISION-3
+  - id: IEL-DECISION-3-TECH
     scope: decision
     level: IEL-3
     requires_any_status_in: [pass, warn]
-    required_gates: [G0A, G0B, G1, G3, G4, G5, G6, G7A, G7B]
+    required_gates: [G0A, G0B, G1, G2, G3, G5, G6, G7A]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G3: [pass]
+      G5: [pass]
+      G6: [pass]
+      G7A: [pass]
     requires_artifact_keys:
       G3: [reliability, dca, utility_curve, utility_spec]
-      G4: [shap_check, faithfulness_summary, perturbation_design, local_interaction_check]
       G5: [perm_importance]
       G6: [rashomon_set, shift_assessment]
+      G7A: [subgroup]
+    conditions:
+      high_stakes: true
+      user_facing: false
+
+  - id: IEL-DECISION-3-USER
+    scope: decision
+    level: IEL-3
+    requires_any_status_in: [pass, warn]
+    required_gates: [G0A, G0B, G1, G2, G3, G5, G6, G7A, G7B]
+    gate_status_requirements:
+      G1: [pass]
+      G2: [pass]
+      G3: [pass]
+      G5: [pass]
+      G6: [pass]
+      G7A: [pass]
+      G7B: [pass]
+    requires_artifact_keys:
+      G3: [reliability, dca, utility_curve, utility_spec]
+      G5: [perm_importance]
+      G6: [rashomon_set, shift_assessment]
+      G7A: [subgroup]
       G7B: [human_factors_evidence]
     conditions:
       high_stakes: true
+      user_facing: true

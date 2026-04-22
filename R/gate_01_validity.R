@@ -140,13 +140,17 @@ Gate1Validity = R6::R6Class(
           pv_fold_means = vapply(per_pv_scores, function(s) {
             v = as.numeric(s[[mid]])
             v = v[is.finite(v)]
-            if (length(v) < 1L) return(NA_real_)
+            if (length(v) < 1L) {
+              return(NA_real_)
+            }
             mean(v)
           }, numeric(1L))
           pv_fold_within_var = vapply(per_pv_scores, function(s) {
             v = as.numeric(s[[mid]])
             v = v[is.finite(v)]
-            if (length(v) < 2L) return(NA_real_)
+            if (length(v) < 2L) {
+              return(NA_real_)
+            }
             stats::var(v) / length(v)
           }, numeric(1L))
 
@@ -310,7 +314,7 @@ Gate1Validity = R6::R6Class(
             split_policy = split_policy,
             n_splits = rr$iters
           ),
-          pv_pool = pv_pool   # NULL unless ctx$plausible_values$pv_tasks supplied
+          pv_pool = pv_pool # NULL unless ctx$plausible_values$pv_tasks supplied
         ),
         messages = c(baseline_msg, preflight_msgs)
       )

@@ -174,7 +174,7 @@ AutoIML = R6::R6Class(
       )
 
       self$gates = private$gate_plan_from_claim(
-        claim = self$ctx$claim,
+        ctx = self$ctx,
         purpose = purpose,
         quick_start = quick_start
       )
@@ -209,7 +209,7 @@ AutoIML = R6::R6Class(
       .autoiml_validate_ctx(ctx)
 
       self$gates = private$gate_plan_from_claim(
-        claim = ctx$claim,
+        ctx = ctx,
         purpose = ctx$purpose,
         quick_start = ctx$quick_start
       )
@@ -325,7 +325,7 @@ AutoIML = R6::R6Class(
     #' @return A list of gate objects in execution order.
     gate_plan = function() {
       private$gate_plan_from_claim(
-        claim = self$ctx$claim,
+        ctx = self$ctx,
         purpose = self$ctx$purpose %||% self$purpose,
         quick_start = self$ctx$quick_start %||% self$quick_start
       )
@@ -518,10 +518,10 @@ AutoIML = R6::R6Class(
       )
     },
 
-    gate_plan_from_claim = function(claim, purpose, quick_start) {
+    gate_plan_from_claim = function(ctx, purpose, quick_start) {
       gates = private$gate_registry()
 
-      claim = .autoiml_as_list(claim)
+      claim = .autoiml_as_list(ctx$claim)
       claim_flags = .autoiml_as_list(claim$claims)
 
       want_global = isTRUE(claim_flags$global %||% TRUE)
@@ -531,14 +531,26 @@ AutoIML = R6::R6Class(
       stakes = tolower(as.character((claim$stakes %||% "medium")[1L]))
       purpose_decision = purpose %in% c("decision_support", "deployment")
       high_stakes = isTRUE(stakes == "high" || purpose_decision)
+      audience = as.character((claim$audience %||% "technical")[1L])
+      user_facing = .autoiml_is_user_facing_audience(audience)
+      has_hf_evidence = .autoiml_has_evidence_value(claim$human_factors_evidence %||% ctx$human_factors_evidence)
 
-      keep = c("G0A", "G0B", "G1", "G2", "G5", "G7A")
+      task = ctx$task %||% self$task
+      group_vars = unique(as.character(ctx$sensitive_features %||% task$col_roles$stratum %||% character()))
+      group_vars = group_vars[nzchar(group_vars)]
+      subgroup_triggered = length(group_vars) > 0L
+
+      keep = c("G0A", "G0B", "G1", "G2", "G5")
 
       if (isTRUE(want_decision) || isTRUE(purpose_decision)) {
-        keep = unique(c(keep, "G3"))
+        keep = unique(c(keep, "G3", "G7A"))
       }
 
-      if (isTRUE(want_local) || isTRUE(want_decision) || isTRUE(purpose_decision)) {
+      if (isTRUE(subgroup_triggered)) {
+        keep = unique(c(keep, "G7A"))
+      }
+
+      if (isTRUE(want_local)) {
         keep = unique(c(keep, "G4"))
       }
 
@@ -546,7 +558,9 @@ AutoIML = R6::R6Class(
         keep = unique(c(keep, "G6"))
       }
 
-      if (isTRUE(high_stakes)) {
+      if (isTRUE(user_facing) && (isTRUE(want_local) || isTRUE(want_decision) || isTRUE(high_stakes))) {
+        keep = unique(c(keep, "G7B"))
+      } else if (isTRUE(has_hf_evidence)) {
         keep = unique(c(keep, "G7B"))
       }
 

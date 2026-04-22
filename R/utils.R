@@ -527,6 +527,175 @@ NULL
 }
 
 
+#' Heuristic for whether the declared audience is user-facing / non-technical.
+#' @keywords internal
+.autoiml_is_user_facing_audience = function(audience) {
+  audience = tolower(trimws(as.character(audience %||% "technical")[1L]))
+  if (!nzchar(audience)) {
+    return(FALSE)
+  }
+
+  technical = c("technical", "research", "researcher", "methodologist", "peer_review", "peer reviewer")
+  if (audience %in% technical) {
+    return(FALSE)
+  }
+
+  grepl(
+    paste(c(
+      "end[_ -]?user", "nontechnical", "lay", "public", "participant", "patient",
+      "client", "student", "teacher", "clinician", "counselor", "parent", "family",
+      "decision[_ -]?maker", "stakeholder"
+    ), collapse = "|"),
+    audience, perl = TRUE
+  )
+}
+
+#' Check whether a value is present and non-empty for audit purposes.
+#' @keywords internal
+.autoiml_has_evidence_value = function(x) {
+  if (is.null(x)) {
+    return(FALSE)
+  }
+  if (is.data.frame(x)) {
+    return(nrow(x) > 0L)
+  }
+  if (is.list(x)) {
+    return(length(x) > 0L)
+  }
+  if (is.character(x)) {
+    x = x[!is.na(x)]
+    return(length(x) > 0L && any(nzchar(trimws(x))))
+  }
+  length(x) > 0L
+}
+
+#' Evaluate requirement applicability against the claim card and executed gates.
+#' @keywords internal
+.autoiml_requirement_applicable = function(requirement, res) {
+  requirement = .autoiml_as_list(requirement)
+  app = .autoiml_as_list(requirement$applicability)
+  if (length(app) < 1L) {
+    return(list(applicable = TRUE, reason = "always"))
+  }
+
+  g0a = .autoiml_get_gate_result(res, "G0A")
+  claim = .autoiml_as_list(g0a$artifacts$claim %||% list())
+  claims = .autoiml_as_list(claim$claims)
+  purpose = as.character(claim$purpose %||% res$purpose %||% NA_character_)[1L]
+  stakes = tolower(as.character(claim$stakes %||% NA_character_)[1L])
+  semantics = as.character(claim$semantics %||% NA_character_)[1L]
+  audience = as.character(claim$audience %||% "technical")[1L]
+  user_facing = .autoiml_is_user_facing_audience(audience)
+  transport_boundary = claim$transport_boundary %||% NULL
+  transport_claimed = .autoiml_has_evidence_value(transport_boundary)
+
+  checks = list()
+
+  if (!is.null(app$purpose)) {
+    allowed = as.character(unlist(app$purpose, use.names = FALSE))
+    checks[["purpose"]] = list(ok = purpose %in% allowed, reason = paste0("purpose=", purpose))
+  }
+  if (!is.null(app$stakes)) {
+    allowed = tolower(as.character(unlist(app$stakes, use.names = FALSE)))
+    checks[["stakes"]] = list(ok = stakes %in% allowed, reason = paste0("stakes=", stakes))
+  }
+  if (!is.null(app$semantics)) {
+    allowed = as.character(unlist(app$semantics, use.names = FALSE))
+    checks[["semantics"]] = list(ok = semantics %in% allowed, reason = paste0("semantics=", semantics))
+  }
+  if (!is.null(app$claims_decision)) {
+    want = isTRUE(app$claims_decision)
+    have = isTRUE(claims$decision %||% FALSE)
+    checks[["claims_decision"]] = list(ok = identical(have, want), reason = paste0("claims_decision=", have))
+  }
+  if (!is.null(app$claims_local)) {
+    want = isTRUE(app$claims_local)
+    have = isTRUE(claims$local %||% FALSE)
+    checks[["claims_local"]] = list(ok = identical(have, want), reason = paste0("claims_local=", have))
+  }
+  if (!is.null(app$claims_global)) {
+    want = isTRUE(app$claims_global)
+    have = isTRUE(claims$global %||% FALSE)
+    checks[["claims_global"]] = list(ok = identical(have, want), reason = paste0("claims_global=", have))
+  }
+  if (!is.null(app$claims_any)) {
+    any_req = as.character(unlist(app$claims_any, use.names = FALSE))
+    have = character(0)
+    if (isTRUE(claims$global %||% FALSE)) have = c(have, "global")
+    if (isTRUE(claims$local %||% FALSE)) have = c(have, "local")
+    if (isTRUE(claims$decision %||% FALSE)) have = c(have, "decision")
+    checks[["claims_any"]] = list(ok = any(have %in% any_req), reason = paste0("claims_any=", paste(have, collapse = ",")))
+  }
+  if (!is.null(app$audience_user_facing)) {
+    want = isTRUE(app$audience_user_facing)
+    checks[["audience_user_facing"]] = list(ok = identical(user_facing, want), reason = paste0("audience_user_facing=", user_facing))
+  }
+  if (!is.null(app$transport_claimed)) {
+    want = isTRUE(app$transport_claimed)
+    checks[["transport_claimed"]] = list(ok = identical(transport_claimed, want), reason = paste0("transport_claimed=", transport_claimed))
+  }
+
+  if (length(checks) < 1L) {
+    return(list(applicable = TRUE, reason = "always"))
+  }
+
+  ok = vapply(checks, function(x) isTRUE(x$ok), logical(1L))
+  if (all(ok)) {
+    return(list(applicable = TRUE, reason = paste(vapply(checks, `[[`, character(1L), "reason"), collapse = "; ")))
+  }
+
+  failed = names(ok)[!ok]
+  list(applicable = FALSE, reason = paste(vapply(checks[failed], `[[`, character(1L), "reason"), collapse = "; "))
+}
+
+#' Evaluate requirement fields against a gate result.
+#' @keywords internal
+.autoiml_requirement_fields_ok = function(requirement, gate_result) {
+  requirement = .autoiml_as_list(requirement)
+  if (is.null(gate_result)) {
+    return(list(ok = FALSE, missing = "<gate_missing>"))
+  }
+
+  arts = .autoiml_as_list(gate_result$artifacts)
+  metrics = gate_result$metrics
+  metric_names = if (data.table::is.data.table(metrics) && nrow(metrics) > 0L) names(metrics) else character(0)
+
+  missing = character(0)
+
+  artifact_fields = as.character(unlist(requirement$artifact_fields %||% character(), use.names = FALSE))
+  for (k in artifact_fields) {
+    if (!(k %in% names(arts)) || !.autoiml_has_evidence_value(arts[[k]])) {
+      missing = c(missing, paste0("artifact:", k))
+    }
+  }
+
+  metric_fields = as.character(unlist(requirement$metric_fields %||% character(), use.names = FALSE))
+  for (k in metric_fields) {
+    if (!(k %in% metric_names)) {
+      missing = c(missing, paste0("metric:", k))
+    }
+  }
+
+  artifact_any = as.character(unlist(requirement$artifact_any_of %||% character(), use.names = FALSE))
+  if (length(artifact_any) > 0L) {
+    has_any = any(vapply(artifact_any, function(k) k %in% names(arts) && .autoiml_has_evidence_value(arts[[k]]), logical(1L)))
+    if (!isTRUE(has_any)) {
+      missing = c(missing, paste0("artifact_any_of:", paste(artifact_any, collapse = "|")))
+    }
+  }
+
+  metric_any = as.character(unlist(requirement$metric_any_of %||% character(), use.names = FALSE))
+  if (length(metric_any) > 0L) {
+    has_any = any(metric_any %in% metric_names)
+    if (!isTRUE(has_any)) {
+      missing = c(missing, paste0("metric_any_of:", paste(metric_any, collapse = "|")))
+    }
+  }
+
+  list(ok = length(missing) == 0L, missing = missing)
+}
+
+
 #' Validate shape of framework requirements YAML.
 #' @keywords internal
 .autoiml_validate_framework_requirements = function(x) {
@@ -543,7 +712,7 @@ NULL
 
   required_keys = c(
     "id", "gate", "requirement_text", "evidence_type",
-    "severity_if_missing", "applicability", "artifact_fields", "tests_required"
+    "severity_if_missing", "applicability", "tests_required"
   )
 
   allowed_gate = c("G0A", "G0B", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B", "IEL", "REPORT")
@@ -588,11 +757,19 @@ NULL
       out$errors = c(out$errors, paste0(tag, " has invalid severity_if_missing: ", sev))
     }
 
-    af = r$artifact_fields %||% NULL
-    if (!is.null(af)) {
-      af = as.character(unlist(af, use.names = FALSE))
-      if (length(af) < 1L || any(!nzchar(af))) {
-        out$errors = c(out$errors, paste0(tag, " must have non-empty artifact_fields"))
+    specs = list(
+      artifact_fields = r$artifact_fields %||% NULL,
+      artifact_any_of = r$artifact_any_of %||% NULL,
+      metric_fields = r$metric_fields %||% NULL,
+      metric_any_of = r$metric_any_of %||% NULL
+    )
+
+    for (nm in names(specs)) {
+      val = specs[[nm]]
+      if (is.null(val)) next
+      vals = as.character(unlist(val, use.names = FALSE))
+      if (length(vals) < 1L || any(!nzchar(vals))) {
+        out$errors = c(out$errors, paste0(tag, " must have non-empty ", nm))
       }
     }
   }
@@ -657,9 +834,32 @@ NULL
       out$errors = c(out$errors, paste0(tag, " must provide non-empty required_gates"))
     }
 
-    st = as.character(unlist(r$requires_any_status_in %||% character(), use.names = FALSE))
+    st = as.character(unlist(r$requires_any_status_in %||% c("pass", "warn"), use.names = FALSE))
     if (length(st) < 1L || any(!st %in% allowed_status)) {
       out$errors = c(out$errors, paste0(tag, " requires_any_status_in must be subset of {pass,warn}"))
+    }
+
+    gate_status_req = r$gate_status_requirements %||% NULL
+    if (!is.null(gate_status_req)) {
+      if (!is.list(gate_status_req) || length(gate_status_req) < 1L || is.null(names(gate_status_req)) || any(!nzchar(names(gate_status_req)))) {
+        out$errors = c(out$errors, paste0(tag, " gate_status_requirements must be a named list of gate ids -> allowed statuses"))
+      } else {
+        bad_gate_refs = setdiff(names(gate_status_req), rg)
+        if (length(bad_gate_refs) > 0L) {
+          out$errors = c(out$errors, paste0(tag, " gate_status_requirements references gates not listed in required_gates: ", paste(bad_gate_refs, collapse = ", ")))
+        }
+        for (gid in names(gate_status_req)) {
+          vals = as.character(unlist(gate_status_req[[gid]], use.names = FALSE))
+          if (length(vals) < 1L || any(!vals %in% allowed_status)) {
+            out$errors = c(out$errors, paste0(tag, " gate_status_requirements$", gid, " must be subset of {pass,warn}"))
+          }
+        }
+      }
+    }
+
+    cond = .autoiml_as_list(r$conditions)
+    if (length(cond) > 0L && !is.null(cond$user_facing) && !is.logical(cond$user_facing)) {
+      out$errors = c(out$errors, paste0(tag, " conditions$user_facing must be TRUE/FALSE when provided"))
     }
 
     req_keys = r$requires_artifact_keys %||% NULL
