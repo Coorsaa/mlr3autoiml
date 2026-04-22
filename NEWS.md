@@ -1,3 +1,16 @@
+# mlr3autoiml 0.0.6
+
+## Alignment with manuscript workflow
+- Claim-scoped IEL assignment now follows the manuscript's simplified backbone: Claim and Semantics Card -> core gates -> triggered additional gates -> claim-scoped IEL.
+- Decision-support defaults no longer implicitly request local/person-level claims.
+- Human-factors evidence (Gate 7B) is now triggered only for user-facing/non-technical claims, rather than for every high-stakes run.
+- IEL rules were revised so that global/local scopes do not require subgroup or human-factors gates by default, Gate 6 mainly matters for stronger transport/robustness tiers, and decision IELs no longer require local-faithfulness evidence unless local claims are actually requested.
+- Extended report-card requirements now support applicability conditions and richer artifact/metric checks, which makes the exported audit bundle line up more closely with the paper's gate logic.
+
+## Internal
+- Added helper utilities for audience heuristics, applicability checks, and evidence-presence validation.
+- Updated package tests to reflect the manuscript-aligned IEL and reporting logic.
+
 # mlr3autoiml 0.0.5
 
 ## Breaking changes
