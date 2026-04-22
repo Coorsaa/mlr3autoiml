@@ -11,8 +11,9 @@ and provides a checklist for expected evidence elements.
 }
 \section{When Triggered}{
 
-For high-stakes or decision/deployment claims, this gate requires explicit
-\code{human_factors_evidence} (in \code{ctx$claim} or \code{ctx}). If missing, status is \code{fail}.
+This gate is triggered when explanations are intended for non-technical end users
+or other user-facing high-stakes stakeholders. Technical audits that remain within
+the analyst/researcher workflow usually do not require Gate 7B by default.
 }
 
 \section{Recommended Evaluation Tasks}{

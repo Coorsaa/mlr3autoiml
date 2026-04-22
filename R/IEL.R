@@ -12,14 +12,14 @@
 #' \itemize{
 #'   \item \strong{IEL-0}: Exploratory only; insufficient evidence for reporting claims.
 #'   \item \strong{IEL-1}: Cautious insight with basic diagnostics.
-#'   \item \strong{IEL-2}: Robust reporting level with multiplicity/transport checks.
-#'   \item \strong{IEL-3}: High-stakes / deployment-grade with a fuller audit trail.
+#'   \item \strong{IEL-2}: Controlled reporting level with claim-matched evidence.
+#'   \item \strong{IEL-3}: Robust support for stronger transport / high-stakes claims.
 #' }
 #'
-#' IEL-3 is intentionally strict: it is only assigned when a high-stakes context is
-#' declared (e.g., stakes = "high" or purpose in decision/deployment settings) and
-#' human-factors evidence (Gate 7B) is available in addition to scope-specific
-#' technical evidence.
+#' IEL-3 is intentionally strict. Depending on the claim scope, it typically
+#' requires stronger robustness evidence (e.g., Gate 6) and, for user-facing
+#' high-stakes claims, human-factors evidence (Gate 7B) in addition to the
+#' scope-specific technical evidence.
 #'
 #' IEL is intentionally \emph{claim-scoped}: evidence for global summaries may differ
 #' from evidence for case-level explanations or decision-support use.
@@ -44,8 +44,9 @@ NULL
 #' computed conservatively as the minimum across the \strong{requested} claim scopes
 #' (derived from Gate 0A).
 #'
-#' For each requested scope, IEL-3 requires both high-stakes context and successful
-#' Gate 7B (human-factors evidence); otherwise the maximum attainable level is IEL-2.
+#' IEL assignment is claim-scoped and rule-based. Higher levels may require
+#' Gate 6 (multiplicity / transport) and, for user-facing high-stakes claims,
+#' Gate 7B (human-factors evidence).
 #'
 #' @param gates (`list()`)
 #'   List of [GateResult] objects (typically G0A/G0B, G1--G6, G7A/G7B).
@@ -77,6 +78,8 @@ iel_from_gates = function(gates) {
   stakes = tolower(as.character((claim0$stakes %||% "medium")[1L]))
   purpose = as.character((claim0$purpose %||% "exploratory")[1L])
   high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
+  audience = as.character((claim0$audience %||% "technical")[1L])
+  user_facing = .autoiml_is_user_facing_audience(audience)
 
   iel_rules = .autoiml_iel_rules()
   vr = .autoiml_validate_iel_rules(iel_rules)
@@ -108,7 +111,7 @@ iel_from_gates = function(gates) {
 
     for (i in seq_along(rules_scope)) {
       r = rules_scope[[i]]
-      chk = .autoiml_eval_iel_rule(r, gate_map = gate_map, high_stakes = high_stakes)
+      chk = .autoiml_eval_iel_rule(r, gate_map = gate_map, high_stakes = high_stakes, user_facing = user_facing)
       if (isTRUE(chk$matched)) matched_levels = c(matched_levels, as.character(r$level))
 
       rule_rows[[i]] = data.table::data.table(
@@ -170,26 +173,26 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 
   scope_global = switch(
     iel_global,
-    "IEL-0" = "Exploratory only: do not report global effects beyond sanity checks; avoid causal language.",
-    "IEL-1" = "Cautious global insight: describe global structure on observed support; report stability and subgroup diagnostics; avoid causal language.",
-    "IEL-2" = "Global insight (publication-grade): add multiplicity/transport diagnostics where relevant; avoid causal language and overgeneralization.",
-    "IEL-3" = "High-stakes / deployment-grade global reporting: include transport/multiplicity checks, subgroup audits, human-factors evaluation (as applicable), monitoring, and governance."
+    "IEL-0" = "Exploratory only: do not report global effects beyond debugging or tentative hypothesis generation; avoid causal language.",
+    "IEL-1" = "Cautious global insight under stated semantics: report within-support global structure conservatively and add subgroup/measurement audit only when cross-group generalization is implied.",
+    "IEL-2" = "Controlled global/regional reporting: report uncertainty, regionalize when interactions are material, and add multiplicity/transport diagnostics when the claim extends across settings.",
+    "IEL-3" = "Robust global insight across near-tie models and plausible shifts, with monitoring for explanation drift."
   )
 
   scope_local = switch(
     iel_local,
-    "IEL-0" = "Avoid case-level explanations: local attributions may be misleading without faithfulness and stability diagnostics.",
-    "IEL-1" = "Limited local explanations with faithfulness + stability diagnostics; prefer regionalization when interactions/heterogeneity are present.",
-    "IEL-2" = "Local explanations with multiplicity/transport checks and subgroup diagnostics; document limitations and uncertainty.",
-    "IEL-3" = "High-stakes / deployment-grade local explanations: include transport/multiplicity checks, subgroup audits, human-factors evaluation (as applicable), monitoring, and governance."
+    "IEL-0" = "Avoid case-level explanations: local attributions are not currently warranted as part of the claim.",
+    "IEL-1" = "Cautious local explanation for representative cases only: document semantics and basic faithfulness/stability, but avoid person-specific guidance.",
+    "IEL-2" = "Controlled local/regional support: use high-fidelity regional or local explanations with explicit semantics, interaction checks, and stability evidence.",
+    "IEL-3" = "Robust local/regional explanations across near-tie models and plausible shifts; if shown to end users, pair them with human-factors evidence and monitoring."
   )
 
   scope_decision = switch(
     iel_decision,
-    "IEL-0" = "Avoid decision recommendations: treat outputs as exploratory and do not use for thresholded actions.",
-    "IEL-1" = "Preliminary decision analysis: assess calibration and specify utilities/costs; do not overclaim without faithfulness/stability evidence.",
-    "IEL-2" = "Decision support: add faithfulness + stability checks; document thresholds/utilities and guard against automation bias.",
-    "IEL-3" = "High-stakes / deployment decision support: include transport/multiplicity checks, subgroup audits, human-factors evaluation, monitoring, and governance."
+    "IEL-0" = "Avoid decision recommendations: treat outputs as exploratory or descriptive only and do not use them for thresholded action.",
+    "IEL-1" = "Preliminary decision analysis only: calibration and decision value are assessed in an explicitly stated threshold range, but deployment readiness is not claimed.",
+    "IEL-2" = "Controlled decision support (pilot/advisory): decision value is supported in the intended range, subgroup consequences are audited, and actionability limits are explicit.",
+    "IEL-3" = "Applied decision support with monitoring: add transport checks, governance artifacts, and user-facing human-factors evidence when explanations are shown to end users."
   )
 
   overall = iel$overall %||% .autoiml_min_iel(c(iel_global, iel_local, iel_decision))
@@ -279,17 +282,26 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 # than merely the gate's pass/warn status.
 #
 # @keywords internal
-.autoiml_eval_iel_rule = function(rule, gate_map, high_stakes = FALSE) {
+.autoiml_eval_iel_rule = function(rule, gate_map, high_stakes = FALSE, user_facing = FALSE) {
   rule = .autoiml_as_list(rule)
-  req_gates  = as.character(unlist(rule$required_gates %||% character(), use.names = FALSE))
+  req_gates = as.character(unlist(rule$required_gates %||% character(), use.names = FALSE))
   req_status = as.character(unlist(rule$requires_any_status_in %||% c("pass", "warn"), use.names = FALSE))
-  req_keys   = .autoiml_as_list(rule$requires_artifact_keys)  # named list: gate_id -> required keys
+  gate_status_req = .autoiml_as_list(rule$gate_status_requirements)
+  req_keys = .autoiml_as_list(rule$requires_artifact_keys) # named list: gate_id -> required keys
 
-  # condition: high_stakes
+  # condition: high_stakes / user_facing
   cond = .autoiml_as_list(rule$conditions)
   if (length(cond) > 0L && !is.null(cond$high_stakes)) {
     if (isTRUE(cond$high_stakes) && !isTRUE(high_stakes)) {
       return(list(matched = FALSE, reason = "high_stakes_condition_not_met"))
+    }
+  }
+  if (length(cond) > 0L && !is.null(cond$user_facing)) {
+    if (isTRUE(cond$user_facing) && !isTRUE(user_facing)) {
+      return(list(matched = FALSE, reason = "user_facing_condition_not_met"))
+    }
+    if (identical(cond$user_facing, FALSE) && isTRUE(user_facing)) {
+      return(list(matched = FALSE, reason = "user_facing_condition_not_met"))
     }
   }
 
@@ -302,13 +314,14 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
   # status check
   bad_status = req_gates[!vapply(req_gates, function(g) {
     st = as.character(gate_map[[g]]$status %||% "")
-    st %in% req_status
+    allowed = as.character(unlist(gate_status_req[[g]] %||% req_status, use.names = FALSE))
+    st %in% allowed
   }, logical(1L))]
   if (length(bad_status) > 0L) {
     return(list(matched = FALSE, reason = paste0("status_mismatch:", paste(bad_status, collapse = ","))))
   }
 
-  # NEW: artifact-key check - per-gate, required keys must exist and be non-empty
+  # Artifact-key check - per-gate, required keys must exist and be non-empty
   if (length(req_keys) > 0L) {
     bad_artifacts = character()
     for (gid in names(req_keys)) {
@@ -320,16 +333,11 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
       arts = .autoiml_as_list(gobj$artifacts)
       keys_needed = as.character(unlist(req_keys[[gid]], use.names = FALSE))
       missing_keys = keys_needed[!keys_needed %in% names(arts)]
-      # Reject keys whose value is NULL or empty list/data.frame/vector
       empty_keys = vapply(keys_needed, function(k) {
-        if (!k %in% names(arts)) return(FALSE)  # already reported as missing
-        v = arts[[k]]
-        if (is.null(v)) return(TRUE)
-        if (is.data.frame(v) && nrow(v) == 0L) return(TRUE)
-        if (!is.list(v) && length(v) == 0L) return(TRUE)
-        if (is.character(v) && length(v) == 1L && !nzchar(v)) return(TRUE)
-        if (is.list(v) && !is.data.frame(v) && length(v) == 0L) return(TRUE)
-        FALSE
+        if (!k %in% names(arts)) {
+          return(FALSE)
+        }
+        !isTRUE(.autoiml_has_evidence_value(arts[[k]]))
       }, logical(1L))
       empty_now = keys_needed[empty_keys]
       bad = unique(c(missing_keys, empty_now))
@@ -339,7 +347,7 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
     }
     if (length(bad_artifacts) > 0L) {
       return(list(matched = FALSE,
-                  reason = paste0("missing_artifact_keys:", paste(bad_artifacts, collapse = ","))))
+        reason = paste0("missing_artifact_keys:", paste(bad_artifacts, collapse = ","))))
     }
   }
 

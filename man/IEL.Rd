@@ -42,8 +42,9 @@ The function returns a named list with IELs per claim scope and an \code{overall
 computed conservatively as the minimum across the \strong{requested} claim scopes
 (derived from Gate 0A).
 
-For each requested scope, IEL-3 requires both high-stakes context and successful
-Gate 7B (human-factors evidence); otherwise the maximum attainable level is IEL-2.
+IEL assignment is claim-scoped and rule-based. Higher levels may require
+Gate 6 (multiplicity / transport) and, for user-facing high-stakes claims,
+Gate 7B (human-factors evidence).
 
 Returns short, human-readable statements describing what kinds of interpretation
 claims are defensible, given achieved IELs and the declared purpose.
@@ -54,14 +55,14 @@ types of interpretation claims:
 \itemize{
 \item \strong{IEL-0}: Exploratory only; insufficient evidence for reporting claims.
 \item \strong{IEL-1}: Cautious insight with basic diagnostics.
-\item \strong{IEL-2}: Robust reporting level with multiplicity/transport checks.
-\item \strong{IEL-3}: High-stakes / deployment-grade with a fuller audit trail.
+\item \strong{IEL-2}: Controlled reporting level with claim-matched evidence.
+\item \strong{IEL-3}: Robust support for stronger transport / high-stakes claims.
 }
 
-IEL-3 is intentionally strict: it is only assigned when a high-stakes context is
-declared (e.g., stakes = "high" or purpose in decision/deployment settings) and
-human-factors evidence (Gate 7B) is available in addition to scope-specific
-technical evidence.
+IEL-3 is intentionally strict. Depending on the claim scope, it typically
+requires stronger robustness evidence (e.g., Gate 6) and, for user-facing
+high-stakes claims, human-factors evidence (Gate 7B) in addition to the
+scope-specific technical evidence.
 
 IEL is intentionally \emph{claim-scoped}: evidence for global summaries may differ
 from evidence for case-level explanations or decision-support use.

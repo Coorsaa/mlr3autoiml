@@ -46,7 +46,7 @@ NULL
   perf_dt[, learner_id := factor(learner_id, levels = perf_dt$learner_id[ord])]
 
   ggplot2::ggplot(perf_dt, ggplot2::aes(x = mean, y = learner_id)) +
-    ggplot2::geom_errorbarh(ggplot2::aes(xmin = ci_low, xmax = ci_high)) +
+    ggplot2::geom_errorbar(ggplot2::aes(xmin = ci_low, xmax = ci_high), orientation = "y") +
     ggplot2::geom_point(ggplot2::aes(shape = in_rashomon), size = 2) +
     ggplot2::labs(
       title = "Gate 6: Alternative learner performance",

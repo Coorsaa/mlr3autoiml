@@ -16,7 +16,7 @@ test_that("report_card works for AutoIML and AutoIMLResult", {
   expect_true(data.table::is.data.table(rce1))
   expect_true(data.table::is.data.table(rce2))
   expect_equal(rce1, rce2)
-  expect_true(all(c("requirement_id", "gate", "gate_status", "artifact_keys_ok") %in% names(rce1)))
+  expect_true(all(c("requirement_id", "gate", "gate_status", "artifact_keys_ok", "applicable", "evidence_status") %in% names(rce1)))
 
   expect_true(data.table::is.data.table(result$report_card_extended()))
 

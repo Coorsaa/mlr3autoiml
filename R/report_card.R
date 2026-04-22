@@ -54,6 +54,7 @@ report_card = function(x) {
 
   dt[, purpose := res$purpose %||% NA_character_]
   dt[, quick_start := isTRUE(res$quick_start)]
+  data.table::set(dt, j = "requested_scopes", value = paste(as.character(res$iel$requested %||% c("global")), collapse = ","))
 
   # If Gate 0 exists, attach claim semantics / stakes as convenience columns.
   g0a = gates[["G0A"]]
@@ -97,24 +98,57 @@ report_card_extended = function(x) {
   reqs = reqs_yaml$requirements
   rows = lapply(reqs, function(r) {
     gate = as.character(r$gate)
-    gr = .autoiml_get_gate_result(res, gate)
+    gr = if (gate %in% c("IEL", "REPORT")) NULL else .autoiml_get_gate_result(res, gate)
+    app = .autoiml_requirement_applicable(r, res)
 
-    artifact_keys = if (!is.null(gr) && is.list(gr$artifacts)) names(gr$artifacts) else character(0)
-    required_keys = as.character(unlist(r$artifact_fields %||% character(), use.names = FALSE))
-    required_keys = required_keys[nzchar(required_keys)]
+    field_chk = if (isTRUE(app$applicable)) {
+      if (identical(gate, "IEL")) {
+        vals = .autoiml_as_list(res$iel)
+        missing = character(0)
+        for (k in as.character(unlist(r$artifact_fields %||% character(), use.names = FALSE))) {
+          if (!k %in% names(vals) || !.autoiml_has_evidence_value(vals[[k]])) {
+            missing = c(missing, paste0("iel:", k))
+          }
+        }
+        list(ok = length(missing) == 0L, missing = missing)
+      } else if (identical(gate, "REPORT")) {
+        rc = report_card(res)
+        missing = character(0)
+        for (k in as.character(unlist(r$artifact_fields %||% character(), use.names = FALSE))) {
+          if (!(k %in% names(rc))) {
+            missing = c(missing, paste0("report:", k))
+          }
+        }
+        list(ok = length(missing) == 0L, missing = missing)
+      } else {
+        .autoiml_requirement_fields_ok(r, gr)
+      }
+    } else {
+      list(ok = NA, missing = character(0))
+    }
 
-    missing_keys = setdiff(required_keys, artifact_keys)
-    keys_ok = length(missing_keys) == 0L
+    evidence_status = if (!isTRUE(app$applicable)) {
+      "not_applicable"
+    } else if (is.null(gr) && !gate %in% c("IEL", "REPORT")) {
+      "gate_missing"
+    } else if (isTRUE(field_chk$ok)) {
+      "evidence_present"
+    } else {
+      "evidence_missing"
+    }
 
     data.table::data.table(
       requirement_id = as.character(r$id),
       gate = gate,
       evidence_type = as.character(r$evidence_type),
       severity_if_missing = as.character(r$severity_if_missing),
-      gate_present = !is.null(gr),
-      gate_status = if (!is.null(gr)) as.character(gr$status %||% NA_character_) else NA_character_,
-      artifact_keys_ok = keys_ok,
-      missing_artifact_keys = if (!keys_ok) paste(missing_keys, collapse = ",") else "",
+      applicable = isTRUE(app$applicable),
+      applicability_reason = as.character(app$reason %||% ""),
+      gate_present = if (!gate %in% c("IEL", "REPORT")) !is.null(gr) else TRUE,
+      gate_status = if (!is.null(gr)) as.character(gr$status %||% NA_character_) else if (gate %in% c("IEL", "REPORT")) "computed" else NA_character_,
+      artifact_keys_ok = if (isTRUE(app$applicable)) isTRUE(field_chk$ok) else NA,
+      missing_artifact_keys = if (isTRUE(app$applicable) && !isTRUE(field_chk$ok)) paste(field_chk$missing, collapse = ",") else "",
+      evidence_status = evidence_status,
       requirement_text = as.character(r$requirement_text)
     )
   })

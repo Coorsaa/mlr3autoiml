@@ -28,7 +28,7 @@ test_that("report_card_extended covers requirement IDs and expected columns", {
   expect_true(data.table::is.data.table(rcx))
   expect_true(all(c(
     "requirement_id", "gate", "evidence_type", "severity_if_missing",
-    "gate_present", "gate_status", "artifact_keys_ok", "missing_artifact_keys"
+    "applicable", "gate_present", "gate_status", "artifact_keys_ok", "missing_artifact_keys", "evidence_status"
   ) %in% names(rcx)))
 
   req = .autoiml_framework_requirements()

@@ -37,6 +37,7 @@ guide_workflow = function(x, max_actions = 6L) {
 
   g2 = .autoiml_get_gate_result(res, "G2")
   g2_metrics = g2$metrics %||% data.table::data.table()
+  requested_scopes = as.character(res$iel$requested %||% c("global"))
 
   trust_summary = .autoiml_trust_summary(res)
   model_story = .autoiml_model_story(res)
@@ -167,7 +168,7 @@ guide_workflow = function(x, max_actions = 6L) {
     )
   }
 
-  if (isTRUE((res$iel$local %||% "IEL-0") == "IEL-0")) {
+  if ("local" %in% requested_scopes && isTRUE((res$iel$local %||% "IEL-0") == "IEL-0")) {
     actions = add_action(
       actions,
       7L,
@@ -177,7 +178,7 @@ guide_workflow = function(x, max_actions = 6L) {
     )
   }
 
-  if (isTRUE((res$iel$decision %||% "IEL-0") == "IEL-0")) {
+  if ("decision" %in% requested_scopes && isTRUE((res$iel$decision %||% "IEL-0") == "IEL-0")) {
     actions = add_action(
       actions,
       7L,
@@ -212,6 +213,7 @@ guide_workflow = function(x, max_actions = 6L) {
     purpose = as.character(res$purpose %||% NA_character_),
     stakes = stakes,
     semantics = semantics,
+    requested_scopes = paste(requested_scopes, collapse = ","),
     iel_overall = as.character(res$iel$overall %||% NA_character_),
     iel_global = as.character(res$iel$global %||% NA_character_),
     iel_local = as.character(res$iel$local %||% NA_character_),

@@ -9,8 +9,9 @@
 #' and provides a checklist for expected evidence elements.
 #'
 #' @section When Triggered:
-#' For high-stakes or decision/deployment claims, this gate requires explicit
-#' `human_factors_evidence` (in `ctx$claim` or `ctx`). If missing, status is `fail`.
+#' This gate is triggered when explanations are intended for non-technical end users
+#' or other user-facing high-stakes stakeholders. Technical audits that remain within
+#' the analyst/researcher workflow usually do not require Gate 7B by default.
 #'
 #' @section Recommended Evaluation Tasks:
 #' \itemize{
@@ -54,25 +55,30 @@ Gate7bHumanFactors = R6::R6Class(
 
       claims = (claim$claims %||% list())
       decision_claim = isTRUE(claims$decision %||% FALSE)
+      local_claim = isTRUE(claims$local %||% FALSE)
 
       stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
       if (!stakes %in% c("low", "medium", "high")) stakes = "medium"
 
+      audience = as.character(claim$audience %||% "technical")[1L]
+      user_facing = .autoiml_is_user_facing_audience(audience)
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment") || decision_claim)
 
-      if (!isTRUE(high_stakes)) {
+      evidence = .autoiml_as_list(claim$human_factors_evidence %||% ctx$human_factors_evidence)
+      has_evidence_object = length(evidence) > 0L
+      required = isTRUE(user_facing && (high_stakes || local_claim || decision_claim))
+
+      if (!isTRUE(required) && !isTRUE(has_evidence_object)) {
         return(GateResult$new(
           gate_id = self$id,
           gate_name = self$name,
           pdr = self$pdr,
           status = "skip",
-          summary = "Human-factors evaluation is primarily relevant for decision support / high-stakes use; skipped.",
-          metrics = data.table::data.table(required = FALSE, stakes = stakes, purpose = purpose),
+          summary = "Human-factors evaluation is not in scope for the current technical/non-user-facing claim.",
+          metrics = data.table::data.table(required = FALSE, provided = FALSE, stakes = stakes, purpose = purpose, audience = audience, user_facing = user_facing),
           messages = character()
         ))
       }
-
-      evidence = .autoiml_as_list(claim$human_factors_evidence %||% ctx$human_factors_evidence)
       .autoiml_assert_known_names(
         evidence,
         c("participants", "task_design", "baseline", "outcomes", "analysis_summary", "artifacts"),
@@ -97,13 +103,19 @@ Gate7bHumanFactors = R6::R6Class(
           gate_id = self$id,
           gate_name = self$name,
           pdr = self$pdr,
-          status = "fail",
-          summary = "High-stakes decision/deployment use requires schema-complete human-factors evidence (participants, task_design, baseline, outcomes, analysis_summary).",
+          status = if (isTRUE(required)) "fail" else "warn",
+          summary = if (isTRUE(required)) {
+            "User-facing high-stakes claims require schema-complete human-factors evidence (participants, task_design, baseline, outcomes, analysis_summary)."
+          } else {
+            "Human-factors evidence was provided, but the schema is incomplete."
+          },
           metrics = data.table::data.table(
-            required = TRUE,
+            required = required,
             provided = FALSE,
             stakes = stakes,
             purpose = purpose,
+            audience = audience,
+            user_facing = user_facing,
             missing_schema_n = length(missing_schema)
           ),
           artifacts = list(missing_schema = missing_schema),
@@ -113,7 +125,7 @@ Gate7bHumanFactors = R6::R6Class(
         ))
       }
 
-      # High-stakes: evidence provided, return pass and checklist for expected content.
+      # Evidence provided, return pass and checklist for expected content.
       msgs = c(
         "If explanations will be shown to people (clinicians, participants, decision-makers), evaluate their effects on decision quality and trust calibration.",
         "Recommended evaluation tasks: (i) error detection (identify wrong model outputs), (ii) appropriate reliance / deferral, (iii) consistency across cases, (iv) robustness to misleading explanations (spurious patterns).",
@@ -125,12 +137,14 @@ Gate7bHumanFactors = R6::R6Class(
         gate_name = self$name,
         pdr = self$pdr,
         status = "pass",
-        summary = "Human-factors evidence provided for high-stakes decision/deployment use.",
+        summary = if (isTRUE(required)) "Human-factors evidence provided for a user-facing high-stakes claim." else "Human-factors evidence recorded for an optional user-evaluation audit.",
         metrics = data.table::data.table(
-          required = TRUE,
+          required = required,
           provided = TRUE,
           stakes = stakes,
           purpose = purpose,
+          audience = audience,
+          user_facing = user_facing,
           missing_schema_n = 0L
         ),
         artifacts = list(checklist = msgs, human_factors_evidence = evidence),

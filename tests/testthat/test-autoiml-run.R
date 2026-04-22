@@ -8,8 +8,8 @@ test_that("AutoIML run returns AutoIMLResult with gate results and report card",
   expect_true(is.list(result$gate_results))
 
   executed = names(result$gate_results)
-  expect_true(all(c("G0A", "G0B", "G1", "G2", "G5", "G6", "G7A") %in% executed))
-  expect_false(any(c("G3", "G4", "G7B") %in% executed))
+  expect_true(all(c("G0A", "G0B", "G1", "G2", "G5", "G6") %in% executed))
+  expect_false(any(c("G3", "G4", "G7A", "G7B") %in% executed))
 
   # report_card is a method, not a field
   rc = result$report_card()
