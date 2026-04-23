@@ -37,7 +37,7 @@ gate6_tables = function(x, top_n = 15L) {
     stop("Gate 6 results not found. Did you run AutoIML$run()?", call. = FALSE)
   }
 
-  arts = gr$artifacts %||% list()
+  arts = gr$artifacts %??% list()
 
   perf = arts$alt_learner_performance
   rash = arts$rashomon_set

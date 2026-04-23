@@ -32,7 +32,7 @@ Gate4Faithfulness = R6::R6Class(
     run = function(ctx) {
       task = ctx$task
       model = ctx$final_model
-      profile = ctx$profile %||% "standard"
+      profile = ctx$profile %??% "standard"
 
       if (is.null(model)) {
         return(GateResult$new(
@@ -45,7 +45,7 @@ Gate4Faithfulness = R6::R6Class(
         ))
       }
 
-      cfg = ctx$faithfulness %||% list()
+      cfg = ctx$faithfulness %??% list()
       if (!is.list(cfg)) cfg <- list()
       .autoiml_assert_known_names(
         cfg,
@@ -62,7 +62,7 @@ Gate4Faithfulness = R6::R6Class(
       messages = character()
 
       # Semantics from Gate 0A (if present)
-      semantics = .autoiml_normalize_semantics((ctx$claim %||% list())$semantics %||% "within_support", default = "within_support")
+      semantics = .autoiml_normalize_semantics((ctx$claim %??% list())$semantics %??% "within_support", default = "within_support")
 
       if (identical(semantics, "causal_recourse")) {
         return(GateResult$new(
@@ -77,9 +77,9 @@ Gate4Faithfulness = R6::R6Class(
 
       # Gate 4 is only required when the claim includes local/regional explanation
       # or decision-support use. For purely global descriptive claims, skip.
-      claim_scopes = ((ctx$claim %||% list())$claims %||% list())
-      need_local = isTRUE(claim_scopes$local %||% FALSE)
-      need_decision = isTRUE(claim_scopes$decision %||% FALSE)
+      claim_scopes = ((ctx$claim %??% list())$claims %??% list())
+      need_local = isTRUE(claim_scopes$local %??% FALSE)
+      need_decision = isTRUE(claim_scopes$decision %??% FALSE)
       if (!isTRUE(need_local || need_decision)) {
         return(GateResult$new(
           gate_id = self$id, gate_name = self$name, pdr = self$pdr,
@@ -92,24 +92,24 @@ Gate4Faithfulness = R6::R6Class(
       }
 
       # SHAP mode defaults to conditional (on-manifold) for within_support semantics and marginal otherwise.
-      shap_cfg = ctx$shap %||% list()
+      shap_cfg = ctx$shap %??% list()
       if (!is.list(shap_cfg)) shap_cfg <- list()
 
       shap_mode = .autoiml_normalize_shap_mode(
-        shap_cfg$mode %||% if (identical(semantics, "within_support")) "conditional" else "marginal",
+        shap_cfg$mode %??% if (identical(semantics, "within_support")) "conditional" else "marginal",
         default = if (identical(semantics, "within_support")) "conditional" else "marginal"
       )
 
-      cond_k = as.integer(shap_cfg$conditional_k %||% 5L)
+      cond_k = as.integer(shap_cfg$conditional_k %??% 5L)
       cond_k = max(1L, cond_k)
-      cond_weighted = isTRUE(shap_cfg$conditional_weighted %||% TRUE)
+      cond_weighted = isTRUE(shap_cfg$conditional_weighted %??% TRUE)
 
       # ---- Data ------------------------------------------------------------
       X = data.table::as.data.table(task$data(cols = task$feature_names))
       n = nrow(X)
 
       # Select a numeric score to surrogate-fit / attribute.
-      pred = ctx$pred %||% model$predict(task)
+      pred = ctx$pred %??% model$predict(task)
 
       yhat_mat = NULL
       yhat_vec = NULL
@@ -127,7 +127,7 @@ Gate4Faithfulness = R6::R6Class(
         if (is.null(colnames(yhat_mat))) colnames(yhat_mat) = task$class_names
 
         # Choose class to evaluate: claim decision_spec$positive_class > task$positive > first class.
-        pos = ((ctx$claim %||% list())$decision_spec %||% list())$positive_class %||% task$positive %||% colnames(yhat_mat)[1L]
+        pos = ((ctx$claim %??% list())$decision_spec %??% list())$positive_class %??% task$positive %??% colnames(yhat_mat)[1L]
         pos = as.character(pos)[1L]
         if (is.na(pos) || !pos %in% colnames(yhat_mat)) pos = colnames(yhat_mat)[1L]
 
@@ -162,7 +162,7 @@ Gate4Faithfulness = R6::R6Class(
       }
 
       # Heuristics: if global surrogate is poor, warn that global linear narratives are risky.
-      r2_warn = as.numeric(cfg$r2_warn %||% 0.70)
+      r2_warn = as.numeric(cfg$r2_warn %??% 0.70)
       if (is.finite(surrogate_r2) && surrogate_r2 < r2_warn) {
         status = "warn"
         messages = c(messages, sprintf("Low global surrogate R^2=%.2f (< %.2f): avoid oversimplified global narratives; interactions/nonlinearities likely matter.", surrogate_r2, r2_warn))
@@ -170,13 +170,13 @@ Gate4Faithfulness = R6::R6Class(
 
       # ---- Local Shapley accuracy check -----------------------------------
       # For additive explanations, verify local accuracy: baseline + sum(phi) ~= f(x).
-      local_n = as.integer(cfg$local_n %||% if (identical(profile, "fast")) 3L else 5L)
+      local_n = as.integer(cfg$local_n %??% if (identical(profile, "fast")) 3L else 5L)
       local_n = max(1L, local_n)
 
-      shap_sample_size = as.integer(cfg$shap_sample_size %||% (ctx$shap$sample_size %||% if (identical(profile, "fast")) 40L else 80L))
+      shap_sample_size = as.integer(cfg$shap_sample_size %??% (ctx$shap$sample_size %??% if (identical(profile, "fast")) 40L else 80L))
       shap_sample_size = max(10L, shap_sample_size)
 
-      background_n = as.integer(cfg$shap_background_n %||% (ctx$shap$background_n %||% if (identical(profile, "fast")) 50L else 200L))
+      background_n = as.integer(cfg$shap_background_n %??% (ctx$shap$background_n %??% if (identical(profile, "fast")) 50L else 200L))
       background_n = max(20L, background_n)
 
       # Select rows for local checks
@@ -228,7 +228,7 @@ Gate4Faithfulness = R6::R6Class(
           x_interest = x0,
           background = bg,
           sample_size = shap_sample_size,
-          seed = (ctx$seed %||% 1L) + r,
+          seed = (ctx$seed %??% 1L) + r,
           class_labels = cls_labels,
           mode = shap_mode,
           conditional_k = cond_k,
@@ -264,7 +264,7 @@ Gate4Faithfulness = R6::R6Class(
         ), fill = TRUE)
 
         # ---- Local interaction screening (2x2 slice for top-2 numeric features) ----
-        if (isTRUE(cfg$interaction_check %||% TRUE)) {
+        if (isTRUE(cfg$interaction_check %??% TRUE)) {
           # Choose top-2 features by |phi|
           top = phi[order(-abs(phi))]
 
@@ -281,7 +281,7 @@ Gate4Faithfulness = R6::R6Class(
             f2 = num_feats[2L]
 
             # Perturbations: +/- delta * sd (clamped to observed range)
-            delta_sd = as.numeric(cfg$interaction_delta_sd %||% 0.25)
+            delta_sd = as.numeric(cfg$interaction_delta_sd %??% 0.25)
             s1 = stats::sd(X[[f1]], na.rm = TRUE)
             if (!is.finite(s1) || s1 <= 0) s1 = 0
             s2 = stats::sd(X[[f2]], na.rm = TRUE)
@@ -344,7 +344,7 @@ Gate4Faithfulness = R6::R6Class(
       }
 
       # Warn if local accuracy is poor (usually indicates insufficient MC sample size or unstable model predictions).
-      shap_warn = as.numeric(cfg$shap_abs_error_warn %||% if (inherits(task, "TaskClassif")) 0.05 else 0.10)
+      shap_warn = as.numeric(cfg$shap_abs_error_warn %??% if (inherits(task, "TaskClassif")) 0.05 else 0.10)
       if (is.finite(shap_max) && shap_max > shap_warn) {
         status = "warn"
         messages = c(messages, sprintf("Local Shapley reconstruction error is high (max=%.3f > %.3f). Increase shap_sample_size/background_n or avoid additive narratives.", shap_max, shap_warn))
@@ -353,7 +353,7 @@ Gate4Faithfulness = R6::R6Class(
       # Local interaction strength warning
       int_mean = if (nrow(interaction_check) > 0L) mean(interaction_check$strength, na.rm = TRUE) else NA_real_
       int_max = if (nrow(interaction_check) > 0L) max(interaction_check$strength, na.rm = TRUE) else NA_real_
-      int_warn = as.numeric(cfg$interaction_strength_warn %||% 0.20)
+      int_warn = as.numeric(cfg$interaction_strength_warn %??% 0.20)
       if (is.finite(int_max) && int_max > int_warn) {
         status = "warn"
         messages = c(messages, sprintf("Local interaction screening suggests non-additivity (max strength=%.2f > %.2f). Prefer region-wise explanations or interaction-aware tools.", int_max, int_warn))
@@ -387,8 +387,8 @@ Gate4Faithfulness = R6::R6Class(
         shap_sample_size = shap_sample_size,
         conditional_k = cond_k,
         conditional_weighted = cond_weighted,
-        interaction_check = isTRUE(cfg$interaction_check %||% TRUE),
-        interaction_delta_sd = as.numeric(cfg$interaction_delta_sd %||% 0.25)
+        interaction_check = isTRUE(cfg$interaction_check %??% TRUE),
+        interaction_delta_sd = as.numeric(cfg$interaction_delta_sd %??% 0.25)
       )
 
       faithfulness_summary = data.table::data.table(

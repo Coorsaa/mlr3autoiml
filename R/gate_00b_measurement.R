@@ -48,10 +48,10 @@ Gate0BMeasurement = R6::R6Class(
       task = ctx$task
 
       claim = .autoiml_as_list(ctx$claim)
-      purpose = claim$purpose %||% ctx$purpose %||% "exploratory"
+      purpose = claim$purpose %??% ctx$purpose %??% "exploratory"
       purpose = .autoiml_validate_purpose(purpose)
 
-      stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
+      stakes = tolower(as.character(claim$stakes %??% "medium")[1L])
       if (!stakes %in% c("low", "medium", "high")) stakes = "medium"
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
 
@@ -83,7 +83,7 @@ Gate0BMeasurement = R6::R6Class(
       }
 
       # user-provided metadata
-      level = m$level %||% "unknown"
+      level = m$level %??% "unknown"
       level = tolower(as.character(level)[1L])
       level = gsub("[[:space:]-]", "_", level)
 
@@ -111,11 +111,11 @@ Gate0BMeasurement = R6::R6Class(
         miss_mean = mean(miss, na.rm = TRUE)
       }
 
-      miss_warn = as.numeric(m$missingness_warn %||% 0.20)
+      miss_warn = as.numeric(m$missingness_warn %??% 0.20)
       miss_flag = isTRUE(is.finite(miss_max) && miss_max >= miss_warn)
 
       # detect whether subgroup vars exist
-      sensitive = ctx$sensitive_features %||% task$col_roles$stratum %||% character()
+      sensitive = ctx$sensitive_features %??% task$col_roles$stratum %??% character()
       sensitive = unique(as.character(sensitive))
       sensitive = sensitive[nzchar(sensitive)]
       has_groups = length(sensitive) > 0L

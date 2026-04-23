@@ -38,35 +38,35 @@ Gate3Calibration = R6::R6Class(
 
     run = function(ctx) {
       task = ctx$task
-      purpose = ctx$purpose %||% "exploratory"
-      cfg = ctx$calibration %||% list()
+      purpose = ctx$purpose %??% "exploratory"
+      cfg = ctx$calibration %??% list()
       .autoiml_assert_known_names(cfg, c("thresholds", "bins"), "ctx$calibration")
 
-      claim = ctx$claim %||% list()
-      claims = (claim$claims %||% list())
-      decision_claim = isTRUE(claims$decision %||% FALSE)
+      claim = ctx$claim %??% list()
+      claims = (claim$claims %??% list())
+      decision_claim = isTRUE(claims$decision %??% FALSE)
 
-      decision_spec = (claim$decision_spec %||% list())
+      decision_spec = (claim$decision_spec %??% list())
       .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
-      claim_thr = decision_spec$thresholds %||% NULL
-      thresholds = claim_thr %||% cfg$thresholds %||% seq(0.01, 0.99, by = 0.01)
+      claim_thr = decision_spec$thresholds %??% NULL
+      thresholds = claim_thr %??% cfg$thresholds %??% seq(0.01, 0.99, by = 0.01)
 
-      bins = as.integer(cfg$bins %||% 10L)
+      bins = as.integer(cfg$bins %??% 10L)
 
       # Utility / cost specification (optional but expected for decision support)
       costs = .autoiml_as_list(decision_spec$costs)
       utility = .autoiml_as_list(decision_spec$utility)
 
       # normalize missing entries
-      costs$tp = as.numeric(costs$tp %||% 0)
-      costs$tn = as.numeric(costs$tn %||% 0)
-      costs$fp = as.numeric(costs$fp %||% NA_real_)
-      costs$fn = as.numeric(costs$fn %||% NA_real_)
+      costs$tp = as.numeric(costs$tp %??% 0)
+      costs$tn = as.numeric(costs$tn %??% 0)
+      costs$fp = as.numeric(costs$fp %??% NA_real_)
+      costs$fn = as.numeric(costs$fn %??% NA_real_)
 
-      utility$tp = as.numeric(utility$tp %||% NA_real_)
-      utility$tn = as.numeric(utility$tn %||% NA_real_)
-      utility$fp = as.numeric(utility$fp %||% NA_real_)
-      utility$fn = as.numeric(utility$fn %||% NA_real_)
+      utility$tp = as.numeric(utility$tp %??% NA_real_)
+      utility$tn = as.numeric(utility$tn %??% NA_real_)
+      utility$fp = as.numeric(utility$fp %??% NA_real_)
+      utility$fn = as.numeric(utility$fn %??% NA_real_)
 
       has_costs = is.finite(costs$fp) && is.finite(costs$fn)
       has_utility = all(is.finite(c(utility$tp, utility$tn, utility$fp, utility$fn)))
@@ -142,7 +142,7 @@ Gate3Calibration = R6::R6Class(
       # --------------------------------------------------------------------
       # Binary classification
       if (nclass == 2L) {
-        pos = task$positive %||% task$class_names[2L]
+        pos = task$positive %??% task$class_names[2L]
         truth01 = as.integer(pred$truth == pos)
         p_hat = as.numeric(pred$prob[, pos])
 

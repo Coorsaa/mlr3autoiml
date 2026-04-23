@@ -40,7 +40,7 @@ Gate0AClaim = R6::R6Class(
     },
 
     run = function(ctx) {
-      purpose = ctx$purpose %||% "exploratory"
+      purpose = ctx$purpose %??% "exploratory"
       purpose = .autoiml_validate_purpose(purpose)
 
       claim = .autoiml_as_list(ctx$claim)
@@ -86,7 +86,7 @@ Gate0AClaim = R6::R6Class(
       claims$decision = isTRUE(claims$decision)
 
       # ---- semantics (3-way taxonomy) -----------------------------------
-      sem_raw = claim$semantics %||% NULL
+      sem_raw = claim$semantics %??% NULL
       if (is.null(sem_raw) || !nzchar(as.character(sem_raw)[1L])) {
         sem_norm = "within_support"
         msgs = c(msgs, "Claim semantics were not provided; defaulting to 'within_support' (associational / on-manifold / descriptive).")
@@ -101,7 +101,7 @@ Gate0AClaim = R6::R6Class(
       }
 
       # ---- stakes / audience -------------------------------------------
-      stakes = claim$stakes %||% NULL
+      stakes = claim$stakes %??% NULL
       if (is.null(stakes) || !nzchar(as.character(stakes)[1L])) {
         stakes = switch(
           purpose,
@@ -118,18 +118,18 @@ Gate0AClaim = R6::R6Class(
         status = "warn"
       }
 
-      audience = claim$audience %||% "technical"
+      audience = claim$audience %??% "technical"
       audience = as.character(audience)[1L]
 
       # ---- transport + use boundaries ---------------------------------
-      target_population = claim$target_population %||% NULL
-      setting = claim$setting %||% NULL
-      time_horizon = claim$time_horizon %||% NULL
-      transport_boundary = claim$transport_boundary %||% NULL
+      target_population = claim$target_population %??% NULL
+      setting = claim$setting %??% NULL
+      time_horizon = claim$time_horizon %??% NULL
+      transport_boundary = claim$transport_boundary %??% NULL
 
-      intended_use = claim$intended_use %||% NULL
-      intended_non_use = claim$intended_non_use %||% NULL
-      prohibited_interpretations = claim$prohibited_interpretations %||% NULL
+      intended_use = claim$intended_use %??% NULL
+      intended_non_use = claim$intended_non_use %??% NULL
+      prohibited_interpretations = claim$prohibited_interpretations %??% NULL
 
       has_transport_scope = has_text(target_population) && has_text(setting) && has_text(time_horizon) && has_text(transport_boundary)
       has_use_boundaries = has_text(intended_use) && has_text(intended_non_use) && has_text(prohibited_interpretations)
@@ -162,12 +162,12 @@ Gate0AClaim = R6::R6Class(
       decision_spec = .autoiml_as_list(claim$decision_spec)
       .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
 
-      decision_policy_rationale = claim$decision_policy_rationale %||% NULL
+      decision_policy_rationale = claim$decision_policy_rationale %??% NULL
       has_decision_policy_rationale = has_text(decision_policy_rationale)
 
       # If a decision claim is requested but thresholds are missing, populate them.
       if (isTRUE(claims$decision) && is.null(decision_spec$thresholds)) {
-        decision_spec$thresholds = (ctx$calibration$thresholds %||% seq(0.01, 0.99, by = 0.01))
+        decision_spec$thresholds = (ctx$calibration$thresholds %??% seq(0.01, 0.99, by = 0.01))
         msgs = c(msgs, "Decision claim enabled but no decision_spec$thresholds provided; using a default threshold grid. For application-specific decision support, provide justified thresholds and/or utilities/costs.")
         status = "warn"
       }
@@ -212,7 +212,7 @@ Gate0AClaim = R6::R6Class(
         !is.null(actionability$constraints) || !is.null(actionability$costs)
 
       # ---- causal assumptions (not implemented; hard stop) ---------------
-      causal_assumptions = claim$causal_assumptions %||% NULL
+      causal_assumptions = claim$causal_assumptions %??% NULL
       has_causal = !is.null(causal_assumptions)
 
       if (identical(sem_norm, "causal_recourse")) {
@@ -250,7 +250,7 @@ Gate0AClaim = R6::R6Class(
 
       ctx$claim = claim_norm
 
-      thr = decision_spec$thresholds %||% numeric()
+      thr = decision_spec$thresholds %??% numeric()
       thr = suppressWarnings(as.numeric(thr))
       thr = thr[is.finite(thr) & thr > 0 & thr < 1]
 
@@ -270,7 +270,7 @@ Gate0AClaim = R6::R6Class(
         has_transport_scope = isTRUE(has_transport_scope),
         has_use_boundaries = isTRUE(has_use_boundaries),
         has_decision_policy_rationale = isTRUE(has_decision_policy_rationale),
-        hard_stop = isTRUE(ctx$hard_stop %||% FALSE)
+        hard_stop = isTRUE(ctx$hard_stop %??% FALSE)
       )
 
       summary = sprintf(
@@ -278,7 +278,7 @@ Gate0AClaim = R6::R6Class(
         claims$global, claims$local, claims$decision, sem_norm
       )
 
-      if (isTRUE(ctx$hard_stop %||% FALSE)) {
+      if (isTRUE(ctx$hard_stop %??% FALSE)) {
         summary = paste0(summary, " Hard stop triggered.")
       }
 

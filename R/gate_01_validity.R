@@ -103,7 +103,7 @@ Gate1Validity = R6::R6Class(
       pv_pool = NULL
       pv_cfg = .autoiml_as_list(ctx$plausible_values)
       .autoiml_assert_known_names(pv_cfg, c("pv_tasks"), "ctx$plausible_values")
-      pv_tasks = pv_cfg$pv_tasks %||% list()
+      pv_tasks = pv_cfg$pv_tasks %??% list()
       if (inherits(pv_tasks, "Task")) pv_tasks = list(pv_tasks)
       if (!is.list(pv_tasks)) {
         stop("ctx$plausible_values$pv_tasks must be NULL, a TaskRegr, or a list of TaskRegr objects.", call. = FALSE)
@@ -221,7 +221,7 @@ Gate1Validity = R6::R6Class(
         data.table::data.table()
       }
 
-      split_policy = as.character(validation_cfg$split_policy %||% "resampling")
+      split_policy = as.character(validation_cfg$split_policy %??% "resampling")
       leakage_checklist = data.table::data.table(
         split_policy = split_policy,
         has_cluster_var = isTRUE(!is.null(validation_cfg$cluster_var) && nzchar(as.character(validation_cfg$cluster_var)[1L])),

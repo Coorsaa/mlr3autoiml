@@ -39,14 +39,14 @@ Gate5Stability = R6::R6Class(
         ))
       }
 
-      stab = ctx$stability %||% list()
+      stab = ctx$stability %??% list()
       .autoiml_assert_known_names(stab, c("B", "max_features", "grouping", "sanity_checks", "instability_rel_sd_warn"), "ctx$stability")
 
-      B = as.integer(stab$B %||% 25L)
-      max_features = as.integer(stab$max_features %||% 10L)
-      grouping = stab$grouping %||% NULL
-      sanity_checks = isTRUE(stab$sanity_checks %||% TRUE)
-      instability_rel_sd_warn = as.numeric(stab$instability_rel_sd_warn %||% 0.75)
+      B = as.integer(stab$B %??% 25L)
+      max_features = as.integer(stab$max_features %??% 10L)
+      grouping = stab$grouping %??% NULL
+      sanity_checks = isTRUE(stab$sanity_checks %??% TRUE)
+      instability_rel_sd_warn = as.numeric(stab$instability_rel_sd_warn %??% 0.75)
 
       set.seed(.autoiml_gate_seed(ctx, self$id))
 
@@ -101,7 +101,7 @@ Gate5Stability = R6::R6Class(
       # correlated features are present.
       auto_grouping = FALSE
       if (is.null(grouping)) {
-        cor_threshold = ctx$structure$cor_threshold %||% 0.70
+        cor_threshold = ctx$structure$cor_threshold %??% 0.70
 
         ft = tryCatch(task$feature_types, error = function(e) NULL)
         num = if (!is.null(ft)) ft$id[ft$type %in% c("numeric", "integer")] else feat
@@ -245,7 +245,7 @@ Gate5Stability = R6::R6Class(
         }
       }
 
-      boot_seed = as.integer(ctx$seed %||% 1L)
+      boot_seed = as.integer(ctx$seed %??% 1L)
 
       if (use_parallel) {
         # Parallel execution via future.apply
@@ -373,7 +373,7 @@ Gate5Stability = R6::R6Class(
       }
       if (inherits(task, "TaskClassif")) {
         if (length(task$class_names) == 2L) {
-          pos = task$positive %||% task$class_names[2L]
+          pos = task$positive %??% task$class_names[2L]
           return(function(y, p) {
             y01 = factor(as.integer(y == pos), levels = c(0L, 1L))
             mlr3measures::auc(y01, p, positive = "1")

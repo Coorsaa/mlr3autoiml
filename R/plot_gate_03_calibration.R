@@ -15,10 +15,9 @@
 #' @keywords internal
 NULL
 
-#' @keywords internal
 .autoiml_plot_g3_calibration = function(result) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G3")
@@ -64,10 +63,9 @@ NULL
     .autoiml_theme_iml()
 }
 
-#' @keywords internal
 .autoiml_plot_g3_dca = function(result) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G3")
@@ -89,8 +87,8 @@ NULL
 
   # Decision range for shading
   dr = gr$artifacts$decision_range
-  thr_min = if (!is.null(dr) && is.finite(dr$thr_min %||% NA_real_)) dr$thr_min else NULL
-  thr_max = if (!is.null(dr) && is.finite(dr$thr_max %||% NA_real_)) dr$thr_max else NULL
+  thr_min = if (!is.null(dr) && is.finite(dr$thr_min %??% NA_real_)) dr$thr_min else NULL
+  thr_max = if (!is.null(dr) && is.finite(dr$thr_max %??% NA_real_)) dr$thr_max else NULL
 
   dca[, threshold_pct := threshold * 100]
 

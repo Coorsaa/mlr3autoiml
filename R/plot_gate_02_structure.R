@@ -188,8 +188,8 @@ NULL
     stop("Unknown feature: ", feat_sel, call. = FALSE)
   }
 
-  rec = gr$artifacts$recommendation %||% list()
-  method_eff = if (method == "auto") (rec$recommended_effect_method %||% "pdp") else method
+  rec = gr$artifacts$recommendation %??% list()
+  method_eff = if (method == "auto") (rec$recommended_effect_method %??% "pdp") else method
 
   pal = .autoiml_plot_palette()
   rug_dt = if (isTRUE(rug)) .autoiml_rug_dt(result, feature = feat_sel) else NULL
@@ -476,7 +476,7 @@ NULL
   if (!is.null(feature1) && !is.null(feature2)) {
     key     = paste0(feature1, "::", feature2)
     key_rev = paste0(feature2, "::", feature1)
-    dt = ale2d[[key]] %||% ale2d[[key_rev]]
+    dt = ale2d[[key]] %??% ale2d[[key_rev]]
     if (is.null(dt)) return(NULL)
   } else {
     dt       = ale2d[[1L]]

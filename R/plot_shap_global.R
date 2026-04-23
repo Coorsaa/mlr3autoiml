@@ -83,13 +83,13 @@ NULL
   if (inherits(auto, "AutoIML")) {
     if (is.null(auto$result)) stop("No result yet; call $run() first.", call. = FALSE)
     ctx = auto$ctx
-    learner_id = auto$learner$id %||% NA_character_
+    learner_id = auto$learner$id %??% NA_character_
     seed_default = auto$seed
   } else if (is.list(auto) && is.environment(auto$ctx)) {
     ctx = auto$ctx
     learner_obj = auto[["learner"]]
-    learner_id = learner_obj$id %||% auto[["learner_id"]] %||% NA_character_
-    seed_default = auto[["seed"]] %||% ctx$seed
+    learner_id = learner_obj$id %??% auto[["learner_id"]] %??% NA_character_
+    seed_default = auto[["seed"]] %??% ctx$seed
   } else {
     stop("Expected an AutoIML object or auto-like object with `ctx`.", call. = FALSE)
   }
@@ -290,7 +290,7 @@ NULL
   if (!inherits(result, "AutoIML")) {
     auto_like$result = result
     auto_like$learner_id = result$learner_id
-    auto_like$seed = ctx$seed %||% seed
+    auto_like$seed = ctx$seed %??% seed
   }
 
   dt = .autoiml_shap_sample_dt(

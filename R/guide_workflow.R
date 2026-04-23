@@ -23,9 +23,9 @@ guide_workflow = function(x, max_actions = 6L) {
   }
 
   rc = report_card(res)
-  claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %||% list())
-  semantics = as.character(claim$semantics %||% NA_character_)
-  stakes = as.character(claim$stakes %||% NA_character_)
+  claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %??% list())
+  semantics = as.character(claim$semantics %??% NA_character_)
+  stakes = as.character(claim$stakes %??% NA_character_)
 
   statuses = if (data.table::is.data.table(rc) && nrow(rc) > 0L) {
     out = as.list(as.character(rc$status))
@@ -36,8 +36,8 @@ guide_workflow = function(x, max_actions = 6L) {
   }
 
   g2 = .autoiml_get_gate_result(res, "G2")
-  g2_metrics = g2$metrics %||% data.table::data.table()
-  requested_scopes = as.character(res$iel$requested %||% c("global"))
+  g2_metrics = g2$metrics %??% data.table::data.table()
+  requested_scopes = as.character(res$iel$requested %??% c("global"))
 
   trust_summary = .autoiml_trust_summary(res)
   model_story = .autoiml_model_story(res)
@@ -168,7 +168,7 @@ guide_workflow = function(x, max_actions = 6L) {
     )
   }
 
-  if ("local" %in% requested_scopes && isTRUE((res$iel$local %||% "IEL-0") == "IEL-0")) {
+  if ("local" %in% requested_scopes && isTRUE((res$iel$local %??% "IEL-0") == "IEL-0")) {
     actions = add_action(
       actions,
       7L,
@@ -178,7 +178,7 @@ guide_workflow = function(x, max_actions = 6L) {
     )
   }
 
-  if ("decision" %in% requested_scopes && isTRUE((res$iel$decision %||% "IEL-0") == "IEL-0")) {
+  if ("decision" %in% requested_scopes && isTRUE((res$iel$decision %??% "IEL-0") == "IEL-0")) {
     actions = add_action(
       actions,
       7L,
@@ -210,21 +210,21 @@ guide_workflow = function(x, max_actions = 6L) {
   }
 
   summary_dt = data.table::data.table(
-    purpose = as.character(res$purpose %||% NA_character_),
+    purpose = as.character(res$purpose %??% NA_character_),
     stakes = stakes,
     semantics = semantics,
     requested_scopes = paste(requested_scopes, collapse = ","),
-    iel_overall = as.character(res$iel$overall %||% NA_character_),
-    iel_global = as.character(res$iel$global %||% NA_character_),
-    iel_local = as.character(res$iel$local %||% NA_character_),
-    iel_decision = as.character(res$iel$decision %||% NA_character_),
-    claim_scope_overall = as.character(res$claim_scope$overall %||% NA_character_),
-    gate0b_status = as.character(statuses[["G0B"]] %||% NA_character_),
-    gate1_status = as.character(statuses[["G1"]] %||% NA_character_),
-    gate4_status = as.character(statuses[["G4"]] %||% NA_character_),
-    gate5_status = as.character(statuses[["G5"]] %||% NA_character_),
-    gate6_status = as.character(statuses[["G6"]] %||% NA_character_),
-    gate7a_status = as.character(statuses[["G7A"]] %||% NA_character_)
+    iel_overall = as.character(res$iel$overall %??% NA_character_),
+    iel_global = as.character(res$iel$global %??% NA_character_),
+    iel_local = as.character(res$iel$local %??% NA_character_),
+    iel_decision = as.character(res$iel$decision %??% NA_character_),
+    claim_scope_overall = as.character(res$claim_scope$overall %??% NA_character_),
+    gate0b_status = as.character(statuses[["G0B"]] %??% NA_character_),
+    gate1_status = as.character(statuses[["G1"]] %??% NA_character_),
+    gate4_status = as.character(statuses[["G4"]] %??% NA_character_),
+    gate5_status = as.character(statuses[["G5"]] %??% NA_character_),
+    gate6_status = as.character(statuses[["G6"]] %??% NA_character_),
+    gate7a_status = as.character(statuses[["G7A"]] %??% NA_character_)
   )
 
   list(

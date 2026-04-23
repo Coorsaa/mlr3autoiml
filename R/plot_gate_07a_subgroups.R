@@ -13,11 +13,10 @@
 #' @keywords internal
 NULL
 
-#' @keywords internal
 .autoiml_plot_g7a_subgroups = function(result, metric = "auto", top_n = 20L,
   labels = NULL) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G7A")
@@ -57,8 +56,8 @@ NULL
   }
   metric = as.character(metric)
   if (!metric %in% names(sub)) {
-    warning(sprintf(".autoiml_plot_g7a_subgroups: metric '%s' not in subgroup table. Available: %s",
-      metric, paste(setdiff(names(sub), c("group_var", "group", "n")), collapse = ", ")))
+    avail = setdiff(names(sub), c("group_var", "group", "n"))
+    cli_warn("Metric {.val {metric}} not found in subgroup table. Available: {.val {avail}}")
     return(NULL)
   }
 

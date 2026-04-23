@@ -203,7 +203,7 @@ AutoIML = R6::R6Class(
       ctx$profile = self$profile
 
       # Re-apply defaults in case ctx was only partially set
-      .autoiml_apply_config_defaults(ctx, profile = ctx$profile %||% "high_resolution")
+      .autoiml_apply_config_defaults(ctx, profile = ctx$profile %??% "high_resolution")
 
       # Strict config validation (early fail)
       .autoiml_validate_ctx(ctx)
@@ -241,7 +241,7 @@ AutoIML = R6::R6Class(
             gate_name = gr$gate_name,
             status = gr$status,
             elapsed_sec = out$elapsed,
-            summary = gr$summary %||% NA_character_
+            summary = gr$summary %??% NA_character_
           )
         ), fill = TRUE)
       }
@@ -326,8 +326,8 @@ AutoIML = R6::R6Class(
     gate_plan = function() {
       private$gate_plan_from_claim(
         ctx = self$ctx,
-        purpose = self$ctx$purpose %||% self$purpose,
-        quick_start = self$ctx$quick_start %||% self$quick_start
+        purpose = self$ctx$purpose %??% self$purpose,
+        quick_start = self$ctx$quick_start %??% self$quick_start
       )
     },
 
@@ -490,23 +490,23 @@ AutoIML = R6::R6Class(
       background = task$data(rows = bg_rows, cols = feats)
 
       cls = if (!is.null(class_label)) as.character(class_label) else NULL
-      seed_use = seed %||% (ctx$seed %||% 1L)
+      seed_use = seed %??% (ctx$seed %??% 1L)
 
       # Semantics: default SHAP mode depends on the declared semantics (Gate 0A),
       # but can be overridden via ctx$shap$mode.
-      sem = .autoiml_normalize_semantics(((ctx$claim %||% list())$semantics %||% "within_support"), default = "within_support")
+      sem = .autoiml_normalize_semantics(((ctx$claim %??% list())$semantics %??% "within_support"), default = "within_support")
 
-      shap_cfg = ctx$shap %||% list()
+      shap_cfg = ctx$shap %??% list()
       if (!is.list(shap_cfg)) shap_cfg <- list()
 
       shap_mode = .autoiml_normalize_shap_mode(
-        shap_cfg$mode %||% if (identical(sem, "within_support")) "conditional" else "marginal",
+        shap_cfg$mode %??% if (identical(sem, "within_support")) "conditional" else "marginal",
         default = if (identical(sem, "within_support")) "conditional" else "marginal"
       )
 
-      cond_k = as.integer(shap_cfg$conditional_k %||% 5L)
+      cond_k = as.integer(shap_cfg$conditional_k %??% 5L)
       cond_k = max(1L, cond_k)
-      cond_weighted = isTRUE(shap_cfg$conditional_weighted %||% TRUE)
+      cond_weighted = isTRUE(shap_cfg$conditional_weighted %??% TRUE)
 
       dt = .autoiml_shapley_iml(
         task = task,
@@ -550,19 +550,19 @@ AutoIML = R6::R6Class(
       claim = .autoiml_as_list(ctx$claim)
       claim_flags = .autoiml_as_list(claim$claims)
 
-      want_global = isTRUE(claim_flags$global %||% TRUE)
-      want_local = isTRUE(claim_flags$local %||% FALSE)
-      want_decision = isTRUE(claim_flags$decision %||% FALSE)
+      want_global = isTRUE(claim_flags$global %??% TRUE)
+      want_local = isTRUE(claim_flags$local %??% FALSE)
+      want_decision = isTRUE(claim_flags$decision %??% FALSE)
 
-      stakes = tolower(as.character((claim$stakes %||% "medium")[1L]))
+      stakes = tolower(as.character((claim$stakes %??% "medium")[1L]))
       purpose_decision = purpose %in% c("decision_support", "deployment")
       high_stakes = isTRUE(stakes == "high" || purpose_decision)
-      audience = as.character((claim$audience %||% "technical")[1L])
+      audience = as.character((claim$audience %??% "technical")[1L])
       user_facing = .autoiml_is_user_facing_audience(audience)
-      has_hf_evidence = .autoiml_has_evidence_value(claim$human_factors_evidence %||% ctx$human_factors_evidence)
+      has_hf_evidence = .autoiml_has_evidence_value(claim$human_factors_evidence %??% ctx$human_factors_evidence)
 
-      task = ctx$task %||% self$task
-      group_vars = unique(as.character(ctx$sensitive_features %||% task$col_roles$stratum %||% character()))
+      task = ctx$task %??% self$task
+      group_vars = unique(as.character(ctx$sensitive_features %??% task$col_roles$stratum %??% character()))
       group_vars = group_vars[nzchar(group_vars)]
       subgroup_triggered = length(group_vars) > 0L
 
@@ -602,7 +602,7 @@ AutoIML = R6::R6Class(
           gate_name = gate_obj$name,
           pdr = gate_obj$pdr,
           status = "skip",
-          summary = paste0("Skipped due to hard stop in Gate 0: ", ctx$hard_stop_reason %||% "No reason provided."),
+          summary = paste0("Skipped due to hard stop in Gate 0: ", ctx$hard_stop_reason %??% "No reason provided."),
           metrics = NULL,
           artifacts = list(),
           messages = character()

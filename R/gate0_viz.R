@@ -28,17 +28,17 @@ gate0_tables = function(x) {
   claim_card = NULL
   claim = NULL
   if (!is.null(g0a)) {
-    a = g0a$artifacts %||% list()
+    a = g0a$artifacts %??% list()
     claim_card = g0a$metrics
-    claim = a$claim %||% NULL
+    claim = a$claim %??% NULL
   }
 
   measurement_card = NULL
   missingness = NULL
   if (!is.null(g0b)) {
-    a = g0b$artifacts %||% list()
+    a = g0b$artifacts %??% list()
     measurement_card = g0b$metrics
-    missingness = a$missingness %||% NULL
+    missingness = a$missingness %??% NULL
   }
 
   list(

@@ -59,14 +59,14 @@ iel_from_gates = function(gates) {
 
   claim0 = NULL
   if (!is.null(gate_map[["G0A"]])) {
-    claim0 = gate_map[["G0A"]]$artifacts$claim %||% NULL
+    claim0 = gate_map[["G0A"]]$artifacts$claim %??% NULL
   }
 
   scopes_req = list(global = TRUE, local = FALSE, decision = FALSE)
   if (!is.null(claim0$claims)) {
-    scopes_req$global = isTRUE(claim0$claims$global %||% TRUE)
-    scopes_req$local = isTRUE(claim0$claims$local %||% FALSE)
-    scopes_req$decision = isTRUE(claim0$claims$decision %||% FALSE)
+    scopes_req$global = isTRUE(claim0$claims$global %??% TRUE)
+    scopes_req$local = isTRUE(claim0$claims$local %??% FALSE)
+    scopes_req$decision = isTRUE(claim0$claims$decision %??% FALSE)
   }
 
   requested = character()
@@ -75,10 +75,10 @@ iel_from_gates = function(gates) {
   if (isTRUE(scopes_req$decision)) requested <- c(requested, "decision")
   if (length(requested) < 1L) requested <- "global"
 
-  stakes = tolower(as.character((claim0$stakes %||% "medium")[1L]))
-  purpose = as.character((claim0$purpose %||% "exploratory")[1L])
+  stakes = tolower(as.character((claim0$stakes %??% "medium")[1L]))
+  purpose = as.character((claim0$purpose %??% "exploratory")[1L])
   high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
-  audience = as.character((claim0$audience %||% "technical")[1L])
+  audience = as.character((claim0$audience %??% "technical")[1L])
   user_facing = .autoiml_is_user_facing_audience(audience)
 
   iel_rules = .autoiml_iel_rules()
@@ -140,7 +140,7 @@ iel_from_gates = function(gates) {
     requested = requested,
     requested_flags = scopes_req,
     iel_justification = justification,
-    iel_rule_source = iel_rules$`_path` %||% NA_character_
+    iel_rule_source = iel_rules$`_path` %??% NA_character_
   )
 }
 
@@ -166,10 +166,10 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
     stop("claim_scope_from_iel(): `iel` must be a list returned by iel_from_gates().", call. = FALSE)
   }
 
-  iel_global = iel$global %||% "IEL-0"
-  iel_local = iel$local %||% "IEL-0"
-  iel_decision = iel$decision %||% "IEL-0"
-  requested = iel$requested %||% c("global")
+  iel_global = iel$global %??% "IEL-0"
+  iel_local = iel$local %??% "IEL-0"
+  iel_decision = iel$decision %??% "IEL-0"
+  requested = iel$requested %??% c("global")
 
   scope_global = switch(
     iel_global,
@@ -195,7 +195,7 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
     "IEL-3" = "Applied decision support with monitoring: add transport checks, governance artifacts, and user-facing human-factors evidence when explanations are shown to end users."
   )
 
-  overall = iel$overall %||% .autoiml_min_iel(c(iel_global, iel_local, iel_decision))
+  overall = iel$overall %??% .autoiml_min_iel(c(iel_global, iel_local, iel_decision))
   scope_overall = paste0(
     "Overall evidence for requested claims (", paste(requested, collapse = ", "), ") is ", overall, "."
   )
@@ -254,7 +254,7 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
   }
 
   if (is.list(scope)) {
-    req = scope$requested %||% c("global")
+    req = scope$requested %??% c("global")
     lines = c()
     if (!is.null(scope$overall)) lines <- c(lines, scope$overall)
     if ("global" %in% req && !is.null(scope$global)) lines <- c(lines, paste0("Global: ", scope$global))
@@ -284,8 +284,8 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 # @keywords internal
 .autoiml_eval_iel_rule = function(rule, gate_map, high_stakes = FALSE, user_facing = FALSE) {
   rule = .autoiml_as_list(rule)
-  req_gates = as.character(unlist(rule$required_gates %||% character(), use.names = FALSE))
-  req_status = as.character(unlist(rule$requires_any_status_in %||% c("pass", "warn"), use.names = FALSE))
+  req_gates = as.character(unlist(rule$required_gates %??% character(), use.names = FALSE))
+  req_status = as.character(unlist(rule$requires_any_status_in %??% c("pass", "warn"), use.names = FALSE))
   gate_status_req = .autoiml_as_list(rule$gate_status_requirements)
   req_keys = .autoiml_as_list(rule$requires_artifact_keys) # named list: gate_id -> required keys
 
@@ -313,8 +313,8 @@ claim_scope_from_iel = function(iel, purpose = "exploratory") {
 
   # status check
   bad_status = req_gates[!vapply(req_gates, function(g) {
-    st = as.character(gate_map[[g]]$status %||% "")
-    allowed = as.character(unlist(gate_status_req[[g]] %||% req_status, use.names = FALSE))
+    st = as.character(gate_map[[g]]$status %??% "")
+    allowed = as.character(unlist(gate_status_req[[g]] %??% req_status, use.names = FALSE))
     st %in% allowed
   }, logical(1L))]
   if (length(bad_status) > 0L) {
