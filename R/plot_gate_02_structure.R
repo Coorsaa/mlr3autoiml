@@ -105,14 +105,14 @@ NULL
 
   top_n = as.integer(top_n)
   dt = dt[order(-ice_sd_mean)][seq_len(min(top_n, .N))]
-  # Use unique feature levels to avoid factor duplication errors
   feat_levels = unique(dt$feature)
   dt[, feature := factor(feature, levels = rev(feat_levels))]
+  pal = .autoiml_plot_palette()
 
   ggplot2::ggplot(dt, ggplot2::aes(x = ice_sd_mean, y = feature)) +
-    ggplot2::geom_col() +
+    ggplot2::geom_col(fill = pal$metric[["primary"]]) +
     ggplot2::labs(
-      title = "Gate 2: ICE heterogeneity",
+      title = "G2: ICE heterogeneity",
       x = "Mean SD of centered ICE (higher = more heterogeneous effect)",
       y = NULL
     ) +
@@ -191,6 +191,7 @@ NULL
   rec = gr$artifacts$recommendation %||% list()
   method_eff = if (method == "auto") (rec$recommended_effect_method %||% "pdp") else method
 
+  pal = .autoiml_plot_palette()
   rug_dt = if (isTRUE(rug)) .autoiml_rug_dt(result, feature = feat_sel) else NULL
 
   # =========================
@@ -243,7 +244,7 @@ NULL
     }
 
     ttl = if (!is.null(class_label)) {
-      sprintf("Positive: %s \u2013 PDP + ICE", as.character(class_label)[1L])
+      sprintf("Positive: %s \u002D PDP + ICE", as.character(class_label)[1L])
     } else {
       "PDP + ICE"
     }
@@ -281,7 +282,7 @@ NULL
     p = p +
       ggplot2::scale_color_manual(
         name = "Curve",
-        values = c("ICE" = "grey60", "PDP" = "#E69F00")
+        values = c("ICE" = pal$reference[["neutral"]], "PDP" = pal$metric[["primary"]])
       ) +
       ggplot2::labs(
         title = ttl,
@@ -316,13 +317,13 @@ NULL
   }
 
   ttl = if (!is.null(class_label)) {
-    sprintf("ALE \u2013 %s", as.character(class_label)[1L])
+    sprintf("ALE \u002D %s", as.character(class_label)[1L])
   } else {
     "ALE"
   }
 
   p = ggplot2::ggplot(ale_dt, ggplot2::aes(x = x, y = ale)) +
-    ggplot2::geom_line(color = "grey20", linewidth = 0.8)
+    ggplot2::geom_line(color = pal$metric[["primary"]], linewidth = 0.8)
 
   if (!is.null(rug_dt)) {
     p = p +
@@ -383,12 +384,14 @@ NULL
   dt = dt[is.finite(hstat)][order(-hstat)][seq_len(min(top_n, .N))]
   dt[, pair := factor(pair, levels = rev(pair))]
 
+  pal = .autoiml_plot_palette()
+
   if (isTRUE(as_barplot)) {
     return(
       ggplot2::ggplot(dt, ggplot2::aes(x = hstat, y = pair)) +
-        ggplot2::geom_col() +
+        ggplot2::geom_col(fill = pal$metric[["tertiary"]]) +
         ggplot2::labs(
-          title = "Gate 2: Interaction strength (Friedman H-statistic)",
+          title = "G2: Interaction strength (Friedman H-statistic)",
           x = "H-statistic",
           y = NULL
         ) +
@@ -397,9 +400,9 @@ NULL
   }
 
   ggplot2::ggplot(dt, ggplot2::aes(x = hstat, y = pair)) +
-    ggplot2::geom_point(size = 2) +
+    ggplot2::geom_point(color = pal$metric[["primary"]], size = 2) +
     ggplot2::labs(
-      title = "Gate 2: Interaction strength (Friedman H-statistic)",
+      title = "G2: Interaction strength (Friedman H-statistic)",
       x = "H-statistic",
       y = NULL
     ) +
@@ -440,8 +443,10 @@ NULL
     return(NULL)
   }
 
+  pal = .autoiml_plot_palette()
+
   ggplot2::ggplot(dt, ggplot2::aes(x = x, y = y, group = region_id)) +
-    ggplot2::geom_line(color = "grey20", linewidth = 0.7) +
+    ggplot2::geom_line(color = pal$metric[["primary"]], linewidth = 0.7) +
     ggplot2::facet_wrap(~path, ncol = as.integer(ncol)) +
     ggplot2::labs(
       title = sprintf("Gate 2: Regionalized effect curves (GADGET-style) for %s", feature),
@@ -449,4 +454,74 @@ NULL
       y = "Centered effect (regional)"
     ) +
     .autoiml_theme_iml()
+}
+
+.autoiml_plot_g2_ale_2d = function(result,
+  feature1    = NULL,
+  feature2    = NULL,
+  class_label = NULL,
+  base_size   = 11
+) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+  }
+
+  gr = .autoiml_get_gate_result(result, "G2")
+  if (is.null(gr)) return(NULL)
+
+  ale2d = gr$artifacts$ale2d
+  if (is.null(ale2d) || length(ale2d) == 0L) return(NULL)
+
+  # Resolve pair
+  if (!is.null(feature1) && !is.null(feature2)) {
+    key     = paste0(feature1, "::", feature2)
+    key_rev = paste0(feature2, "::", feature1)
+    dt = ale2d[[key]] %||% ale2d[[key_rev]]
+    if (is.null(dt)) return(NULL)
+  } else {
+    dt       = ale2d[[1L]]
+    feature1 = dt$feature1[1L]
+    feature2 = dt$feature2[1L]
+  }
+
+  dt = data.table::as.data.table(dt)
+
+  if (!is.null(class_label) && "class_label" %in% names(dt)) {
+    dt = dt[class_label == as.character(class_label)[1L]]
+  }
+  if (nrow(dt) < 1L) return(NULL)
+
+  pal     = .autoiml_plot_palette()
+  abs_max = max(abs(dt$ale2d), na.rm = TRUE)
+  if (!is.finite(abs_max) || abs_max == 0) abs_max = 0.01
+
+  cl_lbl = if (!is.null(class_label)) sprintf(" \u002D %s", as.character(class_label)[1L]) else ""
+  x1_left = x1_right = x2_bottom = x2_top = x1 = x2 = ale2d = NULL
+
+  ggplot2::ggplot(dt) +
+    ggplot2::geom_rect(ggplot2::aes(
+      xmin = x1_left,
+      xmax = x1_right,
+      ymin = x2_bottom,
+      ymax = x2_top,
+      fill = ale2d
+    ), linewidth = 0) +
+    ggplot2::geom_contour(ggplot2::aes(x = x1, y = x2, z = ale2d),
+      colour = "white", alpha = 0.4, linewidth = 0.3) +
+    ggplot2::scale_fill_gradient2(
+      low      = pal$gradient[["low"]],
+      high     = pal$gradient[["high"]],
+      mid      = pal$gradient[["mid"]],
+      midpoint = 0,
+      limits   = c(-abs_max, abs_max),
+      name     = "ALE 2D"
+    ) +
+    ggplot2::labs(
+      title = sprintf("G2: ALE interaction surface%s \u002D %s \u00D7 %s",
+        cl_lbl, feature1, feature2),
+      x = feature1,
+      y = feature2
+    ) +
+    ggplot2::coord_cartesian(expand = FALSE) +
+    .autoiml_theme_iml(base_size = base_size)
 }

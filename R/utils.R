@@ -445,6 +445,7 @@ NULL
     "grid_n", "grid_type",
     "ice_center",
     "ale_bins",
+    "ale_2d_bins", "ale_2d_top_pairs",
     "cor_threshold",
     "hstat_max_features", "hstat_grid_n", "hstat_threshold",
     "support_check",

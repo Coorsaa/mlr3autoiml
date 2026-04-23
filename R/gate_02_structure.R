@@ -59,6 +59,7 @@ Gate2Structure = R6::R6Class(
           "grid_n", "grid_type", "ice_center", "ale_bins",
           "cor_threshold", "hstat_max_features", "hstat_grid_n", "hstat_threshold",
           "regionalize", "regional_method", "gadget_max_depth", "gadget_min_bucket", "gadget_gamma", "gadget_top_k",
+          "ale_2d_bins", "ale_2d_top_pairs",
           "support_check", "support_required_for_marginal"
         ),
         "ctx$structure"
@@ -95,6 +96,9 @@ Gate2Structure = R6::R6Class(
 
       # --- dependence screen
       cor_threshold = as.numeric(cfg$cor_threshold %||% 0.70)
+
+      ale_2d_bins      = as.integer(cfg$ale_2d_bins      %||% 8L)
+      ale_2d_top_pairs = as.integer(cfg$ale_2d_top_pairs %||% 3L)
 
       # --- interaction screening
       hstat_max_features = as.integer(cfg$hstat_max_features %||% 4L)
@@ -220,7 +224,7 @@ Gate2Structure = R6::R6Class(
         h = sqrt(pmin(pmax(h2, 0), 1))
 
         data.table::data.table(
-          class_label = as.character(class_label),
+          class_label = if (is.null(class_label)) "regression" else as.character(class_label),
           feature1 = f1,
           feature2 = f2,
           hstat = as.numeric(h),
@@ -230,12 +234,13 @@ Gate2Structure = R6::R6Class(
       }
 
       # --- main computations ------------------------------------------------
-      pd_curves = NULL
+      pd_curves  = NULL
       ice_curves = NULL
       ice_spread = NULL
       ale_curves = NULL
-      hstats = NULL
-      gadget = list()
+      hstats     = NULL
+      gadget     = list()
+      ale2d_list = list()
 
       pred_mats = list()
       grids = list()
@@ -305,7 +310,7 @@ Gate2Structure = R6::R6Class(
           cls_main = if (is.null(class_labels)) NULL else as.character(class_labels[[1L]])
         }
 
-        if (length(top_feats) >= 2L && !is.null(cls_main)) {
+        if (length(top_feats) >= 2L) {
           pairs = utils::combn(top_feats, 2, simplify = FALSE)
 
           # Check if future.apply is available for parallel execution
@@ -387,6 +392,25 @@ Gate2Structure = R6::R6Class(
                 gad$method = regional_method_used
                 gadget[[ff]] = gad
               }
+            }
+          }
+        }
+
+        # 2D ALE for top interacting pairs (visualizes the detected interaction surface)
+        ale2d_list = list()
+        if (!is.null(hstats) && nrow(hstats) > 0L && ale_2d_top_pairs > 0L) {
+          hs_top = hstats[is.finite(hstat)][order(-hstat)][seq_len(min(ale_2d_top_pairs, .N))]
+          cls_2d = if (is.null(class_labels)) NULL else as.character(class_labels[[1L]])
+          for (k in seq_len(nrow(hs_top))) {
+            f1_k = hs_top$feature1[k]
+            f2_k = hs_top$feature2[k]
+            ale2d_k = tryCatch(
+              .autoiml_ale_2d(task, model, X, f1_k, f2_k,
+                bins = ale_2d_bins, class_label = cls_2d),
+              error = function(e) NULL
+            )
+            if (!is.null(ale2d_k) && nrow(ale2d_k) > 0L) {
+              ale2d_list[[paste0(f1_k, "::", f2_k)]] = ale2d_k
             }
           }
         }
@@ -625,6 +649,7 @@ Gate2Structure = R6::R6Class(
           pd_curves = pd_curves,
           ale_curves = ale_curves,
           hstats = hstats,
+          ale2d  = ale2d_list,
           gadget = gadget,
           gadget_regions = gadget_regions
         ),
