@@ -102,6 +102,9 @@ NULL
     gadget_gamma = 0.00,
     gadget_top_k = 2L,
 
+    ale_2d_bins      = if (profile == "fast") 8L  else 10L,
+    ale_2d_top_pairs = if (profile == "fast") 2L  else 3L,
+
     # Optional: off-manifold support screening for marginal model query semantics (Gate 2)
     support_check = list(
       enabled = NULL,
