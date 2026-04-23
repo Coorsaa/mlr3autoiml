@@ -17,7 +17,7 @@ plotting) activate when the corresponding packages are available.
 
 ``` r
 # install.packages("remotes")
-remotes::install_local("mlr3autoiml")
+remotes::install_github("coorsaa/mlr3autoiml")
 ```
 
 ------------------------------------------------------------------------
@@ -25,8 +25,8 @@ remotes::install_local("mlr3autoiml")
 ## Example 1 — Classification · decision support
 
 **Task:** `german_credit` (1 000 rows, 20 mixed-type features, binary
-`credit_risk`). Full gate path including calibration, decision utility,
-and subgroup audit.
+`credit_risk`). Full gate path including G3 calibration + decision
+utility and G7A subgroup audit.
 
 ``` r
 library(mlr3)
@@ -40,7 +40,7 @@ learner <- lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
 auto <- AutoIML$new(
   task       = task,
   learner    = learner,
-  resampling = rsmp("cv", folds = 5),
+  resampling = rsmp("cv", folds = 3),
   purpose    = "decision_support",
   seed       = 42
 )
@@ -67,28 +67,61 @@ auto$ctx$alt_learners       <- list(
 ```
 
 ``` r
-res <- auto$run(verbose = TRUE)
+res <- auto$run()
 ```
 
 ``` r
-auto$report_card()
-cat("IEL:  G =", res$iel$global, "| L =", res$iel$local,
+knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
+```
+
+| gate_id | gate_name | status | summary |
+|:---|:---|:---|:---|
+| G0A | Scope claim & use | fail | Claim scope set (global=TRUE, local=TRUE, decision=TRUE) with semantics=within_support. |
+| G0B | Measurement readiness | fail | Measurement readiness failed for high-stakes use: missing critical evidence (reliability, missingness_plan, scoring_pipeline, invariance). |
+| G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
+| G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
+| G3 | Calibration and decision utility | warn | Binary calibration/utility checks computed (intercept/slope, ECE, reliability, net benefit, cost-/utility sweep). |
+| G4 | Faithfulness | warn | Faithfulness screened via linear surrogate (R^2=0.06) and local additive checks (Shapley max error=0.068). |
+| G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
+| G6 | Multiplicity and transport | fail | High-stakes claims require transport assessment in Gate 6, but transport evidence is missing. |
+| G7A | Subgroups / measurement audit | fail | High-stakes subgroup claims require measurement comparability evidence (ctx$measurement$invariance). |
+
+``` r
+cat("\nIEL:  G =", res$iel$global, "| L =", res$iel$local,
         "| D =", res$iel$decision, "| overall =", res$iel$overall, "\n")
+#> 
+#> IEL:  G = IEL-0 | L = IEL-0 | D = IEL-0 | overall = IEL-0
 ```
 
 ``` r
 auto$plot("overview")
-auto$plot("g2_hstats")
-auto$plot("g2_effect",        feature = "amount")
-auto$plot("g3_calibration")
-auto$plot("g3_dca")
-auto$plot("g5_stability")
-auto$plot("g6_performance")
-auto$plot("g6_pred_multiplicity")
-auto$plot("g7a_subgroups")
-auto$plot("shap_importance")
-auto$plot("shap_local",       row_id = 1L)
 ```
+
+<img src="man/figures/README-classif-overview-1.png" alt="Gate overview for german_credit" width="100%" />
+
+``` r
+auto$plot("g1_scores")
+```
+
+<img src="man/figures/README-classif-g1-1.png" alt="CV performance scores" width="100%" />
+
+``` r
+auto$plot("g2_effect", feature = "amount")
+```
+
+<img src="man/figures/README-classif-g2-1.png" alt="ALE effect plot for amount" width="100%" />
+
+``` r
+auto$plot("g3_dca")
+```
+
+<img src="man/figures/README-classif-g3-1.png" alt="Decision curve analysis" width="100%" />
+
+``` r
+auto$plot("g5_stability")
+```
+
+<img src="man/figures/README-classif-g5-1.png" alt="Permutation importance stability" width="100%" />
 
 ``` r
 export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_credit")
@@ -100,8 +133,8 @@ export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_cred
 
 **Task:** `california_housing` (20 640 rows, 8 numeric + 1 factor
 feature, continuous `median_house_value`). Correlated spatial predictors
-(`latitude`, `longitude`, `households`) trigger ALE selection and an
-interaction screen in G2.
+trigger ALE selection in G2; `ocean_proximity` serves as the subgroup
+variable.
 
 ``` r
 task    <- tsk("california_housing")
@@ -112,7 +145,7 @@ learner <- lrn("regr.rpart", maxdepth = 8L)
 auto <- AutoIML$new(
   task       = task,
   learner    = learner,
-  resampling = rsmp("cv", folds = 5),
+  resampling = rsmp("cv", folds = 3),
   purpose    = "global_insight",
   seed       = 42
 )
@@ -129,30 +162,56 @@ auto$ctx$claim <- make_claim_card(
 
 auto$ctx$measurement        <- make_measurement_card("item")
 auto$ctx$sensitive_features <- "ocean_proximity"
-auto$ctx$alt_learners       <- list(
-  Featureless = lrn("regr.featureless")
-)
+auto$ctx$alt_learners       <- list(Featureless = lrn("regr.featureless"))
 ```
 
 ``` r
-res <- auto$run(verbose = TRUE)
+res <- auto$run()
 ```
 
 ``` r
-auto$report_card()
-cat("IEL:  G =", res$iel$global, "| overall =", res$iel$overall, "\n")
+knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
+```
+
+| gate_id | gate_name | status | summary |
+|:---|:---|:---|:---|
+| G0A | Scope claim & use | warn | Claim scope set (global=TRUE, local=FALSE, decision=FALSE) with semantics=within_support. |
+| G0B | Measurement readiness | warn | Measurement readiness screened (requires user-supplied psychometric evidence; missingness summarized). |
+| G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
+| G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
+| G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
+| G6 | Multiplicity and transport | pass | Partial Gate 6 coverage: assessed multiplicity; not assessed transport. |
+| G7A | Subgroups / measurement audit | pass | Subgroup audit computed (regression RMSE, R², mean_y by group). |
+
+``` r
+cat("\nIEL:  G =", res$iel$global, "| overall =", res$iel$overall, "\n")
+#> 
+#> IEL:  G = IEL-1 | overall = IEL-1
 ```
 
 ``` r
 auto$plot("overview")
-auto$plot("g2_hstats")
-auto$plot("g2_effect",    feature = "median_income")
-auto$plot("g5_stability")
-auto$plot("g6_performance")
-auto$plot("g6_pred_multiplicity")
-auto$plot("g7a_subgroups")
-auto$plot("shap_importance")
 ```
+
+<img src="man/figures/README-regr-overview-1.png" alt="Gate overview for california_housing" width="100%" />
+
+``` r
+auto$plot("g2_effect", feature = "total_rooms")
+```
+
+<img src="man/figures/README-regr-g2-1.png" alt="ALE effect plot for total_rooms" width="100%" />
+
+``` r
+auto$plot("g5_stability")
+```
+
+<img src="man/figures/README-regr-g5-1.png" alt="Permutation importance stability" width="100%" />
+
+``` r
+auto$plot("g7a_subgroups")
+```
+
+<img src="man/figures/README-regr-g7a-1.png" alt="Subgroup performance by ocean proximity" width="100%" />
 
 ``` r
 export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
