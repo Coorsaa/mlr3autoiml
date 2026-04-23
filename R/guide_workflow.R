@@ -204,7 +204,7 @@ guide_workflow = function(x, max_actions = 6L) {
 
   reader_questions = .autoiml_reader_questions(res, actions = actions)
 
-  rec_plots = c("storyboard", "g2_effect", "g2_hstats", "g6_performance")
+  rec_plots = c("overview", "g2_effect", "g2_hstats", "g6_performance")
   if (!is.null(statuses[["G6"]]) && statuses[["G6"]] != "skip") {
     rec_plots = c(rec_plots, "g6_summary")
   }
