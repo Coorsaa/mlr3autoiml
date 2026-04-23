@@ -410,6 +410,8 @@ AutoIML = R6::R6Class(
     #'   - `"g6_group_performance"`: Gate 6 subgroup performance heterogeneity.
     #'   - `"g6_rashomon_importance"`: Gate 6 Rashomon explanation dispersion.
     #'   - `"g6_rank_heatmap"`: Gate 6 feature importance rank heatmap across Rashomon members.
+    #'   - `"g6_pred_multiplicity"`: Gate 6 per-row prediction range histogram across Rashomon members.
+    #'   - `"g6_loco"`: Gate 6 leave-one-out transport bar chart (requires LOCO transport mode).
     #'   - `"g6_summary"`: Gate 6 composite (performance + importance).
     #'   - `"g7a_subgroups"`: Gate 7A subgroup performance bar chart.
     #'
@@ -445,6 +447,8 @@ AutoIML = R6::R6Class(
         "g6_group_performance"    = .autoiml_plot_g6_group_performance(self$result, ...),
         "g6_rashomon_importance"  = .autoiml_plot_g6_rashomon_importance(self$result, ...),
         "g6_rank_heatmap"         = .autoiml_plot_g6_rank_heatmap(self$result, ...),
+        "g6_pred_multiplicity"    = .autoiml_plot_g6_pred_multiplicity(self$result, ...),
+        "g6_loco"                 = .autoiml_plot_g6_loco(self$result, ...),
         "g6_summary"              = .autoiml_plot_g6_summary(self$result, ...),
         "g7a_subgroups"           = .autoiml_plot_g7a_subgroups(self$result, ...),
         "gate_strip"              = .autoiml_plot_gate_strip(self$result, ...),

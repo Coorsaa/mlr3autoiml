@@ -19,7 +19,7 @@ NULL
 
 .autoiml_plot_g6_performance = function(result) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G6")
@@ -65,7 +65,7 @@ NULL
 
 .autoiml_plot_g6_group_performance = function(result) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G6")
@@ -98,7 +98,7 @@ NULL
 
 .autoiml_plot_g6_rashomon_importance = function(result, top_n = 15L) {
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required for plotting.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G6")
@@ -128,6 +128,69 @@ NULL
       y = NULL
     ) +
     .autoiml_theme_iml()
+}
+
+.autoiml_plot_g6_pred_multiplicity = function(result, bins = 35L) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
+  }
+
+  gr = .autoiml_get_gate_result(result, "G6")
+  if (is.null(gr)) return(NULL)
+
+  dist = gr$artifacts$pred_range_dist
+  if (is.null(dist) || length(dist) < 2L) return(NULL)
+
+  pal = .autoiml_plot_palette()
+  med = stats::median(dist, na.rm = TRUE)
+  p95 = stats::quantile(dist, probs = 0.95, na.rm = TRUE, names = FALSE)
+
+  ggplot2::ggplot(data.table::data.table(pred_range = dist), ggplot2::aes(x = pred_range)) +
+    ggplot2::geom_histogram(fill = pal$metric[["quaternary"]], bins = as.integer(bins), alpha = 0.9) +
+    ggplot2::geom_vline(xintercept = med, linetype = "dashed") +
+    ggplot2::geom_vline(xintercept = p95, color = pal$reference[["alert"]], linetype = "dashed") +
+    ggplot2::labs(
+      title = "G6: Predictive multiplicity",
+      x = "Per-row prediction range across Rashomon members",
+      y = "Count"
+    ) +
+    .autoiml_theme_iml()
+}
+
+.autoiml_plot_g6_loco = function(result) {
+  if (!requireNamespace("ggplot2", quietly = TRUE)) {
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
+  }
+
+  gr = .autoiml_get_gate_result(result, "G6")
+  if (is.null(gr)) return(NULL)
+
+  sa = gr$artifacts$shift_assessment
+  if (is.null(sa) || !identical(sa$mode, "loco")) return(NULL)
+
+  transport_dt = data.table::as.data.table(sa$transport)
+  if (is.null(transport_dt) || nrow(transport_dt) == 0L) return(NULL)
+
+  score_col = intersect(c("score", "logloss", "rmse", "auc"), names(transport_dt))[1L]
+  if (is.na(score_col)) return(NULL)
+
+  transport_dt = transport_dt[order(get(score_col))]
+  measure_id = as.character(sa$measure_id %??% score_col)
+  med_score = stats::median(transport_dt[[score_col]], na.rm = TRUE)
+  pal = .autoiml_plot_palette()
+
+  ggplot2::ggplot(transport_dt, ggplot2::aes(
+    x = reorder(group, .data[[score_col]]), y = .data[[score_col]]
+  )) +
+    ggplot2::geom_col(fill = pal$metric[["tertiary"]], alpha = 0.9) +
+    ggplot2::geom_hline(yintercept = med_score, linetype = "dashed") +
+    ggplot2::labs(
+      title = "G6: Leave-one-out transport (LOCO)",
+      x = NULL,
+      y = measure_id
+    ) +
+    .autoiml_theme_iml() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 70, hjust = 1))
 }
 
 .autoiml_plot_g6_summary = function(result, top_n = 12L) {
