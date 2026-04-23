@@ -48,6 +48,42 @@ NULL
   )
 }
 
+#' @title Plot color palette for mlr3autoiml
+#'
+#' @description
+#' Returns the shared color palette used by all mlr3autoiml plotting functions.
+#' Useful for creating custom figures that match the package's visual style.
+#'
+#' @return A named list with sublists `status`, `metric`, `gradient`,
+#'   `surface`, and `reference`, each a named character vector of hex colors.
+#' @export
+autoiml_palette = function() {
+  .autoiml_plot_palette()
+}
+
+#' @title Standard model color palette for mlr3autoiml analyses
+#'
+#' @description
+#' Returns a named character vector of hex colors for common learner names
+#' used in mlr3autoiml paper analyses. Covers GBM/XGBoost, logistic
+#' regression, ridge, random forest, decision tree, and baseline comparators.
+#'
+#' @return Named character vector of hex colors.
+#' @export
+autoiml_model_colors = function() {
+  c(
+    "GBM"                 = "#4C72B0",
+    "Gradient Boosting"   = "#4C72B0",
+    "Logistic Regression" = "#C44E52",
+    "Ridge"               = "#C44E52",
+    "Random Forest"       = "#55A868",
+    "Decision Tree"       = "#8172B2",
+    "Treat all"           = "grey50",
+    "Treat none"          = "grey80",
+    "featureless"         = "grey70"
+  )
+}
+
 # ---- Gate status strip ------------------------------------------------------
 
 .autoiml_plot_gate_strip = function(result, title = "Gate status") {
