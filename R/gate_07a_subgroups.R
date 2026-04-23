@@ -147,17 +147,22 @@ Gate7aSubgroups = R6::R6Class(
           levs = unique(gg)
           mlr3misc::map_dtr(levs, function(lv) {
             idx = which(gg == lv)
+            yi = y[idx]; yhati = yhat[idx]
+            ss_res = sum((yi - yhati)^2)
+            ss_tot = sum((yi - mean(yi))^2)
             data.table::data.table(
               group_var = g,
               group = as.character(lv),
               n = length(idx),
-              rmse = sqrt(mean((y[idx] - yhat[idx])^2)) # Direct computation, no wrapper
+              mean_y = mean(yi),
+              rmse = sqrt(mean((yi - yhati)^2)),
+              r2 = if (ss_tot < .Machine$double.eps) NA_real_ else 1 - ss_res / ss_tot
             )
           }, .fill = TRUE)
         }, .fill = TRUE)
 
         status = "pass"
-        summary = "Subgroup audit computed (regression RMSE by group)."
+        summary = "Subgroup audit computed (regression RMSE, R\u00b2, mean_y by group)."
 
         return(GateResult$new(
           gate_id = self$id,
