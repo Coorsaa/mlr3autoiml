@@ -57,3 +57,6 @@ analysis/
 IML_ARTICLE/
 *.pdf
 Simulation_Study.R
+
+# AI assistant configuration
+CLAUDE.md

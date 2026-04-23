@@ -24,6 +24,12 @@ test_that("Gate 2 produces expected artifacts and recommendations", {
   if (!is.null(a$ale_curves) && data.table::is.data.table(a$ale_curves) && nrow(a$ale_curves) > 0L) {
     expect_true("semantics_label" %in% names(a$ale_curves))
   }
+  if (!is.null(a$ale2d) && length(a$ale2d) > 0L) {
+    ale2d_one = data.table::as.data.table(a$ale2d[[1L]])
+    expect_true(all(c("x1_left", "x1_right", "x2_bottom", "x2_top") %in% names(ale2d_one)))
+    expect_true(all(ale2d_one$x1_right > ale2d_one$x1_left))
+    expect_true(all(ale2d_one$x2_top > ale2d_one$x2_bottom))
+  }
   if (!is.null(a$support_check) && data.table::is.data.table(a$support_check) && nrow(a$support_check) > 0L) {
     expect_true(all(c("semantics_label", "support_ratio_threshold", "support_diag_available") %in% names(a$support_check)))
   }
