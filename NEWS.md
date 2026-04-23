@@ -1,5 +1,15 @@
 # mlr3autoiml 0.0.6
 
+## New features
+- `AutoIML$plot("overview")` replaces `plot("storyboard")` with a claim-adaptive multi-panel summary: gate-status strip, IEL triplet, G1/G3/G2/G5/G6/G7A evidence panels assembled based on which gates actually ran (requires `patchwork` for composition; returns a named list otherwise).
+- `AutoIML$plot("g2_ale_2d")` visualizes a second-order ALE interaction surface for the top feature pair identified by H-statistics. The surface is computed via `.autoiml_ale_2d()` and stored under `gate$artifacts$ale2d` after each G2 run; configurable via `ctx$structure$ale_2d_bins` and `ctx$structure$ale_2d_top_pairs`.
+- `AutoIML$plot("g3_calibration")` and `AutoIML$plot("g3_dca")` visualize the reliability curve and decision curve analysis produced by Gate 3.
+- `AutoIML$plot("g5_stability")` visualizes permutation importance with bootstrap 95% confidence intervals from Gate 5.
+- `AutoIML$plot("g7a_subgroups")` visualizes subgroup performance as a horizontal bar chart from Gate 7A.
+- `AutoIML$plot("g6_rank_heatmap")` shows a heatmap of feature importance ranks across Rashomon-set members.
+- `AutoIML$plot("gate_strip")` produces a colored tile strip summarizing pass/warn/fail/skip status across all gates.
+- Gate 7A regression subgroup tables now include `r2` (coefficient of determination) and `mean_y` alongside `rmse`.
+
 ## Alignment with manuscript workflow
 - Claim-scoped IEL assignment now follows the manuscript's simplified backbone: Claim and Semantics Card -> core gates -> triggered additional gates -> claim-scoped IEL.
 - Decision-support defaults no longer implicitly request local/person-level claims.

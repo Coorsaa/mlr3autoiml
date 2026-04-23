@@ -12,7 +12,7 @@ AutoIML: Gate-based AutoML/IML workflow
 AutoIML: Gate-based AutoML/IML workflow
 }
 \details{
-\code{AutoIML} orchestrates a gate-based interpretability workflow (G0A, G0B, G1–G6, G7A, G7B) for
+\code{AutoIML} orchestrates a gate-based interpretability workflow (G0A, G0B, G1-G6, G7A, G7B) for
 \code{\link[mlr3:mlr3-package]{mlr3}} tasks and learners. It produces a reproducible
 audit trail and data-/task-dependent interpretability artifacts.
 
