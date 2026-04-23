@@ -51,7 +51,7 @@ autoiml = function(task,
   verbose = FALSE
 ) {
   purpose = match.arg(purpose)
-  seed = as.integer(seed %||% 1L)
+  seed = as.integer(seed %??% 1L)
   AutoIML$new(
     task = task,
     learner = learner,

@@ -18,8 +18,6 @@
 #' @keywords internal
 NULL
 
-`%||%` = function(a, b) if (!is.null(a)) a else b
-
 # ---- common utility helpers -----------------------------------------------
 
 #' Safely convert environment to list, pass through lists and handle NULL
@@ -65,7 +63,7 @@ NULL
 #' Derive deterministic gate-specific seed
 #' @keywords internal
 .autoiml_gate_seed = function(ctx, gate_id) {
-  base_seed = ctx$seed %||% 1L
+  base_seed = ctx$seed %??% 1L
   # Use gate_id hash to derive reproducible offset
   offset = sum(utf8ToInt(as.character(gate_id)))
   (base_seed + offset) %% .Machine$integer.max
@@ -235,7 +233,7 @@ NULL
       return(as.numeric(prob[[1L]]))
     }
     if (ncol(prob) == 2L) {
-      pos = task$positive %||% colnames(prob)[2L]
+      pos = task$positive %??% colnames(prob)[2L]
       return(as.numeric(prob[, pos]))
     }
     return(as.numeric(apply(as.matrix(prob), 1, max)))
@@ -531,7 +529,7 @@ NULL
 #' Heuristic for whether the declared audience is user-facing / non-technical.
 #' @keywords internal
 .autoiml_is_user_facing_audience = function(audience) {
-  audience = tolower(trimws(as.character(audience %||% "technical")[1L]))
+  audience = tolower(trimws(as.character(audience %??% "technical")[1L]))
   if (!nzchar(audience)) {
     return(FALSE)
   }
@@ -580,14 +578,14 @@ NULL
   }
 
   g0a = .autoiml_get_gate_result(res, "G0A")
-  claim = .autoiml_as_list(g0a$artifacts$claim %||% list())
+  claim = .autoiml_as_list(g0a$artifacts$claim %??% list())
   claims = .autoiml_as_list(claim$claims)
-  purpose = as.character(claim$purpose %||% res$purpose %||% NA_character_)[1L]
-  stakes = tolower(as.character(claim$stakes %||% NA_character_)[1L])
-  semantics = as.character(claim$semantics %||% NA_character_)[1L]
-  audience = as.character(claim$audience %||% "technical")[1L]
+  purpose = as.character(claim$purpose %??% res$purpose %??% NA_character_)[1L]
+  stakes = tolower(as.character(claim$stakes %??% NA_character_)[1L])
+  semantics = as.character(claim$semantics %??% NA_character_)[1L]
+  audience = as.character(claim$audience %??% "technical")[1L]
   user_facing = .autoiml_is_user_facing_audience(audience)
-  transport_boundary = claim$transport_boundary %||% NULL
+  transport_boundary = claim$transport_boundary %??% NULL
   transport_claimed = .autoiml_has_evidence_value(transport_boundary)
 
   checks = list()
@@ -606,25 +604,25 @@ NULL
   }
   if (!is.null(app$claims_decision)) {
     want = isTRUE(app$claims_decision)
-    have = isTRUE(claims$decision %||% FALSE)
+    have = isTRUE(claims$decision %??% FALSE)
     checks[["claims_decision"]] = list(ok = identical(have, want), reason = paste0("claims_decision=", have))
   }
   if (!is.null(app$claims_local)) {
     want = isTRUE(app$claims_local)
-    have = isTRUE(claims$local %||% FALSE)
+    have = isTRUE(claims$local %??% FALSE)
     checks[["claims_local"]] = list(ok = identical(have, want), reason = paste0("claims_local=", have))
   }
   if (!is.null(app$claims_global)) {
     want = isTRUE(app$claims_global)
-    have = isTRUE(claims$global %||% FALSE)
+    have = isTRUE(claims$global %??% FALSE)
     checks[["claims_global"]] = list(ok = identical(have, want), reason = paste0("claims_global=", have))
   }
   if (!is.null(app$claims_any)) {
     any_req = as.character(unlist(app$claims_any, use.names = FALSE))
     have = character(0)
-    if (isTRUE(claims$global %||% FALSE)) have = c(have, "global")
-    if (isTRUE(claims$local %||% FALSE)) have = c(have, "local")
-    if (isTRUE(claims$decision %||% FALSE)) have = c(have, "decision")
+    if (isTRUE(claims$global %??% FALSE)) have = c(have, "global")
+    if (isTRUE(claims$local %??% FALSE)) have = c(have, "local")
+    if (isTRUE(claims$decision %??% FALSE)) have = c(have, "decision")
     checks[["claims_any"]] = list(ok = any(have %in% any_req), reason = paste0("claims_any=", paste(have, collapse = ",")))
   }
   if (!is.null(app$audience_user_facing)) {
@@ -663,21 +661,21 @@ NULL
 
   missing = character(0)
 
-  artifact_fields = as.character(unlist(requirement$artifact_fields %||% character(), use.names = FALSE))
+  artifact_fields = as.character(unlist(requirement$artifact_fields %??% character(), use.names = FALSE))
   for (k in artifact_fields) {
     if (!(k %in% names(arts)) || !.autoiml_has_evidence_value(arts[[k]])) {
       missing = c(missing, paste0("artifact:", k))
     }
   }
 
-  metric_fields = as.character(unlist(requirement$metric_fields %||% character(), use.names = FALSE))
+  metric_fields = as.character(unlist(requirement$metric_fields %??% character(), use.names = FALSE))
   for (k in metric_fields) {
     if (!(k %in% metric_names)) {
       missing = c(missing, paste0("metric:", k))
     }
   }
 
-  artifact_any = as.character(unlist(requirement$artifact_any_of %||% character(), use.names = FALSE))
+  artifact_any = as.character(unlist(requirement$artifact_any_of %??% character(), use.names = FALSE))
   if (length(artifact_any) > 0L) {
     has_any = any(vapply(artifact_any, function(k) k %in% names(arts) && .autoiml_has_evidence_value(arts[[k]]), logical(1L)))
     if (!isTRUE(has_any)) {
@@ -685,7 +683,7 @@ NULL
     }
   }
 
-  metric_any = as.character(unlist(requirement$metric_any_of %||% character(), use.names = FALSE))
+  metric_any = as.character(unlist(requirement$metric_any_of %??% character(), use.names = FALSE))
   if (length(metric_any) > 0L) {
     has_any = any(metric_any %in% metric_names)
     if (!isTRUE(has_any)) {
@@ -736,33 +734,33 @@ NULL
       out$errors = c(out$errors, paste0(tag, " missing keys: ", paste(miss, collapse = ", ")))
     }
 
-    rid = as.character(r$id %||% "")
+    rid = as.character(r$id %??% "")
     if (!nzchar(rid)) {
       out$errors = c(out$errors, paste0(tag, " has empty id"))
     } else {
       ids = c(ids, rid)
     }
 
-    gate = as.character(r$gate %||% "")
+    gate = as.character(r$gate %??% "")
     if (!gate %in% allowed_gate) {
       out$errors = c(out$errors, paste0(tag, " has invalid gate: ", gate))
     }
 
-    ev = as.character(r$evidence_type %||% "")
+    ev = as.character(r$evidence_type %??% "")
     if (!ev %in% allowed_evidence) {
       out$errors = c(out$errors, paste0(tag, " has invalid evidence_type: ", ev))
     }
 
-    sev = as.character(r$severity_if_missing %||% "")
+    sev = as.character(r$severity_if_missing %??% "")
     if (!sev %in% allowed_severity) {
       out$errors = c(out$errors, paste0(tag, " has invalid severity_if_missing: ", sev))
     }
 
     specs = list(
-      artifact_fields = r$artifact_fields %||% NULL,
-      artifact_any_of = r$artifact_any_of %||% NULL,
-      metric_fields = r$metric_fields %||% NULL,
-      metric_any_of = r$metric_any_of %||% NULL
+      artifact_fields = r$artifact_fields %??% NULL,
+      artifact_any_of = r$artifact_any_of %??% NULL,
+      metric_fields = r$metric_fields %??% NULL,
+      metric_any_of = r$metric_any_of %??% NULL
     )
 
     for (nm in names(specs)) {
@@ -813,34 +811,34 @@ NULL
       next
     }
 
-    rid = as.character(r$id %||% "")
+    rid = as.character(r$id %??% "")
     if (!nzchar(rid)) {
       out$errors = c(out$errors, paste0(tag, " has empty id"))
     } else {
       ids = c(ids, rid)
     }
 
-    scope = as.character(r$scope %||% "")
+    scope = as.character(r$scope %??% "")
     if (!scope %in% allowed_scope) {
       out$errors = c(out$errors, paste0(tag, " has invalid scope: ", scope))
     }
 
-    level = as.character(r$level %||% "")
+    level = as.character(r$level %??% "")
     if (!level %in% allowed_level) {
       out$errors = c(out$errors, paste0(tag, " has invalid level: ", level))
     }
 
-    rg = as.character(unlist(r$required_gates %||% character(), use.names = FALSE))
+    rg = as.character(unlist(r$required_gates %??% character(), use.names = FALSE))
     if (length(rg) < 1L || any(!nzchar(rg))) {
       out$errors = c(out$errors, paste0(tag, " must provide non-empty required_gates"))
     }
 
-    st = as.character(unlist(r$requires_any_status_in %||% c("pass", "warn"), use.names = FALSE))
+    st = as.character(unlist(r$requires_any_status_in %??% c("pass", "warn"), use.names = FALSE))
     if (length(st) < 1L || any(!st %in% allowed_status)) {
       out$errors = c(out$errors, paste0(tag, " requires_any_status_in must be subset of {pass,warn}"))
     }
 
-    gate_status_req = r$gate_status_requirements %||% NULL
+    gate_status_req = r$gate_status_requirements %??% NULL
     if (!is.null(gate_status_req)) {
       if (!is.list(gate_status_req) || length(gate_status_req) < 1L || is.null(names(gate_status_req)) || any(!nzchar(names(gate_status_req)))) {
         out$errors = c(out$errors, paste0(tag, " gate_status_requirements must be a named list of gate ids -> allowed statuses"))
@@ -863,7 +861,7 @@ NULL
       out$errors = c(out$errors, paste0(tag, " conditions$user_facing must be TRUE/FALSE when provided"))
     }
 
-    req_keys = r$requires_artifact_keys %||% NULL
+    req_keys = r$requires_artifact_keys %??% NULL
     if (!is.null(req_keys)) {
       if (!is.list(req_keys) || length(req_keys) < 1L || is.null(names(req_keys)) || any(!nzchar(names(req_keys)))) {
         out$errors = c(out$errors, paste0(tag, " requires_artifact_keys must be a named list of gate ids -> artifact keys"))
@@ -902,8 +900,8 @@ NULL
   out = list(
     framework_loaded = !inherits(fr, "error"),
     iel_rules_loaded = !inherits(ir, "error"),
-    framework_path = if (!inherits(fr, "error")) fr$`_path` %||% NA_character_ else NA_character_,
-    iel_rules_path = if (!inherits(ir, "error")) ir$`_path` %||% NA_character_ else NA_character_,
+    framework_path = if (!inherits(fr, "error")) fr$`_path` %??% NA_character_ else NA_character_,
+    iel_rules_path = if (!inherits(ir, "error")) ir$`_path` %??% NA_character_ else NA_character_,
     framework_validation = if (!inherits(fr, "error")) .autoiml_validate_framework_requirements(fr) else list(ok = FALSE, errors = conditionMessage(fr)),
     iel_rules_validation = if (!inherits(ir, "error")) .autoiml_validate_iel_rules(ir) else list(ok = FALSE, errors = conditionMessage(ir))
   )

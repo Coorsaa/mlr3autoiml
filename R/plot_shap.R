@@ -114,7 +114,7 @@ NULL
 
   if (inherits(task, "TaskClassif")) {
     if (is.null(cl)) {
-      cl = as.character(class_label %||% task$positive %||% task$class_names[1L])[1L]
+      cl = as.character(class_label %??% task$positive %??% task$class_names[1L])[1L]
     }
     if (!cl %in% colnames(pred_mat)) {
       cl = colnames(pred_mat)[1L]

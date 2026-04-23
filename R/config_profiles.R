@@ -194,7 +194,7 @@ NULL
   out = list()
 
   # Exclude the base learner id if it appears in the alternatives
-  base_id = base_learner$id %||% ""
+  base_id = base_learner$id %??% ""
   learner_ids = setdiff(learner_ids, base_id)
 
   # Filter to learners actually available in the dictionary
@@ -236,14 +236,14 @@ NULL
 
   defaults = .autoiml_default_config(ctx$task, ctx$learner, profile = profile)
 
-  ctx$structure = utils::modifyList(defaults$structure, ctx$structure %||% list())
-  ctx$stability = utils::modifyList(defaults$stability, ctx$stability %||% list())
-  ctx$shap = utils::modifyList(defaults$shap, ctx$shap %||% list())
-  ctx$multiplicity = utils::modifyList(defaults$multiplicity, ctx$multiplicity %||% list())
+  ctx$structure = utils::modifyList(defaults$structure, ctx$structure %??% list())
+  ctx$stability = utils::modifyList(defaults$stability, ctx$stability %??% list())
+  ctx$shap = utils::modifyList(defaults$shap, ctx$shap %??% list())
+  ctx$multiplicity = utils::modifyList(defaults$multiplicity, ctx$multiplicity %??% list())
 
   # ---- Gate 0 / claim semantics defaults -----------------------------
   # Conservative defaults: within_support (associational / on-manifold / descriptive) semantics unless explicitly set.
-  purpose = ctx$purpose %||% "exploratory"
+  purpose = ctx$purpose %??% "exploratory"
   purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
   default_claims = switch(
@@ -265,15 +265,15 @@ NULL
       "deployment" = "high"
     ),
     audience = "technical",
-    decision_spec = list(thresholds = (ctx$calibration$thresholds %||% seq(0.01, 0.99, by = 0.01))),
+    decision_spec = list(thresholds = (ctx$calibration$thresholds %??% seq(0.01, 0.99, by = 0.01))),
     actionability = list(mutable_features = NULL, immutable_features = NULL)
   )
 
-  ctx$claim = utils::modifyList(default_claim, ctx$claim %||% list())
+  ctx$claim = utils::modifyList(default_claim, ctx$claim %??% list())
 
   # Gate 6: populate default alternative learners only when enabled
   if (isTRUE(ctx$multiplicity$enabled) && (is.null(ctx$alt_learners) || length(ctx$alt_learners) == 0L)) {
-    max_n = ctx$multiplicity$max_alt_learners %||% 5L
+    max_n = ctx$multiplicity$max_alt_learners %??% 5L
     ctx$alt_learners = .autoiml_default_alt_learners(ctx$task, ctx$learner, max_n = max_n)
   }
 

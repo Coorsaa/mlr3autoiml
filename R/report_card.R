@@ -20,7 +20,7 @@ report_card = function(x) {
     stop("report_card() expects an AutoIML or AutoIMLResult.", call. = FALSE)
   }
 
-  gates = res$gate_results %||% list()
+  gates = res$gate_results %??% list()
   if (length(gates) == 0L) {
     return(data.table::data.table())
   }
@@ -30,9 +30,9 @@ report_card = function(x) {
       data.table::data.table(
         gate_id = gr$gate_id,
         gate_name = gr$gate_name,
-        pdr = gr$pdr %||% NA_character_,
-        status = gr$status %||% NA_character_,
-        summary = gr$summary %||% NA_character_
+        pdr = gr$pdr %??% NA_character_,
+        status = gr$status %??% NA_character_,
+        summary = gr$summary %??% NA_character_
       )
     }),
     fill = TRUE
@@ -41,10 +41,10 @@ report_card = function(x) {
   # Attach IEL fields (repeat across rows for convenience)
   iel = res$iel
   if (is.list(iel)) {
-    dt[, iel_overall := iel$overall %||% NA_character_]
-    dt[, iel_global := iel$global %||% NA_character_]
-    dt[, iel_local := iel$local %||% NA_character_]
-    dt[, iel_decision := iel$decision %||% NA_character_]
+    dt[, iel_overall := iel$overall %??% NA_character_]
+    dt[, iel_global := iel$global %??% NA_character_]
+    dt[, iel_local := iel$local %??% NA_character_]
+    dt[, iel_decision := iel$decision %??% NA_character_]
   } else {
     dt[, iel_overall := as.character(iel)]
     dt[, iel_global := NA_character_]
@@ -52,19 +52,19 @@ report_card = function(x) {
     dt[, iel_decision := NA_character_]
   }
 
-  dt[, purpose := res$purpose %||% NA_character_]
+  dt[, purpose := res$purpose %??% NA_character_]
   dt[, quick_start := isTRUE(res$quick_start)]
-  data.table::set(dt, j = "requested_scopes", value = paste(as.character(res$iel$requested %||% c("global")), collapse = ","))
+  data.table::set(dt, j = "requested_scopes", value = paste(as.character(res$iel$requested %??% c("global")), collapse = ","))
 
   # If Gate 0 exists, attach claim semantics / stakes as convenience columns.
   g0a = gates[["G0A"]]
   if (!is.null(g0a) && inherits(g0a$metrics, "data.table") && nrow(g0a$metrics) >= 1L) {
     m0 = g0a$metrics[1L]
-    dt[, semantics := m0$semantics %||% NA_character_]
-    dt[, stakes := m0$stakes %||% NA_character_]
-    dt[, claim_global := m0$claim_global %||% NA]
-    dt[, claim_local := m0$claim_local %||% NA]
-    dt[, claim_decision := m0$claim_decision %||% NA]
+    dt[, semantics := m0$semantics %??% NA_character_]
+    dt[, stakes := m0$stakes %??% NA_character_]
+    dt[, claim_global := m0$claim_global %??% NA]
+    dt[, claim_local := m0$claim_local %??% NA]
+    dt[, claim_decision := m0$claim_decision %??% NA]
   }
 
   dt[]
@@ -105,7 +105,7 @@ report_card_extended = function(x) {
       if (identical(gate, "IEL")) {
         vals = .autoiml_as_list(res$iel)
         missing = character(0)
-        for (k in as.character(unlist(r$artifact_fields %||% character(), use.names = FALSE))) {
+        for (k in as.character(unlist(r$artifact_fields %??% character(), use.names = FALSE))) {
           if (!k %in% names(vals) || !.autoiml_has_evidence_value(vals[[k]])) {
             missing = c(missing, paste0("iel:", k))
           }
@@ -114,7 +114,7 @@ report_card_extended = function(x) {
       } else if (identical(gate, "REPORT")) {
         rc = report_card(res)
         missing = character(0)
-        for (k in as.character(unlist(r$artifact_fields %||% character(), use.names = FALSE))) {
+        for (k in as.character(unlist(r$artifact_fields %??% character(), use.names = FALSE))) {
           if (!(k %in% names(rc))) {
             missing = c(missing, paste0("report:", k))
           }
@@ -143,9 +143,9 @@ report_card_extended = function(x) {
       evidence_type = as.character(r$evidence_type),
       severity_if_missing = as.character(r$severity_if_missing),
       applicable = isTRUE(app$applicable),
-      applicability_reason = as.character(app$reason %||% ""),
+      applicability_reason = as.character(app$reason %??% ""),
       gate_present = if (!gate %in% c("IEL", "REPORT")) !is.null(gr) else TRUE,
-      gate_status = if (!is.null(gr)) as.character(gr$status %||% NA_character_) else if (gate %in% c("IEL", "REPORT")) "computed" else NA_character_,
+      gate_status = if (!is.null(gr)) as.character(gr$status %??% NA_character_) else if (gate %in% c("IEL", "REPORT")) "computed" else NA_character_,
       artifact_keys_ok = if (isTRUE(app$applicable)) isTRUE(field_chk$ok) else NA,
       missing_artifact_keys = if (isTRUE(app$applicable) && !isTRUE(field_chk$ok)) paste(field_chk$missing, collapse = ",") else "",
       evidence_status = evidence_status,

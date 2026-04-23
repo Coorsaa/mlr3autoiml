@@ -24,6 +24,8 @@
 #' @importFrom stats cor quantile sd var coef glm predict lm setNames
 #' @importFrom R6 R6Class
 #' @importFrom checkmate assert_flag
+#' @importFrom cli cli_abort cli_warn cli_inform
+#' @importFrom checkmate %??%
 #' @importFrom mlr3misc map_dtr
 #' @importFrom mlr3measures auc bbrier logloss mbrier
 #' @importFrom utils modifyList

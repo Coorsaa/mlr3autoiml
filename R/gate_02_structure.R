@@ -51,7 +51,7 @@ Gate2Structure = R6::R6Class(
         ))
       }
 
-      cfg = ctx$structure %||% list()
+      cfg = ctx$structure %??% list()
       .autoiml_assert_known_names(
         cfg,
         c(
@@ -66,8 +66,8 @@ Gate2Structure = R6::R6Class(
       )
 
       # Claim semantics (set by Gate 0A; conservative default is within_support/associational)
-      claim = ctx$claim %||% list()
-      semantics = .autoiml_normalize_semantics(claim$semantics %||% "within_support", default = "within_support")
+      claim = ctx$claim %??% list()
+      semantics = .autoiml_normalize_semantics(claim$semantics %??% "within_support", default = "within_support")
 
       # Causal/recourse is a hard stop in this workflow (requires causal identification outside AutoIML).
       if (identical(semantics, "causal_recourse")) {
@@ -84,34 +84,34 @@ Gate2Structure = R6::R6Class(
       }
 
       # --- computation budget knobs
-      sample_n = as.integer(cfg$sample_n %||% 200L)
-      max_features = as.integer(cfg$max_features %||% 5L)
-      ice_keep_n = as.integer(cfg$ice_keep_n %||% 30L)
+      sample_n = as.integer(cfg$sample_n %??% 200L)
+      max_features = as.integer(cfg$max_features %??% 5L)
+      ice_keep_n = as.integer(cfg$ice_keep_n %??% 30L)
 
       # --- effect curves
-      pd_grid_n = as.integer(cfg$grid_n %||% 10L)
-      pd_grid_type = as.character(cfg$grid_type %||% "equidist")
-      ice_center = as.character(cfg$ice_center %||% "anchor")
-      ale_bins = as.integer(cfg$ale_bins %||% 10L)
+      pd_grid_n = as.integer(cfg$grid_n %??% 10L)
+      pd_grid_type = as.character(cfg$grid_type %??% "equidist")
+      ice_center = as.character(cfg$ice_center %??% "anchor")
+      ale_bins = as.integer(cfg$ale_bins %??% 10L)
 
       # --- dependence screen
-      cor_threshold = as.numeric(cfg$cor_threshold %||% 0.70)
+      cor_threshold = as.numeric(cfg$cor_threshold %??% 0.70)
 
-      ale_2d_bins      = as.integer(cfg$ale_2d_bins      %||% 8L)
-      ale_2d_top_pairs = as.integer(cfg$ale_2d_top_pairs %||% 3L)
+      ale_2d_bins      = as.integer(cfg$ale_2d_bins      %??% 8L)
+      ale_2d_top_pairs = as.integer(cfg$ale_2d_top_pairs %??% 3L)
 
       # --- interaction screening
-      hstat_max_features = as.integer(cfg$hstat_max_features %||% 4L)
-      hstat_grid_n = as.integer(cfg$hstat_grid_n %||% 6L)
-      hstat_threshold = as.numeric(cfg$hstat_threshold %||% 0.20)
+      hstat_max_features = as.integer(cfg$hstat_max_features %??% 4L)
+      hstat_grid_n = as.integer(cfg$hstat_grid_n %??% 6L)
+      hstat_threshold = as.numeric(cfg$hstat_threshold %??% 0.20)
 
       # --- regionalization (GADGET-style)
-      regionalize = isTRUE(cfg$regionalize %||% FALSE)
-      regional_method = as.character(cfg$regional_method %||% "auto")
-      gadget_max_depth = as.integer(cfg$gadget_max_depth %||% 3L)
-      gadget_min_bucket = as.integer(cfg$gadget_min_bucket %||% 30L)
-      gadget_gamma = as.numeric(cfg$gadget_gamma %||% 0.00)
-      gadget_top_k = as.integer(cfg$gadget_top_k %||% 2L)
+      regionalize = isTRUE(cfg$regionalize %??% FALSE)
+      regional_method = as.character(cfg$regional_method %??% "auto")
+      gadget_max_depth = as.integer(cfg$gadget_max_depth %??% 3L)
+      gadget_min_bucket = as.integer(cfg$gadget_min_bucket %??% 30L)
+      gadget_gamma = as.numeric(cfg$gadget_gamma %??% 0.00)
+      gadget_top_k = as.integer(cfg$gadget_top_k %??% 2L)
 
       set.seed(.autoiml_gate_seed(ctx, self$id))
 
@@ -159,7 +159,7 @@ Gate2Structure = R6::R6Class(
       class_labels = NULL
       if (inherits(task, "TaskClassif")) {
         if (length(task$class_names) == 2L) {
-          class_labels = task$positive %||% task$class_names[2L]
+          class_labels = task$positive %??% task$class_names[2L]
         } else {
           tab = sort(table(task$truth()), decreasing = TRUE)
           class_labels = names(tab)[seq_len(min(3L, length(tab)))]
@@ -427,16 +427,16 @@ Gate2Structure = R6::R6Class(
       support_max_ratio = NA_real_
       support_frac_flagged = NA_real_
 
-      support_cfg = cfg$support_check %||% list()
+      support_cfg = cfg$support_check %??% list()
       if (!is.list(support_cfg)) support_cfg <- list()
       .autoiml_assert_known_names(support_cfg, c("enabled", "sample_n", "ratio_threshold", "k"), "ctx$structure$support_check")
 
-      support_enabled = isTRUE(support_cfg$enabled %||% (semantics == "marginal_model_query"))
-      support_required_for_marginal = isTRUE(cfg$support_required_for_marginal %||% TRUE)
-      support_sample_n = as.integer(support_cfg$sample_n %||% min(200L, nrow(X)))
+      support_enabled = isTRUE(support_cfg$enabled %??% (semantics == "marginal_model_query"))
+      support_required_for_marginal = isTRUE(cfg$support_required_for_marginal %??% TRUE)
+      support_sample_n = as.integer(support_cfg$sample_n %??% min(200L, nrow(X)))
       support_sample_n = max(30L, min(support_sample_n, nrow(X)))
-      support_ratio_threshold = as.numeric(support_cfg$ratio_threshold %||% 1.5)
-      support_k = as.integer(support_cfg$k %||% 2L)
+      support_ratio_threshold = as.numeric(support_cfg$ratio_threshold %??% 1.5)
+      support_k = as.integer(support_cfg$k %??% 2L)
       support_k = max(1L, support_k)
 
       if (isTRUE(support_enabled) && length(num_cols) >= 2L && requireNamespace("FNN", quietly = TRUE)) {

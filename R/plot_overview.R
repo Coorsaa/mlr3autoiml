@@ -19,8 +19,8 @@ NULL
     return(NULL)
   }
 
-  rec = g2$artifacts$recommendation %||% list()
-  top_feat = as.character((rec$top_features %||% character())[1L])
+  rec = g2$artifacts$recommendation %??% list()
+  top_feat = as.character((rec$top_features %??% character())[1L])
   if (!is.na(top_feat) && nzchar(top_feat)) {
     return(top_feat)
   }
@@ -49,20 +49,20 @@ NULL
     return(character())
   }
 
-  iel = res$iel %||% list()
+  iel = res$iel %??% list()
   lines = character()
 
   iel_str = paste0(
-    "IEL: G=", iel$global %||% "?",
-    "  L=", iel$local %||% "?",
-    "  D=", iel$decision %||% "?",
-    "  (overall ", iel$overall %||% "?", ")"
+    "IEL: G=", iel$global %??% "?",
+    "  L=", iel$local %??% "?",
+    "  D=", iel$decision %??% "?",
+    "  (overall ", iel$overall %??% "?", ")"
   )
   lines = c(lines, iel_str)
 
   g0a = .autoiml_get_gate_result(res, "G0A")
   if (!is.null(g0a)) {
-    claim = g0a$artifacts$claim %||% list()
+    claim = g0a$artifacts$claim %??% list()
     parts = character()
     if (!is.null(claim$purpose)) parts = c(parts, paste0("Purpose: ", claim$purpose))
     if (!is.null(claim$semantics)) parts = c(parts, paste0("Semantics: ", claim$semantics))
@@ -84,7 +84,7 @@ NULL
     }
   }
 
-  cs = res$claim_scope %||% list()
+  cs = res$claim_scope %??% list()
   if (!is.null(cs$overall) && nzchar(cs$overall)) {
     lines = c(lines, paste0("Claim: ", cs$overall))
   }
@@ -95,15 +95,17 @@ NULL
 
 .autoiml_plot_overview = function(result, feature = NULL, class_label = NULL) {
   if (!requireNamespace("patchwork", quietly = TRUE)) {
-    message("Package 'patchwork' is required for the full gate overview. ",
-      "Install it with install.packages('patchwork').")
+    cli_inform(c(
+      "Package {.pkg patchwork} is required for the full gate overview.",
+      "i" = "Install it with {.code install.packages('patchwork')}."
+    ))
   }
 
   feature_use = .autoiml_overview_feature(result, feature = feature)
 
   g2 = .autoiml_get_gate_result(result, "G2")
-  rec = if (!is.null(g2)) g2$artifacts$recommendation %||% list() else list()
-  method_pref = as.character(rec$recommended_effect_method %||% "auto")
+  rec = if (!is.null(g2)) g2$artifacts$recommendation %??% list() else list()
+  method_pref = as.character(rec$recommended_effect_method %??% "auto")
 
   # ---- Individual panels ---------------------------------------------------
 

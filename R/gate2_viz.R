@@ -37,7 +37,7 @@ gate2_tables = function(x, top_n = 10L) {
     stop("Gate 2 results not found. Did you run AutoIML$run()?", call. = FALSE)
   }
 
-  a = gr$artifacts %||% list()
+  a = gr$artifacts %??% list()
   m = gr$metrics
 
   rec = a$recommendation

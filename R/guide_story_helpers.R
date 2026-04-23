@@ -40,7 +40,7 @@ NULL
     return(NA_character_)
   }
 
-  uncertainty = g1$artifacts$uncertainty %||% NULL
+  uncertainty = g1$artifacts$uncertainty %??% NULL
   metric_ids = character(0)
   if (data.table::is.data.table(uncertainty) && nrow(uncertainty) > 0L && "measure_id" %in% names(uncertainty)) {
     metric_ids = unique(as.character(uncertainty$measure_id))
@@ -63,7 +63,7 @@ NULL
     return(metric_ids[[1L]])
   }
 
-  metrics = g1$metrics %||% NULL
+  metrics = g1$metrics %??% NULL
   if (data.table::is.data.table(metrics) && nrow(metrics) > 0L) {
     metric_cols = setdiff(names(metrics), grep("_baseline$", names(metrics), value = TRUE))
     metric_cols = setdiff(metric_cols, c("task_type", "nclass", "positive", "utility_spec", "opt_threshold", "opt_value"))
@@ -87,8 +87,8 @@ NULL
   }
 
   metric_id = .autoiml_guess_primary_metric(g1)
-  uncertainty = g1$artifacts$uncertainty %||% NULL
-  metrics = g1$metrics %||% NULL
+  uncertainty = g1$artifacts$uncertainty %??% NULL
+  metrics = g1$metrics %??% NULL
   minimize = .autoiml_measure_minimize(metric_id)
 
   estimate = NA_real_
@@ -147,7 +147,7 @@ NULL
 }
 
 .autoiml_scope_support_label = function(iel) {
-  iel = as.character(iel %||% NA_character_)[1L]
+  iel = as.character(iel %??% NA_character_)[1L]
   if (is.na(iel) || !nzchar(iel)) {
     return("unclear")
   }
@@ -162,7 +162,7 @@ NULL
 }
 
 .autoiml_complexity_rank = function(learner_id) {
-  s = toupper(gsub("[^A-Z0-9 ]", " ", as.character(learner_id %||% "")))
+  s = toupper(gsub("[^A-Z0-9 ]", " ", as.character(learner_id %??% "")))
   s = gsub("[[:space:]]+", " ", trimws(s))
 
   if (!nzchar(s)) {
@@ -236,16 +236,16 @@ NULL
     ))
   }
 
-  perf = g6$artifacts$alt_learner_performance %||% NULL
-  rashomon = g6$artifacts$rashomon_set %||% NULL
+  perf = g6$artifacts$alt_learner_performance %??% NULL
+  rashomon = g6$artifacts$rashomon_set %??% NULL
   metric_id = as.character(.autoiml_dt_scalar(g6$metrics, "primary_measure_id", .autoiml_dt_scalar(g6$artifacts$rashomon_provenance, "primary_measure_id", NA_character_)))[1L]
   minimize = .autoiml_measure_minimize(metric_id)
   if (is.na(minimize)) {
     minimize = FALSE
   }
 
-  dependence_flag = .autoiml_dt_scalar(g2$metrics %||% NULL, "dependence_flag", NA)
-  interaction_flag = .autoiml_dt_scalar(g2$metrics %||% NULL, "interaction_flag", NA)
+  dependence_flag = .autoiml_dt_scalar(g2$metrics %??% NULL, "dependence_flag", NA)
+  interaction_flag = .autoiml_dt_scalar(g2$metrics %??% NULL, "interaction_flag", NA)
 
   if (!data.table::is.data.table(perf) || nrow(perf) < 1L) {
     return(data.table::data.table(
@@ -268,7 +268,7 @@ NULL
   perf[, learner_id := as.character(learner_id)]
   data.table::set(perf, j = "complexity_rank", value = vapply(perf[["learner_id"]], .autoiml_complexity_rank, numeric(1L)))
   data.table::set(perf, j = "complexity_bucket", value = vapply(perf[["learner_id"]], .autoiml_complexity_bucket, character(1L)))
-  perf[, in_rashomon := if ("in_rashomon" %in% names(perf)) as.logical(in_rashomon) else learner_id %in% as.character(rashomon$learner_id %||% character())]
+  perf[, in_rashomon := if ("in_rashomon" %in% names(perf)) as.logical(in_rashomon) else learner_id %in% as.character(rashomon$learner_id %??% character())]
 
   best = .autoiml_pick_best_row(perf, minimize = minimize)
   simple = perf[perf[["complexity_bucket"]] == "simple"]
@@ -340,17 +340,17 @@ NULL
   }
   perf = .autoiml_extract_primary_performance(res)
 
-  g1_status = as.character(statuses[["G1"]] %||% NA_character_)
-  g0b_status = as.character(statuses[["G0B"]] %||% NA_character_)
-  g4_status = as.character(statuses[["G4"]] %||% NA_character_)
-  g5_status = as.character(statuses[["G5"]] %||% NA_character_)
-  g6_status = as.character(statuses[["G6"]] %||% NA_character_)
-  g3_status = as.character(statuses[["G3"]] %||% NA_character_)
+  g1_status = as.character(statuses[["G1"]] %??% NA_character_)
+  g0b_status = as.character(statuses[["G0B"]] %??% NA_character_)
+  g4_status = as.character(statuses[["G4"]] %??% NA_character_)
+  g5_status = as.character(statuses[["G5"]] %??% NA_character_)
+  g6_status = as.character(statuses[["G6"]] %??% NA_character_)
+  g3_status = as.character(statuses[["G3"]] %??% NA_character_)
 
-  iel_global = as.character(res$iel$global %||% NA_character_)
-  iel_local = as.character(res$iel$local %||% NA_character_)
-  iel_decision = as.character(res$iel$decision %||% NA_character_)
-  requested = as.character(res$iel$requested %||% c("global"))
+  iel_global = as.character(res$iel$global %??% NA_character_)
+  iel_local = as.character(res$iel$local %??% NA_character_)
+  iel_decision = as.character(res$iel$decision %??% NA_character_)
+  requested = as.character(res$iel$requested %??% c("global"))
   scope_label = function(scope, iel) {
     if (!scope %in% requested) {
       return("not requested")
@@ -410,9 +410,9 @@ NULL
 .autoiml_reader_questions = function(res, actions = NULL) {
   trust = .autoiml_trust_summary(res)
   model_story = .autoiml_model_story(res)
-  claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %||% list())
-  semantics = as.character(claim$semantics %||% NA_character_)[1L]
-  requested = as.character(res$iel$requested %||% c("global"))
+  claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %??% list())
+  semantics = as.character(claim$semantics %??% NA_character_)[1L]
+  requested = as.character(res$iel$requested %??% c("global"))
   g0b = .autoiml_get_gate_result(res, "G0B")
   g2 = .autoiml_get_gate_result(res, "G2")
   g4 = .autoiml_get_gate_result(res, "G4")
@@ -425,14 +425,14 @@ NULL
     action_text = paste0(actions$action[seq_len(min(3L, nrow(actions)))], collapse = " | ")
   }
 
-  g2_metrics = g2$metrics %||% data.table::data.table()
+  g2_metrics = g2$metrics %??% data.table::data.table()
   recommended_effect_method = as.character(.autoiml_dt_scalar(g2_metrics, "recommended_effect_method", NA_character_))
   dependence_flag = .autoiml_dt_scalar(g2_metrics, "dependence_flag", NA)
   interaction_flag = .autoiml_dt_scalar(g2_metrics, "interaction_flag", NA)
 
-  g5_metrics = g5$metrics %||% data.table::data.table()
+  g5_metrics = g5$metrics %??% data.table::data.table()
   unstable = .autoiml_dt_scalar(g5_metrics, "any_unstable", NA)
-  g6_metrics = g6$metrics %||% data.table::data.table()
+  g6_metrics = g6$metrics %??% data.table::data.table()
   n_rashomon = as.integer(.autoiml_dt_scalar(g6_metrics, "n_models_in_rashomon", NA_integer_))
 
   q = list(
@@ -470,12 +470,12 @@ NULL
       reader_question = "Can I make case-level claims from the local explanations?",
       short_answer = if (!"local" %in% requested) {
         "Not part of the current Claim and Semantics Card: no case-level claim is being made."
-      } else if (identical(res$iel$local %||% "IEL-0", "IEL-0")) {
+      } else if (identical(res$iel$local %??% "IEL-0", "IEL-0")) {
         "No. Local case-level claims are not yet supported by the current evidence pattern."
       } else {
         paste0("Only with guardrails. Local claims are ", .autoiml_scope_support_label(res$iel$local), ".")
       },
-      why = paste0("Gate 4 = ", as.character(g4$status %||% NA_character_), "; Gate 5 = ", as.character(g5$status %||% NA_character_), "; Gate 6 = ", as.character(g6$status %||% NA_character_), "."),
+      why = paste0("Gate 4 = ", as.character(g4$status %??% NA_character_), "; Gate 5 = ", as.character(g5$status %??% NA_character_), "; Gate 6 = ", as.character(g6$status %??% NA_character_), "."),
       what_to_do_now = "Treat local explanations as audited model behavior summaries, not as causal facts about the person.",
       evidence = "G4 + G5 + G6 + IEL-local"
     ),
@@ -484,12 +484,12 @@ NULL
       reader_question = "Can I turn the model into thresholded decisions or interventions?",
       short_answer = if (!"decision" %in% requested) {
         "Not part of the current Claim and Semantics Card: the workflow is not currently supporting thresholded decisions or interventions."
-      } else if (identical(res$iel$decision %||% "IEL-0", "IEL-0")) {
+      } else if (identical(res$iel$decision %??% "IEL-0", "IEL-0")) {
         "No. Decision use is blocked until calibration, thresholds, utility assumptions, and subgroup consequences are justified."
       } else {
         paste0("Only within the explicitly evaluated decision range, because decision evidence is ", .autoiml_scope_support_label(res$iel$decision), ".")
       },
-      why = paste0("Gate 3 = ", as.character(.autoiml_get_gate_result(res, "G3")$status %||% NA_character_), "; decision IEL = ", as.character(res$iel$decision %||% NA_character_), "."),
+      why = paste0("Gate 3 = ", as.character(.autoiml_get_gate_result(res, "G3")$status %??% NA_character_), "; decision IEL = ", as.character(res$iel$decision %??% NA_character_), "."),
       what_to_do_now = "Specify threshold ranges and utility/cost assumptions, validate calibration, and audit subgroup impacts before acting on scores.",
       evidence = "G3 + G7A + IEL-decision"
     ),
@@ -540,12 +540,12 @@ NULL
       reader_question = "Can I generalize the interpretation across subgroups, and do measurement issues matter here?",
       short_answer = if (is.null(g7a)) {
         "Subgroup and audience auditing are not part of the current claim scope, so no broad subgroup generalization should be made."
-      } else if (identical(g7a$status %||% NA_character_, "pass")) {
+      } else if (identical(g7a$status %??% NA_character_, "pass")) {
         "Only cautiously. Subgroup auditing exists, but subgroup differences still depend on measurement comparability and construct quality."
       } else {
         "Not yet. Subgroup-facing interpretation needs both subgroup audits and explicit measurement/comparability information."
       },
-      why = paste0("Gate 0B = ", as.character(g0b$status %||% NA_character_), "; Gate 7A = ", as.character(g7a$status %||% NA_character_), "."),
+      why = paste0("Gate 0B = ", as.character(g0b$status %??% NA_character_), "; Gate 7A = ", as.character(g7a$status %??% NA_character_), "."),
       what_to_do_now = "Document scoring/reliability/invariance assumptions and pair subgroup explanations with subgroup performance/calibration evidence.",
       evidence = "G0B + G7A"
     )

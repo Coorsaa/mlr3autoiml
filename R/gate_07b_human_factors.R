@@ -38,7 +38,7 @@ Gate7bHumanFactors = R6::R6Class(
     },
 
     run = function(ctx) {
-      claim = ctx$claim %||% list()
+      claim = ctx$claim %??% list()
       .autoiml_assert_known_names(
         .autoiml_as_list(claim),
         c(
@@ -50,21 +50,21 @@ Gate7bHumanFactors = R6::R6Class(
         ),
         "ctx$claim"
       )
-      purpose = claim$purpose %||% ctx$purpose %||% "exploratory"
+      purpose = claim$purpose %??% ctx$purpose %??% "exploratory"
       purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
-      claims = (claim$claims %||% list())
-      decision_claim = isTRUE(claims$decision %||% FALSE)
-      local_claim = isTRUE(claims$local %||% FALSE)
+      claims = (claim$claims %??% list())
+      decision_claim = isTRUE(claims$decision %??% FALSE)
+      local_claim = isTRUE(claims$local %??% FALSE)
 
-      stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
+      stakes = tolower(as.character(claim$stakes %??% "medium")[1L])
       if (!stakes %in% c("low", "medium", "high")) stakes = "medium"
 
-      audience = as.character(claim$audience %||% "technical")[1L]
+      audience = as.character(claim$audience %??% "technical")[1L]
       user_facing = .autoiml_is_user_facing_audience(audience)
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment") || decision_claim)
 
-      evidence = .autoiml_as_list(claim$human_factors_evidence %||% ctx$human_factors_evidence)
+      evidence = .autoiml_as_list(claim$human_factors_evidence %??% ctx$human_factors_evidence)
       has_evidence_object = length(evidence) > 0L
       required = isTRUE(user_facing && (high_stakes || local_claim || decision_claim))
 

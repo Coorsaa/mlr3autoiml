@@ -41,7 +41,7 @@ Gate7aSubgroups = R6::R6Class(
 
     run = function(ctx) {
       task = ctx$task
-      claim = ctx$claim %||% list()
+      claim = ctx$claim %??% list()
       .autoiml_assert_known_names(
         .autoiml_as_list(claim),
         c(
@@ -53,17 +53,17 @@ Gate7aSubgroups = R6::R6Class(
         ),
         "ctx$claim"
       )
-      purpose = claim$purpose %||% ctx$purpose %||% "exploratory"
+      purpose = claim$purpose %??% ctx$purpose %??% "exploratory"
       purpose = match.arg(purpose, c("exploratory", "global_insight", "decision_support", "deployment"))
 
-      stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
+      stakes = tolower(as.character(claim$stakes %??% "medium")[1L])
       if (!stakes %in% c("low", "medium", "high")) stakes = "medium"
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
 
-      claims = (claim$claims %||% list())
-      decision_claim = isTRUE(claims$decision %||% FALSE)
+      claims = (claim$claims %??% list())
+      decision_claim = isTRUE(claims$decision %??% FALSE)
 
-      decision_spec = (claim$decision_spec %||% list())
+      decision_spec = (claim$decision_spec %??% list())
       .autoiml_assert_known_names(.autoiml_as_list(decision_spec), c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
 
       has_content = function(x) {
@@ -79,7 +79,7 @@ Gate7aSubgroups = R6::R6Class(
       measurement_invariance_present = isTRUE(has_content(meas$invariance))
 
       # subgroup variables: explicit declaration preferred
-      group_vars = ctx$sensitive_features %||% task$col_roles$stratum %||% character()
+      group_vars = ctx$sensitive_features %??% task$col_roles$stratum %??% character()
       group_vars = unique(as.character(group_vars))
       group_vars = group_vars[nzchar(group_vars)]
 
@@ -192,7 +192,7 @@ Gate7aSubgroups = R6::R6Class(
 
       # Binary classification subgroup audit (most common)
       if (nclass == 2L) {
-        pos = task$positive %||% task$class_names[2L]
+        pos = task$positive %??% task$class_names[2L]
         truth01 = as.integer(pred$truth == pos)
         p_hat = as.numeric(pred$prob[, pos])
 
@@ -200,19 +200,19 @@ Gate7aSubgroups = R6::R6Class(
         costs = .autoiml_as_list(decision_spec$costs)
         utility = .autoiml_as_list(decision_spec$utility)
 
-        costs$fp = as.numeric(costs$fp %||% NA_real_)
-        costs$fn = as.numeric(costs$fn %||% NA_real_)
+        costs$fp = as.numeric(costs$fp %??% NA_real_)
+        costs$fn = as.numeric(costs$fn %??% NA_real_)
 
-        utility$tp = as.numeric(utility$tp %||% NA_real_)
-        utility$tn = as.numeric(utility$tn %||% NA_real_)
-        utility$fp = as.numeric(utility$fp %||% NA_real_)
-        utility$fn = as.numeric(utility$fn %||% NA_real_)
+        utility$tp = as.numeric(utility$tp %??% NA_real_)
+        utility$tn = as.numeric(utility$tn %??% NA_real_)
+        utility$fp = as.numeric(utility$fp %??% NA_real_)
+        utility$fn = as.numeric(utility$fn %??% NA_real_)
 
         has_costs = is.finite(costs$fp) && is.finite(costs$fn)
         has_utility = all(is.finite(c(utility$tp, utility$tn, utility$fp, utility$fn)))
         utility_spec = if (isTRUE(has_utility)) "utility" else if (isTRUE(has_costs)) "costs" else "none"
 
-        thresholds = suppressWarnings(as.numeric(decision_spec$thresholds %||% seq(0.01, 0.99, by = 0.01)))
+        thresholds = suppressWarnings(as.numeric(decision_spec$thresholds %??% seq(0.01, 0.99, by = 0.01)))
         thresholds = thresholds[is.finite(thresholds) & thresholds > 0 & thresholds < 1]
         thresholds = sort(unique(thresholds))
 

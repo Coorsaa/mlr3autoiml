@@ -31,7 +31,7 @@ Gate6Multiplicity = R6::R6Class(
       task = ctx$task
       pred = ctx$pred
 
-      cfg = ctx$multiplicity %||% list()
+      cfg = ctx$multiplicity %??% list()
       .autoiml_assert_known_names(
         cfg,
         c("enabled", "max_alt_learners", "rashomon_rule", "epsilon", "importance_n", "importance_max_features", "require_transport_for_high_stakes", "group_col", "transport_mode", "transport_measure_id"),
@@ -39,19 +39,19 @@ Gate6Multiplicity = R6::R6Class(
       )
       enabled = isTRUE(cfg$enabled)
       benchmarkable_n = 0L
-      group_col = as.character(cfg$group_col %||% (task$col_roles$group %||% character()))
+      group_col = as.character(cfg$group_col %??% (task$col_roles$group %??% character()))
       if (length(group_col) > 1L) group_col = group_col[1L]
       has_group_role = length(group_col) == 1L
       claim = .autoiml_as_list(ctx$claim)
-      stakes = tolower(as.character(claim$stakes %||% "medium")[1L])
-      purpose = as.character(claim$purpose %||% ctx$purpose %||% "exploratory")[1L]
+      stakes = tolower(as.character(claim$stakes %??% "medium")[1L])
+      purpose = as.character(claim$purpose %??% ctx$purpose %??% "exploratory")[1L]
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
-      require_transport_for_high_stakes = isTRUE(cfg$require_transport_for_high_stakes %||% TRUE)
-      transport_mode = as.character(cfg$transport_mode %||% "group_performance")[1L]
+      require_transport_for_high_stakes = isTRUE(cfg$require_transport_for_high_stakes %??% TRUE)
+      transport_mode = as.character(cfg$transport_mode %??% "group_performance")[1L]
       if (!transport_mode %in% c("group_performance", "loco")) {
         stop("ctx$multiplicity$transport_mode must be one of {'group_performance','loco'}.", call. = FALSE)
       }
-      transport_measure_id = as.character(cfg$transport_measure_id %||% private$.default_transport_measure_id(task))[1L]
+      transport_measure_id = as.character(cfg$transport_measure_id %??% private$.default_transport_measure_id(task))[1L]
 
       # ----------------------------
       # 6a) Multiplicity (Rashomon)
@@ -64,9 +64,9 @@ Gate6Multiplicity = R6::R6Class(
 
       multiplicity_flag = NA
       primary_id = NA_character_
-      rashomon_rule = cfg$rashomon_rule %||% "1se"
+      rashomon_rule = cfg$rashomon_rule %??% "1se"
       rashomon_threshold = NA_real_
-      rashomon_epsilon = suppressWarnings(as.numeric(cfg$epsilon %||% NA_real_))
+      rashomon_epsilon = suppressWarnings(as.numeric(cfg$epsilon %??% NA_real_))
       if (!rashomon_rule %in% c("1se", "epsilon")) {
         stop("ctx$multiplicity$rashomon_rule must be one of {'1se','epsilon'}.", call. = FALSE)
       }
@@ -79,7 +79,7 @@ Gate6Multiplicity = R6::R6Class(
       if (enabled) {
         # Ensure we have an alternative learner set.
         if (is.null(ctx$alt_learners) || !is.list(ctx$alt_learners) || length(ctx$alt_learners) == 0L) {
-          max_n = cfg$max_alt_learners %||% 5L
+          max_n = cfg$max_alt_learners %??% 5L
           ctx$alt_learners = .autoiml_default_alt_learners(task, ctx$learner, max_n = max_n)
         }
 
@@ -89,7 +89,7 @@ Gate6Multiplicity = R6::R6Class(
         if (length(benchmark_specs) >= 2L) {
           resampling = private$.benchmark_resampling(ctx, task)
 
-          primary_id = ctx$primary_measure_id %||% private$.primary_measure_id(task)
+          primary_id = ctx$primary_measure_id %??% private$.primary_measure_id(task)
           msr = mlr3::msr(primary_id)
 
           perf_tbl = NULL
@@ -155,8 +155,8 @@ Gate6Multiplicity = R6::R6Class(
 
       # If we have a Rashomon set with >=2 learners: compute explanation dispersion via PFI
       if (!is.null(rashomon_tbl) && nrow(rashomon_tbl) >= 2L && !is.null(bmr)) {
-        importance_n = as.integer(cfg$importance_n %||% min(task$nrow, 800L))
-        importance_max_features = as.integer(cfg$importance_max_features %||% 15L)
+        importance_n = as.integer(cfg$importance_n %??% min(task$nrow, 800L))
+        importance_max_features = as.integer(cfg$importance_max_features %??% 15L)
 
         rows = task$row_ids
         if (length(rows) > importance_n) {
@@ -347,9 +347,9 @@ Gate6Multiplicity = R6::R6Class(
         transport_measure_id = transport_measure_id,
         benchmarkable_n = benchmarkable_n,
         n_alt_learners_declared = if (is.list(ctx$alt_learners)) length(ctx$alt_learners) else 0L,
-        importance_n = as.integer(cfg$importance_n %||% min(task$nrow, 800L)),
-        importance_max_features = as.integer(cfg$importance_max_features %||% 15L),
-        seed = as.integer(ctx$seed %||% NA_integer_)
+        importance_n = as.integer(cfg$importance_n %??% min(task$nrow, 800L)),
+        importance_max_features = as.integer(cfg$importance_max_features %??% 15L),
+        seed = as.integer(ctx$seed %??% NA_integer_)
       )
 
       GateResult$new(
@@ -388,8 +388,8 @@ Gate6Multiplicity = R6::R6Class(
     },
 
     .benchmark_learners = function(task, primary_learner, alt_learners, primary_measure_id = NULL) {
-      measure_id = as.character(primary_measure_id %||% private$.primary_measure_id(task))[1L]
-      learners_raw = c(list(primary_learner), unname(alt_learners %||% list()))
+      measure_id = as.character(primary_measure_id %??% private$.primary_measure_id(task))[1L]
+      learners_raw = c(list(primary_learner), unname(alt_learners %??% list()))
       out = list()
       seen_ids = character()
 
@@ -404,7 +404,7 @@ Gate6Multiplicity = R6::R6Class(
           }
         }
 
-        lid = as.character(lr2$id %||% class(lr2)[1L])
+        lid = as.character(lr2$id %??% class(lr2)[1L])
         if (!nzchar(lid) || lid %in% seen_ids) next
         seen_ids = c(seen_ids, lid)
         out[[length(out) + 1L]] = list(id = lid, learner = lr2)
@@ -475,7 +475,7 @@ Gate6Multiplicity = R6::R6Class(
         }
         msr = mlr3::msr(measure_id)
         prob_mat = .autoiml_pred_prob_matrix(pred, task = task)
-        row_ids = pred$row_ids %||% task$row_ids
+        row_ids = pred$row_ids %??% task$row_ids
         dt = data.table::data.table(group = groups)
         transport_tbl = dt[, {
           idx = .I
@@ -529,8 +529,8 @@ Gate6Multiplicity = R6::R6Class(
         return(NULL)
       }
 
-      primary_id = ctx$learner$id %||% names(benchmark_specs)[1L]
-      learner_spec = benchmark_specs[[primary_id]] %||% benchmark_specs[[1L]]
+      primary_id = ctx$learner$id %??% names(benchmark_specs)[1L]
+      learner_spec = benchmark_specs[[primary_id]] %??% benchmark_specs[[1L]]
       msr = mlr3::msr(measure_id)
 
       rows_by_group = split(task$row_ids, groups)

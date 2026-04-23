@@ -17,7 +17,6 @@ NULL
 
 # ---- Shared color palette ---------------------------------------------------
 
-#' @keywords internal
 .autoiml_plot_palette = function() {
   list(
     status = c(
@@ -51,10 +50,9 @@ NULL
 
 # ---- Gate status strip ------------------------------------------------------
 
-#' @keywords internal
 .autoiml_plot_gate_strip = function(result, title = "Gate status") {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   grs = if (inherits(result, "AutoIML")) {
@@ -71,7 +69,7 @@ NULL
 
   pal = .autoiml_plot_palette()
   ids  = vapply(grs, function(g) as.character(g$gate_id), character(1L))
-  stts = vapply(grs, function(g) as.character(g$status %||% "skip"), character(1L))
+  stts = vapply(grs, function(g) as.character(g$status %??% "skip"), character(1L))
 
   dt = data.table::data.table(
     gate_id = factor(ids, levels = ids),
@@ -100,10 +98,9 @@ NULL
 
 # ---- Text panel -------------------------------------------------------------
 
-#' @keywords internal
 .autoiml_plot_text_panel = function(lines, title = NULL) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   lines = as.character(lines)
@@ -146,10 +143,9 @@ NULL
 
 # ---- G6 Rashomon rank heatmap -----------------------------------------------
 
-#' @keywords internal
 .autoiml_plot_g6_rank_heatmap = function(result, top_n = 12L) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G6")

@@ -12,10 +12,9 @@
 #' @keywords internal
 NULL
 
-#' @keywords internal
 .autoiml_plot_g5_stability = function(result, top_n = 15L) {
   if (!.autoiml_require_pkg("ggplot2")) {
-    stop("Plotting requires package 'ggplot2'. Please install it.", call. = FALSE)
+    cli_abort("Plotting requires package {.pkg ggplot2}. Install it with {.code install.packages('ggplot2')}.")
   }
 
   gr = .autoiml_get_gate_result(result, "G5")
