@@ -241,19 +241,19 @@ NULL
   if (nrow(imp) > top_n) imp = imp[seq_len(top_n)]
 
   imp[, feature := factor(feature, levels = rev(feature))]
+  pal = .autoiml_plot_palette()
 
-  title = "Global SHAP importance (mean |phi|)"
+  title = "SHAP importance (mean |phi|)"
   if (!all(is.na(dt$class_label))) {
     cl = unique(dt$class_label)
     cl = cl[!is.na(cl)]
-    if (length(cl) > 0L) title = paste0(title, " - class: ", cl[[1L]])
+    if (length(cl) > 0L) title = paste0(title, " \u002D class: ", cl[[1L]])
   }
 
-  ggplot2::ggplot(imp, ggplot2::aes(x = feature, y = mean_abs_phi)) +
-    ggplot2::geom_col() +
-    ggplot2::coord_flip() +
-    ggplot2::labs(title = title, x = NULL, y = "mean(|SHAP|)") +
-    ggplot2::theme_minimal()
+  ggplot2::ggplot(imp, ggplot2::aes(x = mean_abs_phi, y = feature)) +
+    ggplot2::geom_col(fill = pal$metric[["primary"]]) +
+    ggplot2::labs(title = title, x = "mean(|SHAP|)", y = NULL) +
+    .autoiml_theme_iml()
 }
 
 .autoiml_shap_global_cached = function(result,
@@ -376,18 +376,18 @@ NULL
       alpha = as.numeric(alpha),
       size = as.numeric(point_size)
     ) +
-    ggplot2::scale_colour_gradient(low = "steelblue", high = "firebrick", na.value = "grey70") +
+    ggplot2::scale_colour_gradient(
+      low = .autoiml_plot_palette()$metric[["primary"]],
+      high = .autoiml_plot_palette()$metric[["secondary"]],
+      na.value = "grey70"
+    ) +
     ggplot2::labs(
       title = ttl,
       x = "SHAP value (phi)",
       y = NULL,
       colour = "Feature value"
     ) +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(
-      panel.grid.minor = ggplot2::element_blank(),
-      legend.position = "right"
-    )
+    .autoiml_theme_iml()
 
   # multiclass -> facet if not filtered
   if ("class_label" %in% names(dt) && is.null(class_label)) {

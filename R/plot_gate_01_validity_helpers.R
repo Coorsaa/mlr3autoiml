@@ -47,21 +47,26 @@ NULL
   }
 
   dt = scores[, .(iteration, value = get(measure))]
+  pal = .autoiml_plot_palette()
 
   p = ggplot2::ggplot(dt, ggplot2::aes(x = iteration, y = value)) +
-    ggplot2::geom_line() +
-    ggplot2::geom_point() +
+    ggplot2::geom_line(color = pal$metric[["primary"]]) +
+    ggplot2::geom_point(color = pal$metric[["primary"]], size = 2) +
     ggplot2::labs(
-      title = sprintf("Gate 1: CV performance (%s)", measure),
+      title = sprintf("G1: CV performance (%s)", measure),
       x = "CV iteration",
       y = measure
-    )
+    ) +
+    .autoiml_theme_iml()
 
   if (isTRUE(include_baseline) && !is.null(g1$artifacts$baseline_rr)) {
     base_scores = tryCatch(g1$artifacts$baseline_rr$score(mlr3::msr(measure)), error = function(e) NULL)
     if (!is.null(base_scores) && "iteration" %in% names(base_scores)) {
       bdt = data.table::as.data.table(base_scores)[, .(iteration, value = get(measure))]
-      p = p + ggplot2::geom_line(data = bdt, ggplot2::aes(x = iteration, y = value), linetype = 2)
+      p = p + ggplot2::geom_line(
+        data = bdt, ggplot2::aes(x = iteration, y = value),
+        color = pal$metric[["secondary"]], linetype = "dashed"
+      )
     }
   }
 
