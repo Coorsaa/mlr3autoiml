@@ -44,15 +44,23 @@ NULL
 
   ord = if (minimize) order(perf_dt$mean, decreasing = FALSE) else order(perf_dt$mean, decreasing = TRUE)
   perf_dt[, learner_id := factor(learner_id, levels = perf_dt$learner_id[ord])]
+  pal = .autoiml_plot_palette()
 
   ggplot2::ggplot(perf_dt, ggplot2::aes(x = mean, y = learner_id)) +
-    ggplot2::geom_errorbar(ggplot2::aes(xmin = ci_low, xmax = ci_high), orientation = "y") +
-    ggplot2::geom_point(ggplot2::aes(shape = in_rashomon), size = 2) +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(xmin = ci_low, xmax = ci_high),
+      orientation = "y", color = pal$metric[["primary"]]
+    ) +
+    ggplot2::geom_point(
+      ggplot2::aes(shape = in_rashomon),
+      color = pal$metric[["primary"]], size = 2
+    ) +
     ggplot2::labs(
-      title = "Gate 6: Alternative learner performance",
+      title = "G6: Alternative learner performance",
       x = sprintf("%s (mean +/- ~95%% CI)", measure_id),
-      y = "Learner"
-    )
+      y = NULL
+    ) +
+    .autoiml_theme_iml()
 }
 
 .autoiml_plot_g6_group_performance = function(result) {
@@ -76,15 +84,16 @@ NULL
   if (is.na(val_col)) {
     return(NULL)
   }
+  pal = .autoiml_plot_palette()
 
-  ggplot2::ggplot(dt, ggplot2::aes(x = group, y = .data[[val_col]])) +
-    ggplot2::geom_col() +
+  ggplot2::ggplot(dt, ggplot2::aes(x = .data[[val_col]], y = group)) +
+    ggplot2::geom_col(fill = pal$metric[["primary"]], alpha = 0.85) +
     ggplot2::labs(
-      title = "Gate 6: Group performance heterogeneity",
-      x = "Group",
-      y = val_col
+      title = "G6: Group performance heterogeneity",
+      x = val_col,
+      y = NULL
     ) +
-    ggplot2::coord_flip()
+    .autoiml_theme_iml()
 }
 
 .autoiml_plot_g6_rashomon_importance = function(result, top_n = 15L) {
@@ -108,15 +117,17 @@ NULL
   top_feats = imp[, .(m = mean(importance, na.rm = TRUE)), by = feature][order(-m)][seq_len(min(top_n, .N))]$feature
   imp = imp[feature %in% top_feats]
   imp[, feature := factor(feature, levels = rev(top_feats))]
+  pal = .autoiml_plot_palette()
 
   ggplot2::ggplot(imp, ggplot2::aes(x = importance, y = feature)) +
-    ggplot2::geom_point() +
+    ggplot2::geom_point(color = pal$metric[["primary"]], size = 1.8) +
     ggplot2::facet_wrap(~learner_id, scales = "free_x") +
     ggplot2::labs(
-      title = "Gate 6: Rashomon explanation dispersion (permutation importance)",
-      x = "Permutation importance (change in primary measure; positive = worse after permutation)",
-      y = "Feature"
-    )
+      title = "G6: Rashomon explanation dispersion (permutation importance)",
+      x = "Permutation importance (change in primary measure)",
+      y = NULL
+    ) +
+    .autoiml_theme_iml()
 }
 
 .autoiml_plot_g6_summary = function(result, top_n = 12L) {

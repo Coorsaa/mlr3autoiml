@@ -167,7 +167,10 @@ NULL
       size = 3.2
     ) +
     ggplot2::scale_color_manual(
-      values = c("negative" = "#1f77b4", "positive" = "#d62728"),
+      values = {
+        pal = .autoiml_plot_palette()
+        c("negative" = pal$metric[["primary"]], "positive" = pal$metric[["secondary"]])
+      },
       guide = "none"
     ) +
     ggplot2::labs(
