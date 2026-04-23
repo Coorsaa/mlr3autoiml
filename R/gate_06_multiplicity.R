@@ -236,7 +236,7 @@ Gate6Multiplicity = R6::R6Class(
         n_features_compared = if (!is.null(imp_tbl)) data.table::uniqueN(imp_tbl$feature) else 0L,
         median_kendall_tau = if (!is.null(rankcorr_tbl) && nrow(rankcorr_tbl) > 0L) stats::median(rankcorr_tbl$kendall_tau, na.rm = TRUE) else NA_real_,
         min_kendall_tau = if (!is.null(rankcorr_tbl) && nrow(rankcorr_tbl) > 0L) min(rankcorr_tbl$kendall_tau, na.rm = TRUE) else NA_real_,
-        predictive_p95_range = if (!is.null(predictive_multiplicity) && nrow(predictive_multiplicity) > 0L) predictive_multiplicity$p95_range[[1L]] else NA_real_
+        predictive_p95_range = if (!is.null(predictive_multiplicity) && !is.null(predictive_multiplicity$summary) && nrow(predictive_multiplicity$summary) > 0L) predictive_multiplicity$summary$p95_range[[1L]] else NA_real_
       )
 
       # ----------------------------
@@ -364,7 +364,8 @@ Gate6Multiplicity = R6::R6Class(
           rashomon_set = rashomon_tbl,
           rashomon_importance = imp_tbl,
           rashomon_rankcorr = rankcorr_tbl,
-          predictive_multiplicity = predictive_multiplicity,
+          predictive_multiplicity = predictive_multiplicity$summary,
+          pred_range_dist = predictive_multiplicity$pred_range_dist,
           group_performance = transport_tbl,
           shift_assessment = shift_assessment,
           rashomon_provenance = rashomon_provenance,
@@ -454,12 +455,15 @@ Gate6Multiplicity = R6::R6Class(
       }
 
       row_range = apply(pred_mat, 1L, function(x) diff(range(x, na.rm = TRUE)))
-      data.table::data.table(
-        n_models = ncol(pred_mat),
-        mean_range = mean(row_range, na.rm = TRUE),
-        median_range = stats::median(row_range, na.rm = TRUE),
-        p95_range = stats::quantile(row_range, probs = 0.95, na.rm = TRUE, names = FALSE),
-        max_range = max(row_range, na.rm = TRUE)
+      list(
+        summary = data.table::data.table(
+          n_models = ncol(pred_mat),
+          mean_range = mean(row_range, na.rm = TRUE),
+          median_range = stats::median(row_range, na.rm = TRUE),
+          p95_range = stats::quantile(row_range, probs = 0.95, na.rm = TRUE, names = FALSE),
+          max_range = max(row_range, na.rm = TRUE)
+        ),
+        pred_range_dist = as.numeric(row_range)
       )
     },
 

@@ -313,6 +313,8 @@ Plot type identifier. Supported values:
 \item \code{"g6_group_performance"}: Gate 6 subgroup performance heterogeneity.
 \item \code{"g6_rashomon_importance"}: Gate 6 Rashomon explanation dispersion.
 \item \code{"g6_rank_heatmap"}: Gate 6 feature importance rank heatmap across Rashomon members.
+\item \code{"g6_pred_multiplicity"}: Gate 6 per-row prediction range histogram across Rashomon members.
+\item \code{"g6_loco"}: Gate 6 leave-one-out transport bar chart (requires LOCO transport mode).
 \item \code{"g6_summary"}: Gate 6 composite (performance + importance).
 \item \code{"g7a_subgroups"}: Gate 7A subgroup performance bar chart.
 }

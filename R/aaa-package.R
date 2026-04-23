@@ -21,7 +21,7 @@
 #' }
 #'
 #' @importFrom data.table data.table rbindlist setnames := .N .SD .I
-#' @importFrom stats cor quantile sd var coef glm predict lm setNames
+#' @importFrom stats cor quantile sd var coef glm predict lm setNames reorder
 #' @importFrom R6 R6Class
 #' @importFrom checkmate assert_flag
 #' @importFrom cli cli_abort cli_warn cli_inform
@@ -48,7 +48,7 @@ utils::globalVariables(c(
   "iel_overall", "iel_global", "iel_local", "iel_decision",
   "purpose", "quick_start", "semantics", "stakes",
   "claim_global", "claim_local", "claim_decision",
-  "missing_rate", "iteration", "value",
+  "missing_rate", "iteration", "value", "rank", "pred_range", "learner",
   "x_mid", "y_mean", "bin", "threshold", "net_benefit", "nb_treat_all", "nb_treat_none",
   "mean_importance", "flag_off_support", "ratio_to_baseline", "region_id",
   "feature1", "feature2", "pair", "x", "y", "yhat", "m", "shap_mode"
