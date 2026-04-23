@@ -296,15 +296,38 @@ Create ggplot2-based visual outputs from the latest run.
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{type}}{(\code{character(1)})
-Plot type identifier. Supported values include:
+Plot type identifier. Supported values:
+
+\strong{Gate-specific:}
 \itemize{
-\item \code{"g1_scores"}: Gate 1 CV score trend.
+\item \code{"g1_scores"}: Gate 1 CV score trend over folds.
 \item \code{"g2_effect"}: Gate 2 global effect (PDP/ALE) with optional ICE overlay.
-\item \code{"g2_ice_spread"}: Gate 2 ICE spread summary.
-\item \code{"g2_hstats"}: Gate 2 interaction screening (H-statistics).
+\item \code{"g2_ice_spread"}: Gate 2 ICE heterogeneity summary.
+\item \code{"g2_hstats"}: Gate 2 interaction screening (Friedman H-statistics).
+\item \code{"g2_ale_2d"}: Gate 2 ALE interaction surface heatmap for top interacting pair.
 \item \code{"g2_gadget"}: Gate 2 regionalization summary (if available).
-\item \code{"storyboard"}: Guided visual-first summary (G2 + G6 where available).
-\item \code{"shap_local"}: Local SHAP/Shapley breakdown for a selected row.
+\item \code{"g3_calibration"}: Gate 3 reliability (calibration) curve.
+\item \code{"g3_dca"}: Gate 3 decision curve analysis (net benefit vs threshold).
+\item \code{"g5_stability"}: Gate 5 permutation importance with bootstrap CIs.
+\item \code{"g6_performance"}: Gate 6 alternative learner performance comparison.
+\item \code{"g6_group_performance"}: Gate 6 subgroup performance heterogeneity.
+\item \code{"g6_rashomon_importance"}: Gate 6 Rashomon explanation dispersion.
+\item \code{"g6_rank_heatmap"}: Gate 6 feature importance rank heatmap across Rashomon members.
+\item \code{"g6_summary"}: Gate 6 composite (performance + importance).
+\item \code{"g7a_subgroups"}: Gate 7A subgroup performance bar chart.
+}
+
+\strong{SHAP / Shapley:}
+\itemize{
+\item \code{"shap_local"}: Local SHAP waterfall for a selected row.
+\item \code{"shap_importance"}: Global SHAP mean(|phi|) bar chart.
+\item \code{"shap_beeswarm"}: Global SHAP beeswarm plot.
+}
+
+\strong{Composite:}
+\itemize{
+\item \code{"gate_strip"}: Colored tile strip showing pass/warn/fail/skip per gate.
+\item \code{"overview"}: Claim-adaptive multi-panel gate evidence overview (requires patchwork).
 }}
 
 \item{\code{...}}{Additional arguments forwarded to the selected plot helper.}

@@ -43,7 +43,7 @@ report_card(res)
 For most users, the easiest path is:
 
 1. run AutoIML,
-2. inspect the storyboard,
+2. inspect the overview plot,
 3. follow `guide()` actions,
 4. export an audit bundle.
 
@@ -67,7 +67,7 @@ auto = AutoIML$new(
 result = auto$run(verbose = FALSE)
 
 # 1) Visual orientation first
-auto$plot("storyboard")
+auto$plot("overview")
 
 # 2) Actionable next steps
 guide = auto$guide(max_actions = 6)
@@ -91,14 +91,14 @@ bundle_paths
 
 ### How to interpret the workflow
 
-- `storyboard`: first-pass visual narrative of structure + multiplicity evidence.
+- `overview`: first-pass visual narrative of structure + multiplicity evidence.
 - `guide$actions`: prioritized "what to do next" recommendations.
 - `report_card_extended()`: requirement-level evidence matrix for transparent reporting.
 - `export_audit_bundle()`: one-command artifact export for audit and governance handoff.
 
 ### Typical user loop
 
-- Start with `purpose = "global_insight"` and inspect `storyboard`.
+- Start with `purpose = "global_insight"` and inspect `overview`.
 - Apply top `guide$actions` (e.g., add subgroup fields, add alternative learners).
 - Re-run AutoIML and verify IEL/claim-scope changes before strengthening conclusions.
 - Export the audit bundle for reproducibility and review.
