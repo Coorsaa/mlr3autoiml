@@ -40,16 +40,12 @@ task$set_col_roles("personal_status_sex", add_to = "group")
 learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
 ```
 
-The next block is deliberately tutorial-like. The `ctx$claim` entries
-are not learned from the data, and they are not outputs of the model.
-They are pre-analysis declarations that formalize what kind of claim is
-being requested. For your own work, a practical shortcut is to answer
-five questions before fitting anything: who is the target population,
-what use is intended, what uses are out of scope, where should
-interpretation stop, and why is this threshold or utility framing
-reasonable? In this benchmark example, the wording is illustrative
-rather than authoritative, but the structure is the same one you would
-use in a real audit.
+The `ctx$claim` block is a pre-analysis declaration, not a model
+output. Before fitting anything, five questions are worth writing down:
+who is the target population, what use is intended, what is out of
+scope, where should interpretation stop, and why is this threshold
+reasonable? The wording here is illustrative; the structure is the same
+you would use in a real audit.
 
 ``` r
 auto = AutoIML$new(
@@ -124,11 +120,7 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | G6 | Multiplicity and transport | pass | Multiplicity and transport checks did not raise major concerns (given available evidence). |
 | G7A | Subgroups / measurement audit | warn | Subgroup audit computed (binary classification performance + calibration; utility if specified). |
 
-``` r
-cat("\nIEL (overall) =", res$iel$overall, "\n")
-#> 
-#> IEL (overall) = IEL-1
-```
+**IEL (overall):** IEL-1
 
 With the claim card, measurement notes, and subgroup transport check
 filled in, the remaining warnings are substantive rather than
@@ -164,10 +156,10 @@ export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_cred
 
 **Task:** `california_housing` (20 433 complete cases from the 20
 640-row benchmark, 8 numeric + 1 factor feature, continuous
-`median_house_value`). For the README, we keep a complete-case subset so
-`ranger`, lasso, and `xgboost` benchmark the same design matrix.
-Correlated spatial predictors still trigger ALE selection in G2, and the
-mixed learner family makes Gate 6 Rashomon diagnostics realistic.
+`median_house_value`). We use a complete-case subset so `ranger`, lasso,
+and `xgboost` benchmark the same design matrix. Correlated spatial
+predictors still trigger ALE selection in G2, and the mixed learner
+family makes Gate 6 Rashomon diagnostics realistic.
 
 ``` r
 task = tsk("california_housing")
@@ -181,13 +173,12 @@ learner = lrn(
 )
 ```
 
-The same idea applies here. The claim card below is not extra
-decoration; it makes the analysis design explicit before Gate 6 compares
-models. Because this README uses a complete-case subset, the declared
-target population, transport boundary, and missingness plan all refer to
-that filtered analysis set. That is the right way to handle these fields
-in practice: write down the population and workflow you are actually
-analyzing, not the broader one you might wish you had.
+The claim card here is not extra decoration; it makes the analysis
+design explicit before Gate 6 compares models. Because we restrict to
+complete cases, the declared target population, transport boundary, and
+missingness plan all refer to that filtered analysis set. Write down the
+population you are actually analyzing, not the broader one you might
+wish you had.
 
 ``` r
 auto = AutoIML$new(
@@ -262,17 +253,12 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | G6 | Multiplicity and transport | warn | Evidence of multiplicity (Rashomon set contains multiple near-tie models) and/or limited transportability across groups; scope interpretive claims accordingly. |
 | G7A | Subgroups / measurement audit | pass | Subgroup audit computed (regression RMSE, R², mean_y by group). |
 
-``` r
-cat("\nIEL (overall) =", res$iel$overall, "\n")
-#> 
-#> IEL (overall) = IEL-1
-```
+**IEL (overall):** IEL-1
 
-For the README, we widen Gate 2 slightly so the effect plots include the
-more interpretable housing variables that dominate the model story:
-income and coastal location. Using `ranger` as the fitted model keeps
-the global effects readable, while Gate 6 benchmarks it against lasso,
-`xgboost`, and a single tree baseline.
+The effect plots focus on the housing variables that dominate the model
+story: income and coastal location. `ranger` keeps the global effects
+readable, while Gate 6 benchmarks it against lasso, `xgboost`, and a
+single tree baseline.
 
 ``` r
 auto$plot("g2_effect", feature = c("median_income", "latitude", "longitude"))
