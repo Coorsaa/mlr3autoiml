@@ -10,6 +10,7 @@ knitr::opts_chunk$set(
   comment   = "#>",
   fig.path  = "man/figures/README-",
   out.width = "100%",
+  fig.retina = 2,
   message   = FALSE,
   warning   = FALSE
 )
@@ -45,69 +46,112 @@ G7A subgroup audit.
 ```{r classif-setup}
 library(mlr3)
 library(mlr3autoiml)
+library(mlr3learners)
+library(mlr3pipelines)
 
-task    <- tsk("german_credit")
-learner <- lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
+task = tsk("german_credit")
+task$set_col_roles("personal_status_sex", add_to = "group")
+
+learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
 ```
+
+The next block is deliberately tutorial-like.
+The `ctx$claim` entries are not learned from the data,
+and they are not outputs of the model.
+They are pre-analysis declarations that formalize what kind of claim is being requested.
+For your own work,
+a practical shortcut is to answer five questions before fitting anything:
+who is the target population,
+what use is intended,
+what uses are out of scope,
+where should interpretation stop,
+and why is this threshold or utility framing reasonable?
+In this benchmark example,
+the wording is illustrative rather than authoritative,
+but the structure is the same one you would use in a real audit.
 
 ```{r classif-autoiml}
-auto <- AutoIML$new(
-  task       = task,
-  learner    = learner,
+auto = AutoIML$new(
+  task = task,
+  learner = learner,
   resampling = rsmp("cv", folds = 3),
-  purpose    = "decision_support",
-  seed       = 42
+  purpose = "decision_support",
+  seed = 42
 )
 
-auto$ctx$claim <- make_claim_card(
-  purpose       = "decision_support",
-  semantics     = "within_support",
-  stakes        = "medium",
-  claims        = list(global = TRUE, local = TRUE, decision = TRUE),
+auto$ctx$claim = make_claim_card(
+  purpose = "decision_support",
+  semantics = "within_support",
+  stakes = "medium",
+  claims = list(global = TRUE, local = FALSE, decision = TRUE),
   decision_spec = list(
     thresholds = seq(0.20, 0.60, by = 0.05),
-    utility    = list(tp = 1, fp = -0.5, fn = -1, tn = 0)
+    utility = list(tp = 1, fp = -0.5, fn = -1, tn = 0)
   ),
-  target_population          = "Loan applicants, German Credit dataset",
-  intended_use               = "Support credit-risk screening decisions.",
-  prohibited_interpretations = "Causal claims; individual enforcement decisions."
+  target_population = "Loan applicants in the German Credit benchmark population",
+  setting = "Illustrative credit-risk screening benchmark",
+  time_horizon = "Single application review",
+  transport_boundary =
+    "Interpretation limited to applicants similar to the benchmark sample and the declared subgroup structure",
+  intended_use = "Support analyst review of credit-risk screening decisions.",
+  intended_non_use = "Not for automated approval, denial, or enforcement.",
+  prohibited_interpretations = "Causal claims; individual enforcement decisions.",
+  decision_policy_rationale =
+    paste(
+      "Thresholds reflect a conservative screening range where missed high-risk cases",
+      "are costlier than extra manual review."
+    )
 )
 
-auto$ctx$measurement        <- make_measurement_card("item")
-auto$ctx$sensitive_features <- c("personal_status_sex", "foreign_worker")
-auto$ctx$alt_learners       <- list(
-  Featureless = lrn("classif.featureless", predict_type = "prob")
+auto$ctx$measurement = make_measurement_card(
+  level = "item",
+  missingness_plan = "Use the benchmark task encoding as provided.",
+  reliability =
+    list(note = "Observed benchmark variables are treated as recorded inputs rather than latent scales."),
+  invariance =
+    list(status = "not-applicable", note = "Subgroup comparisons are descriptive audits of observed benchmark fields."),
+  scoring_pipeline = "Use the provided encoded predictors and binary outcome without additional score construction."
 )
+auto$ctx$sensitive_features = "personal_status_sex"
+auto$ctx$alt_learners = list(
+  featureless = lrn("classif.featureless", predict_type = "prob")
+)
+auto$ctx$multiplicity$transport_mode = "group_performance"
 ```
 
+The measurement card is declared for the same reason.
+It documents how we are treating the variables,
+missingness, and subgroup comparisons,
+rather than pretending those assumptions can be inferred from the fitted model.
+
 ```{r classif-run, results = "hide"}
-res <- auto$run()
+res = auto$run()
 ```
 
 ```{r classif-report}
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-cat("\nIEL:  G =", res$iel$global, "| L =", res$iel$local,
-        "| D =", res$iel$decision, "| overall =", res$iel$overall, "\n")
+cat("\nIEL (overall) =", res$iel$overall, "\n")
 ```
 
-```{r classif-overview, fig.height = 11, fig.alt = "Gate overview for german_credit"}
-auto$plot("overview")
-```
+With the claim card,
+measurement notes, and subgroup transport check filled in,
+the remaining warnings are substantive rather than setup-related:
+calibration, net benefit in the declared threshold range,
+and the interaction pattern that makes a simple one-feature story too thin.
 
-```{r classif-g1, fig.height = 4, fig.alt = "CV performance scores"}
-auto$plot("g1_scores")
-```
-
-```{r classif-g2, fig.height = 5, fig.alt = "ALE effect plot for amount"}
-auto$plot("g2_effect", feature = "amount")
-```
-
-```{r classif-g3, fig.height = 5, fig.alt = "Decision curve analysis"}
+```{r classif-g3, fig.width = 5.5, fig.height = 4.2, out.width = "49%", fig.show = "hold"}
+auto$plot("g3_calibration")
 auto$plot("g3_dca")
 ```
 
-```{r classif-g5, fig.height = 5, fig.alt = "Permutation importance stability"}
-auto$plot("g5_stability")
+Gate 2 then shows why the package warns instead of presenting a single global
+effect curve as the main story:
+`amount` and `duration` dominate,
+and they interact strongly.
+
+```{r classif-g2, fig.width = 5.5, fig.height = 4.4, out.width = "49%", fig.show = "hold"}
+auto$plot("g2_hstats", top_n = 3L)
+auto$plot("g2_ale_2d", feature1 = "amount", feature2 = "duration", class_label = task$positive)
 ```
 
 ```{r classif-export, eval = FALSE}
@@ -118,62 +162,119 @@ export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_cred
 
 ## Example 2 — Regression · global insight
 
-**Task:** `california_housing` (20 640 rows, 8 numeric + 1 factor feature,
-continuous `median_house_value`). Correlated spatial predictors trigger ALE
-selection in G2; `ocean_proximity` serves as the subgroup variable.
+**Task:** `california_housing` (20 433 complete cases from the 20 640-row benchmark,
+8 numeric + 1 factor feature,
+continuous `median_house_value`).
+For the README,
+we keep a complete-case subset so `ranger`, lasso, and `xgboost`
+benchmark the same design matrix.
+Correlated spatial predictors still trigger ALE selection in G2,
+and the mixed learner family makes Gate 6 Rashomon diagnostics realistic.
 
 ```{r regr-setup}
-task    <- tsk("california_housing")
-learner <- lrn("regr.rpart", maxdepth = 8L)
+task = tsk("california_housing")
+task$filter(task$row_ids[stats::complete.cases(task$data())])
+
+learner = lrn(
+  "regr.ranger",
+  num.trees = 200L,
+  mtry.ratio = 0.5,
+  min.node.size = 5L
+)
 ```
 
+The same idea applies here.
+The claim card below is not extra decoration;
+it makes the analysis design explicit before Gate 6 compares models.
+Because this README uses a complete-case subset,
+the declared target population,
+transport boundary, and missingness plan all refer to that filtered analysis set.
+That is the right way to handle these fields in practice:
+write down the population and workflow you are actually analyzing,
+not the broader one you might wish you had.
+
 ```{r regr-autoiml}
-auto <- AutoIML$new(
-  task       = task,
-  learner    = learner,
+auto = AutoIML$new(
+  task = task,
+  learner = learner,
   resampling = rsmp("cv", folds = 3),
-  purpose    = "global_insight",
-  seed       = 42
+  purpose = "global_insight",
+  seed = 42
 )
 
-auto$ctx$claim <- make_claim_card(
-  purpose           = "global_insight",
-  semantics         = "within_support",
-  stakes            = "low",
-  claims            = list(global = TRUE, local = FALSE, decision = FALSE),
-  target_population = "Californian housing blocks (1990 census)",
-  intended_use      = "Identify global drivers of median house value.",
+auto$ctx$claim = make_claim_card(
+  purpose = "global_insight",
+  semantics = "within_support",
+  stakes = "low",
+  claims = list(global = TRUE, local = FALSE, decision = FALSE),
+  target_population = "Californian housing blocks (1990 census) with complete predictor information",
+  setting = "Illustrative housing-value benchmark",
+  time_horizon = "Cross-sectional snapshot",
+  transport_boundary =
+    "Interpretation limited to blocks similar to the observed 1990 census sample after complete-case filtering",
+  intended_use = "Identify global drivers of median house value.",
+  intended_non_use = "Not for causal policy claims or parcel-level appraisal.",
   prohibited_interpretations = "Causal claims; individual valuation."
 )
 
-auto$ctx$measurement        <- make_measurement_card("item")
-auto$ctx$sensitive_features <- "ocean_proximity"
-auto$ctx$alt_learners       <- list(Featureless = lrn("regr.featureless"))
+auto$ctx$measurement = make_measurement_card(
+  level = "item",
+  missingness_plan =
+    "Restrict the README example to complete cases so the mixed learner family shares the same input matrix.",
+  reliability =
+    list(note = "Observed benchmark variables are treated as recorded inputs rather than latent scales."),
+  invariance =
+    list(status = "not-applicable", note = "Subgroup comparisons are descriptive audits of observed benchmark fields."),
+  scoring_pipeline = "Use the provided encoded predictors and numeric outcome without additional score construction."
+)
+auto$ctx$sensitive_features = "ocean_proximity"
+auto$ctx$alt_learners = list(
+  lasso = as_learner(po("encode") %>>% lrn("regr.glmnet", alpha = 1)),
+  xgboost = as_learner(
+    po("encode") %>>%
+      lrn(
+        "regr.xgboost",
+        nrounds = 150L,
+        eta = 0.05,
+        max_depth = 6L,
+        subsample = 0.8,
+        colsample_bytree = 0.8,
+        verbose = 0
+      )
+  ),
+  tree = lrn("regr.rpart", maxdepth = 12L, cp = 1e-03),
+  featureless = lrn("regr.featureless")
+)
+auto$ctx$structure$max_features = 8L
 ```
 
 ```{r regr-run, results = "hide"}
-res <- auto$run()
+res = auto$run()
 ```
 
 ```{r regr-report}
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-cat("\nIEL:  G =", res$iel$global, "| overall =", res$iel$overall, "\n")
+cat("\nIEL (overall) =", res$iel$overall, "\n")
 ```
 
-```{r regr-overview, fig.height = 11, fig.alt = "Gate overview for california_housing"}
-auto$plot("overview")
+For the README,
+we widen Gate 2 slightly so the effect plots include the more interpretable
+housing variables that dominate the model story:
+income and coastal location.
+Using `ranger` as the fitted model keeps the global effects readable,
+while Gate 6 benchmarks it against lasso, `xgboost`, and a single tree baseline.
+
+```{r regr-g2, fig.width = 10, fig.height = 4.4, fig.alt = "ALE effects for median income and spatial coordinates"}
+auto$plot("g2_effect", feature = c("median_income", "latitude", "longitude"))
 ```
 
-```{r regr-g2, fig.height = 5, fig.alt = "ALE effect plot for total_rooms"}
-auto$plot("g2_effect", feature = "total_rooms")
-```
+The supporting views below add two complementary angles:
+conditional SHAP importance for the fitted tree,
+and a Rashomon rank heatmap for the near-tie models in Gate 6.
 
-```{r regr-g5, fig.height = 5, fig.alt = "Permutation importance stability"}
-auto$plot("g5_stability")
-```
-
-```{r regr-g7a, fig.height = 5, fig.alt = "Subgroup performance by ocean proximity"}
-auto$plot("g7a_subgroups")
+```{r regr-shap-g6, fig.width = 5.8, fig.height = 4.6, out.width = "49%", fig.show = "hold"}
+auto$plot("shap_importance", n_rows = 40L, sample_size = 15L, background_n = 40L, top_n = 8L)
+auto$plot("g6_rank_heatmap", top_n = 8L)
 ```
 
 ```{r regr-export, eval = FALSE}
