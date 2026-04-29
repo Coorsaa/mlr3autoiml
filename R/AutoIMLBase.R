@@ -402,7 +402,9 @@ AutoIML = R6::R6Class(
     #'   - `"g2_ice_spread"`: Gate 2 ICE heterogeneity summary.
     #'   - `"g2_hstats"`: Gate 2 interaction screening (Friedman H-statistics).
     #'   - `"g2_ale_2d"`: Gate 2 ALE interaction surface heatmap for top interacting pair.
-    #'   - `"g2_gadget"`: Gate 2 regionalization summary (if available).
+    #'   - `"g2_gadget"`: Gate 2 regionalized local-effect curves (if available).
+    #'   - `"g2_gadget_tree"`: Gate 2 GADGET split tree / split-gain summary.
+    #'   - `"g2_pint"`: Gate 2 optional GADGET-PINT interaction screen.
     #'   - `"g3_calibration"`: Gate 3 reliability (calibration) curve.
     #'   - `"g3_dca"`: Gate 3 decision curve analysis (net benefit vs threshold).
     #'   - `"g5_stability"`: Gate 5 permutation importance with bootstrap CIs.
@@ -434,28 +436,30 @@ AutoIML = R6::R6Class(
 
       switch(
         type,
-        "g1_scores"               = .autoiml_plot_g1_scores(self$result, ...),
-        "g2_ice_spread"           = .autoiml_plot_g2_ice_spread(self$result, ...),
-        "g2_effect"               = .autoiml_plot_g2_effect(self$result, ...),
-        "g2_hstats"               = .autoiml_plot_g2_hstats(self$result, ...),
-        "g2_ale_2d"               = .autoiml_plot_g2_ale_2d(self$result, ...),
-        "g2_gadget"               = .autoiml_plot_g2_gadget(self$result, ...),
-        "g3_calibration"          = .autoiml_plot_g3_calibration(self$result, ...),
-        "g3_dca"                  = .autoiml_plot_g3_dca(self$result, ...),
-        "g5_stability"            = .autoiml_plot_g5_stability(self$result, ...),
-        "g6_performance"          = .autoiml_plot_g6_performance(self$result, ...),
-        "g6_group_performance"    = .autoiml_plot_g6_group_performance(self$result, ...),
-        "g6_rashomon_importance"  = .autoiml_plot_g6_rashomon_importance(self$result, ...),
-        "g6_rank_heatmap"         = .autoiml_plot_g6_rank_heatmap(self$result, ...),
-        "g6_pred_multiplicity"    = .autoiml_plot_g6_pred_multiplicity(self$result, ...),
-        "g6_loco"                 = .autoiml_plot_g6_loco(self$result, ...),
-        "g6_summary"              = .autoiml_plot_g6_summary(self$result, ...),
-        "g7a_subgroups"           = .autoiml_plot_g7a_subgroups(self$result, ...),
-        "gate_strip"              = .autoiml_plot_gate_strip(self$result, ...),
-        "overview"                = .autoiml_plot_overview(self$result, ...),
-        "shap_local"              = .autoiml_plot_shap_local(self, ...),
-        "shap_importance"         = .autoiml_plot_shap_importance(self, ...),
-        "shap_beeswarm"           = .autoiml_plot_shap_beeswarm(self, ...),
+        "g1_scores" = .autoiml_plot_g1_scores(self$result, ...),
+        "g2_ice_spread" = .autoiml_plot_g2_ice_spread(self$result, ...),
+        "g2_effect" = .autoiml_plot_g2_effect(self$result, ...),
+        "g2_hstats" = .autoiml_plot_g2_hstats(self$result, ...),
+        "g2_ale_2d" = .autoiml_plot_g2_ale_2d(self$result, ...),
+        "g2_gadget" = .autoiml_plot_g2_gadget(self$result, ...),
+        "g2_gadget_tree" = .autoiml_plot_g2_gadget_tree(self$result, ...),
+        "g2_pint" = .autoiml_plot_g2_pint(self$result, ...),
+        "g3_calibration" = .autoiml_plot_g3_calibration(self$result, ...),
+        "g3_dca" = .autoiml_plot_g3_dca(self$result, ...),
+        "g5_stability" = .autoiml_plot_g5_stability(self$result, ...),
+        "g6_performance" = .autoiml_plot_g6_performance(self$result, ...),
+        "g6_group_performance" = .autoiml_plot_g6_group_performance(self$result, ...),
+        "g6_rashomon_importance" = .autoiml_plot_g6_rashomon_importance(self$result, ...),
+        "g6_rank_heatmap" = .autoiml_plot_g6_rank_heatmap(self$result, ...),
+        "g6_pred_multiplicity" = .autoiml_plot_g6_pred_multiplicity(self$result, ...),
+        "g6_loco" = .autoiml_plot_g6_loco(self$result, ...),
+        "g6_summary" = .autoiml_plot_g6_summary(self$result, ...),
+        "g7a_subgroups" = .autoiml_plot_g7a_subgroups(self$result, ...),
+        "gate_strip" = .autoiml_plot_gate_strip(self$result, ...),
+        "overview" = .autoiml_plot_overview(self$result, ...),
+        "shap_local" = .autoiml_plot_shap_local(self, ...),
+        "shap_importance" = .autoiml_plot_shap_importance(self, ...),
+        "shap_beeswarm" = .autoiml_plot_shap_beeswarm(self, ...),
         stop("Unknown plot type: '", type, "'. See ?AutoIML for supported types.", call. = FALSE)
       )
     },
