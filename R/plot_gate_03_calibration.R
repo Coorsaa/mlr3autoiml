@@ -96,8 +96,8 @@ NULL
   all_nb = c(dca$net_benefit, if ("nb_treat_all" %in% names(dca)) dca$nb_treat_all, 0)
   all_nb = all_nb[is.finite(all_nb)]
   y_range = range(all_nb, na.rm = TRUE)
-  y_pad   = max(0.005, diff(y_range) * 0.08)
-  y_lims  = c(y_range[1L] - y_pad, y_range[2L] + y_pad)
+  y_pad = max(0.005, diff(y_range) * 0.08)
+  y_lims = c(y_range[1L] - y_pad, y_range[2L] + y_pad)
 
   x_range = range(dca$threshold_pct, na.rm = TRUE)
 

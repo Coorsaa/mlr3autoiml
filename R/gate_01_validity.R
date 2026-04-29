@@ -239,6 +239,7 @@ Gate1Validity = R6::R6Class(
       primary_metric = private$primary_metric(task)
 
       baseline_lr = NULL
+      baseline_scores_dt = NULL
       if (inherits(task, "TaskClassif")) {
         baseline_lr = mlr3::lrn("classif.featureless", predict_type = "prob")
       } else if (inherits(task, "TaskRegr")) {
@@ -247,6 +248,7 @@ Gate1Validity = R6::R6Class(
 
       if (!is.null(baseline_lr)) {
         rr0 = mlr3::resample(task, baseline_lr, resampling, store_models = FALSE, store_backends = TRUE)
+        baseline_scores_dt = data.table::as.data.table(rr0$score(measures))
         baseline_agg = rr0$aggregate(measures)
         baseline_agg_dt = private$agg_to_dt(baseline_agg)
 
@@ -306,6 +308,7 @@ Gate1Validity = R6::R6Class(
         metrics = metrics,
         artifacts = list(
           scores = scores,
+          baseline_scores = baseline_scores_dt,
           rr = rr,
           uncertainty = uncertainty,
           leakage_checklist = leakage_checklist,
