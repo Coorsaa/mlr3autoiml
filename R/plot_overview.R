@@ -139,9 +139,9 @@ NULL
   p_g2_ale = if (!is.null(feature_use) && nzchar(feature_use)) {
     tryCatch(
       .autoiml_plot_g2_effect(
-        result  = result,
+        result = result,
         feature = feature_use,
-        method  = method_pref,
+        method = method_pref,
         class_label = class_label,
         show_ice = identical(method_pref, "pdp")
       ),
@@ -183,29 +183,37 @@ NULL
 
   # Row assembly helpers
   .pair = function(left, right) {
-    if (!is.null(left) && !is.null(right)) return(left | right)
-    if (!is.null(left))  return(left)
-    if (!is.null(right)) return(right)
+    if (!is.null(left) && !is.null(right)) {
+      return(left | right)
+    }
+    if (!is.null(left)) {
+      return(left)
+    }
+    if (!is.null(right)) {
+      return(right)
+    }
     NULL
   }
 
-  row2 = .pair(p_g1,    p_g3)
+  row2 = .pair(p_g1, p_g3)
   row3 = .pair(p_g2_ale, p_g2_h)
-  row4 = .pair(p_g5,    p_g6h)
+  row4 = .pair(p_g5, p_g6h)
 
   content_rows = Filter(Negate(is.null), list(row2, row3, row4))
   n_content = length(content_rows)
 
   if (n_content == 0L) {
-    if (!is.null(p_strip)) return(p_strip)
+    if (!is.null(p_strip)) {
+      return(p_strip)
+    }
     return(NULL)
   }
 
   heights = c(
-    if (!is.null(p_strip)) 0.5   else numeric(),
-    if (!is.null(p_text))  0.85  else numeric(),
+    if (!is.null(p_strip)) 0.5 else numeric(),
+    if (!is.null(p_text)) 0.85 else numeric(),
     rep(1.5, n_content),
-    if (!is.null(p_g7a))   1.5   else numeric()
+    if (!is.null(p_g7a)) 1.5 else numeric()
   )
 
   pieces = Filter(Negate(is.null), c(

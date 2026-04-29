@@ -293,8 +293,16 @@ NULL
   X_ok = X[ok]
   x_ok = as.numeric(X_ok[[feature]])
 
-  # Quantile-based grid (iml-style ALE binning)
-  g = .autoiml_grid_1d_iml(x_ok, grid_n = as.integer(bins) + 1L, grid_type = "quantile", trim = trim)
+  # Preserve the full observed support for low-cardinality features so ordered
+  # response scales and similar discrete variables are not truncated to trimmed
+  # quantiles in the exported ALE curve.
+  x_unique = sort(unique(x_ok))
+  if (length(x_unique) <= as.integer(bins) + 1L) {
+    g = x_unique
+  } else {
+    # Quantile-based grid (iml-style ALE binning)
+    g = .autoiml_grid_1d_iml(x_ok, grid_n = as.integer(bins) + 1L, grid_type = "quantile", trim = trim)
+  }
   if (length(g) < 3L) {
     return(NULL)
   }
@@ -382,7 +390,7 @@ NULL
   X,
   feature1,
   feature2,
-  bins        = 8L,
+  bins = 8L,
   class_label = NULL
 ) {
   X = data.table::as.data.table(X)
@@ -390,22 +398,26 @@ NULL
   x1 = suppressWarnings(as.numeric(X[[feature1]]))
   x2 = suppressWarnings(as.numeric(X[[feature2]]))
   ok = is.finite(x1) & is.finite(x2)
-  if (sum(ok) < 10L) return(NULL)
+  if (sum(ok) < 10L) {
+    return(NULL)
+  }
 
-  X_ok  = X[ok]
+  X_ok = X[ok]
   x1_ok = x1[ok]
   x2_ok = x2[ok]
-  n     = nrow(X_ok)
-  bins  = as.integer(bins)
+  n = nrow(X_ok)
+  bins = as.integer(bins)
 
   g1 = unique(stats::quantile(x1_ok, probs = seq(0, 1, length.out = bins + 1L),
     na.rm = TRUE, type = 7))
   g2 = unique(stats::quantile(x2_ok, probs = seq(0, 1, length.out = bins + 1L),
     na.rm = TRUE, type = 7))
-  if (length(g1) < 3L || length(g2) < 3L) return(NULL)
+  if (length(g1) < 3L || length(g2) < 3L) {
+    return(NULL)
+  }
 
-  B1   = length(g1) - 1L
-  B2   = length(g2) - 1L
+  B1 = length(g1) - 1L
+  B2 = length(g2) - 1L
   idx1 = findInterval(x1_ok, g1, all.inside = TRUE)
   idx2 = findInterval(x2_ok, g2, all.inside = TRUE)
 
@@ -417,11 +429,11 @@ NULL
   X_lh = data.table::copy(X_ok)
   X_hh = data.table::copy(X_ok)
 
-  data.table::set(X_ll, j = feature1, value = .autoiml_cast_like_feature(g1[idx1],      ftype1, NULL))
-  data.table::set(X_ll, j = feature2, value = .autoiml_cast_like_feature(g2[idx2],      ftype2, NULL))
+  data.table::set(X_ll, j = feature1, value = .autoiml_cast_like_feature(g1[idx1], ftype1, NULL))
+  data.table::set(X_ll, j = feature2, value = .autoiml_cast_like_feature(g2[idx2], ftype2, NULL))
   data.table::set(X_hl, j = feature1, value = .autoiml_cast_like_feature(g1[idx1 + 1L], ftype1, NULL))
-  data.table::set(X_hl, j = feature2, value = .autoiml_cast_like_feature(g2[idx2],      ftype2, NULL))
-  data.table::set(X_lh, j = feature1, value = .autoiml_cast_like_feature(g1[idx1],      ftype1, NULL))
+  data.table::set(X_hl, j = feature2, value = .autoiml_cast_like_feature(g2[idx2], ftype2, NULL))
+  data.table::set(X_lh, j = feature1, value = .autoiml_cast_like_feature(g1[idx1], ftype1, NULL))
   data.table::set(X_lh, j = feature2, value = .autoiml_cast_like_feature(g2[idx2 + 1L], ftype2, NULL))
   data.table::set(X_hh, j = feature1, value = .autoiml_cast_like_feature(g1[idx1 + 1L], ftype1, NULL))
   data.table::set(X_hh, j = feature2, value = .autoiml_cast_like_feature(g2[idx2 + 1L], ftype2, NULL))
@@ -438,13 +450,13 @@ NULL
   delta = (p_hh - p_lh) - (p_hl - p_ll)
 
   agg_dt = data.table::data.table(i = idx1, j = idx2, delta = delta)
-  agg    = agg_dt[, .(mean_delta = mean(delta, na.rm = TRUE), n_obs = .N), by = c("i", "j")]
+  agg = agg_dt[, .(mean_delta = mean(delta, na.rm = TRUE), n_obs = .N), by = c("i", "j")]
 
   delta_mat = matrix(NA_real_, nrow = B1, ncol = B2)
-  n_mat     = matrix(0L,       nrow = B1, ncol = B2)
+  n_mat = matrix(0L, nrow = B1, ncol = B2)
   for (k in seq_len(nrow(agg))) {
     delta_mat[agg$i[k], agg$j[k]] = agg$mean_delta[k]
-    n_mat[agg$i[k],     agg$j[k]] = agg$n_obs[k]
+    n_mat[agg$i[k], agg$j[k]] = agg$n_obs[k]
   }
 
   # Nearest-neighbor imputation for empty cells (iml-style):
@@ -454,22 +466,24 @@ NULL
   if (any(empty)) {
     x1_mid_all = (g1[seq_len(B1)] + g1[seq_len(B1) + 1L]) / 2
     x2_mid_all = (g2[seq_len(B2)] + g2[seq_len(B2) + 1L]) / 2
-    r1 = diff(range(x1_mid_all)); if (r1 == 0) r1 = 1
-    r2 = diff(range(x2_mid_all)); if (r2 == 0) r2 = 1
+    r1 = diff(range(x1_mid_all))
+    if (r1 == 0) r1 = 1
+    r2 = diff(range(x2_mid_all))
+    if (r2 == 0) r2 = 1
     x1n = (x1_mid_all - min(x1_mid_all)) / r1
     x2n = (x2_mid_all - min(x2_mid_all)) / r2
 
     # Flat index arrays: vary row (i) fastest, matching matrix column-major layout
     all_i = rep(seq_len(B1), B2)
     all_j = rep(seq_len(B2), each = B1)
-    ax1   = x1n[all_i]
-    ax2   = x2n[all_j]
-    ev    = as.vector(empty)
+    ax1 = x1n[all_i]
+    ax2 = x2n[all_j]
+    ev = as.vector(empty)
 
     non_empty_k = which(!ev)
     for (ek in which(ev)) {
-      d2  = (ax1[non_empty_k] - ax1[ek])^2 + (ax2[non_empty_k] - ax2[ek])^2
-      nn  = non_empty_k[which.min(d2)]
+      d2 = (ax1[non_empty_k] - ax1[ek])^2 + (ax2[non_empty_k] - ax2[ek])^2
+      nn = non_empty_k[which.min(d2)]
       delta_mat[all_i[ek], all_j[ek]] = delta_mat[all_i[nn], all_j[nn]]
     }
   }
@@ -479,13 +493,13 @@ NULL
 
   # 2D cumulative sum: first along feature2 (cols), then along feature1 (rows)
   # ale_mat[I,J] = sum_{i<=I, j<=J} delta[i,j]
-  ale_mat = t(apply(delta_mat, 1, cumsum))  # cumsum across cols (feature2 dir)
-  ale_mat = apply(ale_mat,     2, cumsum)   # cumsum down rows   (feature1 dir)
+  ale_mat = t(apply(delta_mat, 1, cumsum)) # cumsum across cols (feature2 dir)
+  ale_mat = apply(ale_mat, 2, cumsum) # cumsum down rows   (feature1 dir)
 
   # Centre by weighted mean (weights = observed cell counts; empty cells weight 0)
   total_n = sum(n_mat)
   if (total_n > 0L) {
-    center  = sum(ale_mat * (n_mat / total_n), na.rm = TRUE)
+    center = sum(ale_mat * (n_mat / total_n), na.rm = TRUE)
     ale_mat = ale_mat - center
   }
 

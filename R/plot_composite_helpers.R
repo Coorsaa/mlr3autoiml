@@ -27,9 +27,9 @@ NULL
       error = "#C44E52"
     ),
     metric = c(
-      primary   = "#4C72B0",
+      primary = "#4C72B0",
       secondary = "#C44E52",
-      tertiary  = "#6E90C9",
+      tertiary = "#6E90C9",
       quaternary = "#2F5D9B"
     ),
     gradient = c(
@@ -104,7 +104,7 @@ autoiml_model_colors = function() {
   }
 
   pal = .autoiml_plot_palette()
-  ids  = vapply(grs, function(g) as.character(g$gate_id), character(1L))
+  ids = vapply(grs, function(g) as.character(g$gate_id), character(1L))
   stts = vapply(grs, function(g) as.character(g$status %??% "skip"), character(1L))
 
   dt = data.table::data.table(
@@ -127,7 +127,7 @@ autoiml_model_colors = function() {
     ggplot2::labs(title = title) +
     ggplot2::theme_void(base_size = 11) +
     ggplot2::theme(
-      plot.title    = ggplot2::element_text(face = "bold", hjust = 0),
+      plot.title = ggplot2::element_text(face = "bold", hjust = 0),
       legend.position = "none"
     )
 }
@@ -158,8 +158,8 @@ autoiml_model_colors = function() {
     ggplot2::annotate(
       "rect",
       xmin = -0.05, xmax = 1.05,
-      ymin = 0.4,   ymax = n + 0.8,
-      fill  = fill_col, color = NA
+      ymin = 0.4, ymax = n + 0.8,
+      fill = fill_col, color = NA
     ) +
     ggplot2::geom_text(hjust = 0, vjust = 1, lineheight = 1.15, size = 3.2) +
     ggplot2::xlim(0, 1) +

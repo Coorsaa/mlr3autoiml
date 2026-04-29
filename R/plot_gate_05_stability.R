@@ -45,11 +45,10 @@ NULL
     ) +
     ggplot2::geom_errorbar(
       ggplot2::aes(xmin = ci_low, xmax = ci_high),
-      orientation = "y", width = 0.25,
-      color = pal$metric[["primary"]], alpha = 0.7
+      orientation = "y", width = 0.2
     ) +
     ggplot2::geom_point(
-      color = pal$metric[["primary"]], size = 2
+      color = pal$metric[["primary"]], size = 2.5
     ) +
     ggplot2::geom_vline(
       xintercept = 0, linetype = "dotted",

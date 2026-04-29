@@ -49,11 +49,14 @@ NULL
   ggplot2::ggplot(perf_dt, ggplot2::aes(x = mean, y = learner_id)) +
     ggplot2::geom_errorbar(
       ggplot2::aes(xmin = ci_low, xmax = ci_high),
-      orientation = "y", color = pal$metric[["primary"]]
+      orientation = "y", width = 0.2
     ) +
     ggplot2::geom_point(
-      ggplot2::aes(shape = in_rashomon),
-      color = pal$metric[["primary"]], size = 2
+      ggplot2::aes(color = in_rashomon), size = 2.5
+    ) +
+    ggplot2::scale_color_manual(
+      values = c("TRUE" = pal$metric[["primary"]], "FALSE" = pal$metric[["secondary"]]),
+      name = "Rashomon set"
     ) +
     ggplot2::labs(
       title = "G6: Alternative learner performance",
@@ -136,10 +139,14 @@ NULL
   }
 
   gr = .autoiml_get_gate_result(result, "G6")
-  if (is.null(gr)) return(NULL)
+  if (is.null(gr)) {
+    return(NULL)
+  }
 
   dist = gr$artifacts$pred_range_dist
-  if (is.null(dist) || length(dist) < 2L) return(NULL)
+  if (is.null(dist) || length(dist) < 2L) {
+    return(NULL)
+  }
 
   pal = .autoiml_plot_palette()
   med = stats::median(dist, na.rm = TRUE)
@@ -163,16 +170,24 @@ NULL
   }
 
   gr = .autoiml_get_gate_result(result, "G6")
-  if (is.null(gr)) return(NULL)
+  if (is.null(gr)) {
+    return(NULL)
+  }
 
   sa = gr$artifacts$shift_assessment
-  if (is.null(sa) || !identical(sa$mode, "loco")) return(NULL)
+  if (is.null(sa) || !identical(sa$mode, "loco")) {
+    return(NULL)
+  }
 
   transport_dt = data.table::as.data.table(sa$transport)
-  if (is.null(transport_dt) || nrow(transport_dt) == 0L) return(NULL)
+  if (is.null(transport_dt) || nrow(transport_dt) == 0L) {
+    return(NULL)
+  }
 
   score_col = intersect(c("score", "logloss", "rmse", "auc"), names(transport_dt))[1L]
-  if (is.na(score_col)) return(NULL)
+  if (is.na(score_col)) {
+    return(NULL)
+  }
 
   transport_dt = transport_dt[order(get(score_col))]
   measure_id = as.character(sa$measure_id %??% score_col)
