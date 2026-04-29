@@ -1,4 +1,4 @@
-test_that("Gate0AClaim enforces high-stakes transport and use boundaries", {
+test_that("Gate0AClaim derives use boundaries and decision rationale from analysis context", {
   gate = mlr3autoiml:::Gate0AClaim$new()
   ctx = list(
     purpose = "deployment",
@@ -10,11 +10,6 @@ test_that("Gate0AClaim enforces high-stakes transport and use boundaries", {
       audience = "technical",
       decision_spec = list(thresholds = c(0.2, 0.4, 0.6), utility = list(tp = 1, tn = 0, fp = -1, fn = -2)),
       actionability = list(mutable_features = c("x1")),
-      # missing on purpose:
-      # target_population, setting, time_horizon, transport_boundary,
-      # intended_use, intended_non_use, prohibited_interpretations,
-      # decision_policy_rationale
-
       # present to avoid causal hard-stop branch:
       causal_assumptions = NULL
     ),
@@ -22,11 +17,11 @@ test_that("Gate0AClaim enforces high-stakes transport and use boundaries", {
   )
 
   out = gate$run(ctx)
-  expect_equal(out$status, "fail")
-  miss = out$artifacts$missing_codes
-  expect_true("transport_scope" %in% miss)
-  expect_true("use_boundaries" %in% miss)
-  expect_true("decision_policy_rationale" %in% miss)
+  expect_true(out$status %in% c("pass", "warn"))
+  expect_true(out$metrics$has_use_boundaries[[1L]])
+  expect_true(out$metrics$has_decision_policy_rationale[[1L]])
+  expect_false(out$metrics$has_transport_scope[[1L]])
+  expect_true(all(c("intended_use", "intended_non_use", "prohibited_interpretations", "decision_policy_rationale") %in% out$artifacts$derived_fields))
 })
 
 

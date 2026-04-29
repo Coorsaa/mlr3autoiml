@@ -17,7 +17,7 @@ test_that("Gate 2 produces expected artifacts and recommendations", {
 
   a = g2$artifacts
   expect_true(is.list(a))
-  expect_true(all(c("pd_curves", "ice_curves", "ale_curves", "ice_spread", "hstats", "max_cor_pair") %in% names(a)))
+  expect_true(all(c("pd_curves", "ice_curves", "ale_curves", "ice_spread", "hstats", "max_cor_pair", "pint", "gadget_multi", "gadget_regions", "gadget_splits", "gadget_feature_metrics") %in% names(a)))
   if (!is.null(a$pd_curves) && data.table::is.data.table(a$pd_curves) && nrow(a$pd_curves) > 0L) {
     expect_true("semantics_label" %in% names(a$pd_curves))
   }

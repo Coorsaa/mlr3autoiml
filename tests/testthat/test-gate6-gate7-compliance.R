@@ -104,6 +104,38 @@ test_that("Gate7A fails high-stakes subgroup claims without invariance evidence"
 })
 
 
+test_that("Gate7A does not require invariance for item-level subgroup audits", {
+  gate = mlr3autoiml:::Gate7aSubgroups$new()
+
+  dat = iris
+  dat$group_var = factor(ifelse(dat$Sepal.Length > median(dat$Sepal.Length), "high", "low"))
+  task = mlr3::as_task_classif(Species ~ ., data = dat, id = "iris_item_grouped")
+  learner = make_learner_classif_rpart()
+  learner$train(task)
+  pred = learner$predict(task)
+
+  ctx = list(
+    task = task,
+    pred = pred,
+    final_model = learner,
+    sensitive_features = "group_var",
+    claim = list(
+      purpose = "decision_support",
+      stakes = "high",
+      claims = list(global = TRUE, local = TRUE, decision = TRUE),
+      decision_spec = list(
+        thresholds = c(0.2, 0.4, 0.6),
+        utility = list(tp = 1, tn = 0, fp = -1, fn = -2)
+      )
+    ),
+    measurement = list(level = "item")
+  )
+
+  out = gate$run(ctx)
+  expect_true(out$status %in% c("pass", "warn"))
+})
+
+
 test_that("Gate7A emits subgroup explanation stability artifacts", {
   gate = mlr3autoiml:::Gate7aSubgroups$new()
 

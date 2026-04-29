@@ -52,3 +52,43 @@ test_that("cached global SHAP accepts AutoIMLResult", {
   expect_true(data.table::is.data.table(dt))
   expect_gt(nrow(dt), 0L)
 })
+
+test_that("regression g2_effect does not facet missing class labels and pads ALE", {
+  skip_if_not_installed("ggplot2")
+
+  auto = get_auto_mtcars(quick_start = FALSE)
+  top_feature = auto$result$gate_results$G2$artifacts$recommendation$top_features[[1L]]
+  ale_dt = data.table::as.data.table(auto$result$gate_results$G2$artifacts$ale_curves)[feature == top_feature]
+
+  p = auto$plot("g2_effect", feature = top_feature, method = "ale")
+  expect_s3_class(p, "ggplot")
+  expect_identical(class(p$facet)[1L], "FacetNull")
+
+  built = ggplot2::ggplot_build(p)
+  panel = built$layout$panel_params[[1L]]
+  y_range = if (!is.null(panel$y.range)) panel$y.range else panel$y$continuous_range
+
+  expect_lt(y_range[1L], min(ale_dt$ale))
+  expect_gt(y_range[2L], max(ale_dt$ale))
+})
+
+test_that("ALE keeps full support for low-cardinality numeric features", {
+  task = make_task_mtcars_regr()
+  learner = make_learner_regr()
+  learner$train(task)
+
+  ale_dt = mlr3autoiml:::.autoiml_ale_1d_iml(
+    task = task,
+    model = learner,
+    X = task$data(cols = task$feature_names),
+    feature = "cyl",
+    bins = 10L
+  )
+
+  raw_x = sort(unique(task$data(cols = "cyl")[["cyl"]]))
+
+  expect_true(data.table::is.data.table(ale_dt))
+  expect_equal(min(ale_dt$x_left), min(raw_x))
+  expect_equal(max(ale_dt$x_right), max(raw_x))
+  expect_equal(nrow(ale_dt), length(raw_x) - 1L)
+})
