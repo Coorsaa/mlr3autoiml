@@ -1,3 +1,15 @@
+# mlr3autoiml 0.0.8
+
+## Gate 2 / GADGET integration
+- Gate 2 now stores the centered ICE matrices used for heterogeneity diagnostics, fixing the previously inert GADGET regionalization path.
+- Added joint GADGET-style regionalization across the selected feature set instead of independent one-feature regionalizations. Splits now minimize the summed centered-local-effect risk across target features, retain split rules, region assignments, local curves, global curves, and feature-wise heterogeneity-reduction metrics.
+- Added optional GADGET-PINT permutation screening (`ctx$structure$pint_enabled`) for final analyses where repeated refits are acceptable. The screen stores observed centered-ICE risks, permutation null summaries, p-value-style Monte Carlo exceedance rates, and flags.
+- Added `AutoIML$plot("g2_gadget")`, `AutoIML$plot("g2_gadget_tree")`, and `AutoIML$plot("g2_pint")` outputs, and exported the corresponding tables and figures through `export_analysis_bundle()`.
+
+## Analysis workflow
+- `gate2_tables()` and `guide_workflow()` now expose and recommend the GADGET/PINT artifacts when they are available.
+- Gate 0A now derives conservative non-use, prohibited-interpretation, and decision-policy wording from the declared claims and semantics, while Gate 0B derives pipeline-level missingness and scoring notes from the analyzed task and only requires reliability or comparability evidence when the measurement type makes those claims material.
+
 # mlr3autoiml 0.0.6
 
 ## New features
