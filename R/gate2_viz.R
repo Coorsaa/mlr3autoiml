@@ -7,7 +7,8 @@
 #'
 #' Gate 2 assesses whether global effect summaries are likely to be misleading
 #' under feature dependence and/or heterogeneity. It computes global effect
-#' curves (PDP + ICE and ALE), lightweight interaction diagnostics, and optional off-manifold support screening.
+#' curves (PDP + ICE and ALE), lightweight interaction diagnostics, optional GADGET-style
+#' regionalization, optional GADGET-PINT screening, and off-manifold support screening.
 #'
 #' The returned object is intended for programmatic reporting (tables); plotting
 #' is performed via [AutoIML] `$plot(type = ...)`.
@@ -25,6 +26,10 @@
 #' * `max_cor_pair`: Most correlated numeric feature pair (proxy for dependence).
 #' * `ice_spread_top`: Top ICE spread features (heterogeneity proxy).
 #' * `hstats_top`: Top interaction diagnostics (Friedman--Popescu H).
+#' * `pint`: Optional GADGET-PINT permutation interaction screen.
+#' * `gadget_regions`: Joint GADGET region table.
+#' * `gadget_splits`: GADGET split rules and split gains.
+#' * `gadget_feature_metrics`: Feature-wise GADGET heterogeneity reduction.
 #' * `support_check_flagged`: Off-manifold support flags for PDP grids (if computed).
 #'
 #' @export
@@ -43,26 +48,51 @@ gate2_tables = function(x, top_n = 10L) {
   rec = a$recommendation
   rec_dt = NULL
   if (is.list(rec) && length(rec) > 0L) {
-    rec_dt = data.table::as.data.table(rec)
+    rec_flat = lapply(rec, function(z) {
+      if (is.null(z) || length(z) == 0L) {
+        return(NA_character_)
+      }
+      if (length(z) > 1L) {
+        return(paste(as.character(z), collapse = ", "))
+      }
+      z
+    })
+    rec_dt = data.table::as.data.table(rec_flat)
   }
 
   ice_spread_top = NULL
   if (!is.null(a$ice_spread) && nrow(a$ice_spread) > 0L) {
-    ice_spread_top = a$ice_spread[order(-ice_sd_mean)][seq_len(min(top_n, .N))]
+    dt = a$ice_spread[order(-ice_sd_mean)]
+    ice_spread_top = dt[seq_len(min(top_n, nrow(dt)))]
   }
 
   hstats_top = NULL
   if (!is.null(a$hstats) && nrow(a$hstats) > 0L) {
-    hstats_top = a$hstats[is.finite(hstat)][order(-hstat)][seq_len(min(top_n, .N))]
+    dt = a$hstats[is.finite(hstat)][order(-hstat)]
+    hstats_top = dt[seq_len(min(top_n, nrow(dt)))]
+  }
+
+  pint_top = NULL
+  if (!is.null(a$pint) && nrow(a$pint) > 0L) {
+    dt = a$pint[order(-observed_risk)]
+    pint_top = dt[seq_len(min(top_n, nrow(dt)))]
+  }
+
+  gadget_feature_metrics = NULL
+  if (!is.null(a$gadget_feature_metrics) && nrow(a$gadget_feature_metrics) > 0L) {
+    dt = a$gadget_feature_metrics[order(-heterogeneity_reduction)]
+    gadget_feature_metrics = dt[seq_len(min(top_n, nrow(dt)))]
   }
 
   support_check_flagged = NULL
   if (!is.null(a$support_check) && nrow(a$support_check) > 0L) {
-    dt = a$support_check[isTRUE(flag_off_support) & is.finite(ratio_to_baseline)]
+    dt = a$support_check[flag_off_support %in% TRUE & is.finite(ratio_to_baseline)]
     if (nrow(dt) > 0L) {
-      support_check_flagged = dt[order(-ratio_to_baseline)][seq_len(min(top_n, .N))]
+      dt = dt[order(-ratio_to_baseline)]
+      support_check_flagged = dt[seq_len(min(top_n, nrow(dt)))]
     } else {
-      support_check_flagged = a$support_check[order(-ratio_to_baseline)][seq_len(min(top_n, .N))]
+      dt = a$support_check[order(-ratio_to_baseline)]
+      support_check_flagged = dt[seq_len(min(top_n, nrow(dt)))]
     }
   }
 
@@ -72,6 +102,10 @@ gate2_tables = function(x, top_n = 10L) {
     max_cor_pair = a$max_cor_pair,
     ice_spread_top = ice_spread_top,
     hstats_top = hstats_top,
+    pint = pint_top,
+    gadget_regions = a$gadget_regions,
+    gadget_splits = a$gadget_splits,
+    gadget_feature_metrics = gadget_feature_metrics,
     support_check_flagged = support_check_flagged
   )
 }

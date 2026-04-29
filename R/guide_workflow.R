@@ -205,6 +205,17 @@ guide_workflow = function(x, max_actions = 6L) {
   reader_questions = .autoiml_reader_questions(res, actions = actions)
 
   rec_plots = c("overview", "g2_effect", "g2_hstats", "g6_performance")
+  g2_artifacts = if (!is.null(g2)) g2$artifacts %??% list() else list()
+  if (!is.null(g2_artifacts$ale2d) && length(g2_artifacts$ale2d) > 0L) {
+    rec_plots = c(rec_plots, "g2_ale_2d")
+  }
+  if (isTRUE(.autoiml_dt_scalar(g2_metrics, "interaction_flag", FALSE)) &&
+    !is.null(g2_artifacts$gadget_regions) && nrow(g2_artifacts$gadget_regions) > 0L) {
+    rec_plots = c(rec_plots, "g2_gadget", "g2_gadget_tree")
+  }
+  if (!is.null(g2_artifacts$pint) && nrow(g2_artifacts$pint) > 0L) {
+    rec_plots = c(rec_plots, "g2_pint")
+  }
   if (!is.null(statuses[["G6"]]) && statuses[["G6"]] != "skip") {
     rec_plots = c(rec_plots, "g6_summary")
   }

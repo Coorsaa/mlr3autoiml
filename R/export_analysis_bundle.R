@@ -24,9 +24,13 @@ save_analysis_table = function(dt, base_path, caption = NULL, label = NULL,
   list_cols = names(dt2)[vapply(dt2, is.list, logical(1L))]
   for (lc in list_cols) {
     dt2[[lc]] = vapply(dt2[[lc]], function(x) {
-      if (is.null(x)) return(NA_character_)
+      if (is.null(x)) {
+        return(NA_character_)
+      }
       x_chr = as.character(x)
-      if (length(x_chr) == 0L) return(NA_character_)
+      if (length(x_chr) == 0L) {
+        return(NA_character_)
+      }
       paste(x_chr, collapse = " | ")
     }, character(1L))
   }
@@ -123,15 +127,18 @@ save_analysis_plot = function(p, base_path, width = 7, height = 4.5, title = NUL
 #'   each element is forwarded to [save_analysis_table()].
 #' @param extra_figures (`list`) Named list of `list(p = ..., path = ..., ...)`;
 #'   each element is forwarded to [save_analysis_plot()].
+#' @param exclude_plot_types (`character()`) Standard `auto$plot()` types to
+#'   skip when exporting the default figure set.
 #' @param fig_width,fig_height (`numeric(1)`) Default figure dimensions in inches.
 #' @return Invisibly, a named list of all paths written.
 #' @export
 export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
-  extra_tables = list(), extra_figures = list(),
+  extra_tables = list(), extra_figures = list(), exclude_plot_types = character(),
   fig_width = 10, fig_height = 6) {
   checkmate::assert_class(auto, "AutoIML")
   checkmate::assert_string(dir, min.chars = 1L)
   checkmate::assert_string(prefix, min.chars = 1L)
+  checkmate::assert_character(exclude_plot_types, any.missing = FALSE, null.ok = FALSE)
 
   res = auto$result
   if (is.null(res)) {
@@ -139,9 +146,9 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
   }
 
   bundle_dir = file.path(dir, "audit_bundle")
-  tab_dir    = file.path(dir, "tables")
-  fig_dir    = file.path(dir, "figures")
-  obj_dir    = file.path(dir, "objects")
+  tab_dir = file.path(dir, "tables")
+  fig_dir = file.path(dir, "figures")
+  obj_dir = file.path(dir, "objects")
 
   for (d in c(bundle_dir, tab_dir, fig_dir, obj_dir)) {
     dir.create(d, recursive = TRUE, showWarnings = FALSE)
@@ -159,10 +166,27 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
 
   # ---- Helper ---------------------------------------------------------------
   .save_tbl = function(dt, name) {
-    if (is.null(dt)) return(NULL)
+    if (is.null(dt)) {
+      return(NULL)
+    }
     p = file.path(tab_dir, paste0(prefix, "_", name))
     save_analysis_table(dt, p)
     p
+  }
+
+  .flatten_list_row = function(x) {
+    if (!is.list(x) || length(x) == 0L) {
+      return(NULL)
+    }
+    data.table::as.data.table(lapply(x, function(z) {
+      if (is.null(z) || length(z) == 0L) {
+        return(NA_character_)
+      }
+      if (length(z) > 1L) {
+        return(paste(as.character(z), collapse = ", "))
+      }
+      z
+    }))
   }
 
   # ---- G1: CV performance metrics ------------------------------------------
@@ -182,10 +206,22 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
       paths$g2_hstats = .save_tbl(hs, "g2_hstats_pairs")
     }
     paths$g2_recommendation = .save_tbl(
-      data.table::as.data.table(g2$artifacts$recommendation), "g2_recommendation"
+      .flatten_list_row(g2$artifacts$recommendation), "g2_recommendation"
+    )
+    paths$g2_pint = .save_tbl(
+      g2$artifacts$pint, "g2_pint_interaction_screen"
+    )
+    paths$g2_gadget_regions = .save_tbl(
+      g2$artifacts$gadget_regions, "g2_gadget_regions"
+    )
+    paths$g2_gadget_splits = .save_tbl(
+      g2$artifacts$gadget_splits, "g2_gadget_splits"
+    )
+    paths$g2_gadget_feature_metrics = .save_tbl(
+      g2$artifacts$gadget_feature_metrics, "g2_gadget_feature_metrics"
     )
     paths$g2_support = .save_tbl(
-      data.table::as.data.table(g2$artifacts$support_check), "g2_support_check"
+      g2$artifacts$support_check, "g2_support_check"
     )
   }
 
@@ -264,32 +300,46 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
   }
 
   # ---- Plots: all standard auto$plot() types --------------------------------
+  exclude_plot_types = unique(as.character(exclude_plot_types))
+
   .save_plt = function(type, name, w = fig_width, h = fig_height, ...) {
+    if (type %in% exclude_plot_types) {
+      base = file.path(fig_dir, paste0(prefix, "_", name))
+      unlink(c(paste0(base, ".pdf"), paste0(base, ".png")), force = TRUE)
+      return(NULL)
+    }
     p = tryCatch(auto$plot(type, ...), error = function(e) NULL)
-    if (is.null(p)) return(NULL)
+    if (is.null(p)) {
+      return(NULL)
+    }
     path = file.path(fig_dir, paste0(prefix, "_", name))
     save_analysis_plot(p, path, width = w, height = h)
     path
   }
 
-  paths$fig_overview    = .save_plt("overview",   "fig_overview",   w = 13, h = 16)
-  paths$fig_gate_strip  = .save_plt("gate_strip", "fig_gate_strip", w = 10, h = 1.5)
-  paths$fig_g1_scores   = .save_plt("g1_scores",  "fig_g1_scores",  w = 8,  h = 4)
-  paths$fig_g2_hstats   = .save_plt("g2_hstats",  "fig_g2_hstats",  w = 8,  h = 5)
-  paths$fig_g2_ale2d    = .save_plt("g2_ale_2d",  "fig_g2_ale2d",   w = 7,  h = 5)
-  paths$fig_g3_cal      = .save_plt("g3_calibration",    "fig_g3_calibration",    w = 6, h = 5)
-  paths$fig_g3_dca      = .save_plt("g3_dca",            "fig_g3_dca",            w = 8, h = 5)
-  paths$fig_g5_stab     = .save_plt("g5_stability",      "fig_g5_stability",      w = 8, h = 6)
-  paths$fig_g6_heatmap  = .save_plt("g6_rank_heatmap",   "fig_g6_rank_heatmap",   w = 8, h = 5)
-  paths$fig_g6_perf     = .save_plt("g6_performance",    "fig_g6_performance",    w = 7, h = 5)
-  paths$fig_g6_mult     = .save_plt("g6_pred_multiplicity", "fig_g6_pred_multiplicity", w = 7, h = 5)
-  paths$fig_g6_loco     = .save_plt("g6_loco",           "fig_g6_loco",           w = 11, h = 5)
-  paths$fig_g7a         = .save_plt("g7a_subgroups",     "fig_g7a_subgroups",     w = 11, h = 5)
+  paths$fig_overview = .save_plt("overview", "fig_overview", w = 13, h = 16)
+  paths$fig_gate_strip = .save_plt("gate_strip", "fig_gate_strip", w = 10, h = 1.5)
+  paths$fig_g1_scores = .save_plt("g1_scores", "fig_g1_scores", w = 8, h = 4)
+  paths$fig_g2_hstats = .save_plt("g2_hstats", "fig_g2_hstats", w = 8, h = 5)
+  paths$fig_g2_ale2d = .save_plt("g2_ale_2d", "fig_g2_ale2d", w = 7, h = 5)
+  paths$fig_g2_gadget = .save_plt("g2_gadget", "fig_g2_gadget", w = 10, h = 7)
+  paths$fig_g2_gadget_tree = .save_plt("g2_gadget_tree", "fig_g2_gadget_tree", w = 9, h = 4.5)
+  paths$fig_g2_pint = .save_plt("g2_pint", "fig_g2_pint", w = 8, h = 5)
+  paths$fig_g3_cal = .save_plt("g3_calibration", "fig_g3_calibration", w = 6, h = 5)
+  paths$fig_g3_dca = .save_plt("g3_dca", "fig_g3_dca", w = 8, h = 5)
+  paths$fig_g5_stab = .save_plt("g5_stability", "fig_g5_stability", w = 8, h = 6)
+  paths$fig_g6_heatmap = .save_plt("g6_rank_heatmap", "fig_g6_rank_heatmap", w = 8, h = 5)
+  paths$fig_g6_perf = .save_plt("g6_performance", "fig_g6_performance", w = 7, h = 5)
+  paths$fig_g6_mult = .save_plt("g6_pred_multiplicity", "fig_g6_pred_multiplicity", w = 7, h = 5)
+  paths$fig_g6_loco = .save_plt("g6_loco", "fig_g6_loco", w = 11, h = 5)
+  paths$fig_g7a = .save_plt("g7a_subgroups", "fig_g7a_subgroups", w = 11, h = 5)
 
   # Top-feature ALE/effect plot (auto-selects feature from G2 recommendation)
   top_feat = tryCatch({
     rec = res$gate_results$G2$artifacts$recommendation
-    as.character((rec$top_features %??% character())[1L])
+    tf = rec$top_features %??% character()
+    if (is.list(tf)) tf = unlist(tf, use.names = FALSE)
+    as.character(tf[1L])
   }, error = function(e) NULL)
   if (!is.null(top_feat) && nzchar(top_feat)) {
     paths$fig_g2_effect = .save_plt("g2_effect", "fig_g2_effect",
