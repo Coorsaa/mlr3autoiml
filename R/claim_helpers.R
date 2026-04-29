@@ -3,9 +3,10 @@
 #' @description
 #' Constructs a named list suitable for assignment to `auto$ctx$claim`. The
 #' four operative fields — `purpose`, `semantics`, `stakes`, `claims` — are
-#' required and validated. All narrative documentation fields are optional and
-#' default to `NULL`; they are stored verbatim in the G0A artifact but never
-#' branch gate logic.
+#' required and validated. All narrative documentation fields are optional.
+#' When they are omitted, Gate 0A derives conservative defaults from the
+#' declared purpose, semantics, and decision specification, and users can
+#' override those defaults whenever the analysis warrants narrower wording.
 #'
 #' @param purpose (`character(1)`) Analysis purpose. One of `"exploratory"`,
 #'   `"global_insight"`, `"decision_support"`, `"deployment"`.
@@ -38,35 +39,32 @@
 #' @return A named list ready to assign to `auto$ctx$claim`.
 #' @export
 #' @examples
-#' card <- make_claim_card(
-#'   purpose  = "decision_support",
+#' card = make_claim_card(
+#'   purpose = "decision_support",
 #'   semantics = "within_support",
-#'   stakes   = "medium",
-#'   claims   = list(global = TRUE, local = TRUE, decision = TRUE),
+#'   stakes = "medium",
+#'   claims = list(global = TRUE, local = FALSE, decision = TRUE),
 #'   decision_spec = list(
 #'     thresholds = seq(0.05, 0.25, by = 0.05),
 #'     utility    = list(tp = 1, fp = 0, fn = 0, tn = 0)
-#'   ),
-#'   target_population = "Adults aged 18+",
-#'   intended_use = "Prioritise follow-up contacts.",
-#'   prohibited_interpretations = "Causal claims; individual diagnosis."
+#'   )
 #' )
 make_claim_card = function(
-    purpose,
-    semantics,
-    stakes,
-    claims,
-    decision_spec                = NULL,
-    audience                     = NULL,
-    target_population            = NULL,
-    setting                      = NULL,
-    time_horizon                 = NULL,
-    transport_boundary           = NULL,
-    intended_use                 = NULL,
-    intended_non_use             = NULL,
-    prohibited_interpretations   = NULL,
-    decision_policy_rationale    = NULL,
-    human_factors_evidence       = NULL) {
+  purpose,
+  semantics,
+  stakes,
+  claims,
+  decision_spec = NULL,
+  audience = NULL,
+  target_population = NULL,
+  setting = NULL,
+  time_horizon = NULL,
+  transport_boundary = NULL,
+  intended_use = NULL,
+  intended_non_use = NULL,
+  prohibited_interpretations = NULL,
+  decision_policy_rationale = NULL,
+  human_factors_evidence = NULL) {
 
   checkmate::assert_choice(purpose,
     c("exploratory", "global_insight", "decision_support", "deployment"))
@@ -107,8 +105,11 @@ make_claim_card = function(
 #'
 #' @description
 #' Constructs a named list suitable for assignment to `auto$ctx$measurement`.
-#' `level` is required and operative (affects G0B checks and narration scope).
-#' All other fields are narrative documentation stored in the G0B artifact.
+#' `level` is the main operative field.
+#' Gate 0B normalizes legacy aliases such as `"composite"` and `"latent"`,
+#' infers `"plausible_values"` when `ctx$plausible_values$pv_tasks` is present,
+#' and derives conservative pipeline notes when `missingness_plan` or
+#' `scoring_pipeline` are omitted.
 #'
 #' @param level (`character(1)`) Measurement level. One of `"item"`,
 #'   `"scale"`, `"factor_score"`, `"plausible_values"`.
@@ -124,19 +125,17 @@ make_claim_card = function(
 #' @return A named list ready to assign to `auto$ctx$measurement`.
 #' @export
 #' @examples
-#' card <- make_measurement_card(
-#'   level            = "scale",
-#'   missingness_plan = "Median impute numerics, mode impute categoricals.",
-#'   reliability      = list(method = "Cronbach alpha", note = "alpha = 0.87"),
-#'   invariance       = list(status = "partial", note = "Loadings invariant, intercepts not tested.")
+#' card = make_measurement_card(
+#'   level = "item"
 #' )
 make_measurement_card = function(
-    level,
-    missingness_plan = NULL,
-    reliability      = NULL,
-    invariance       = NULL,
-    scoring_pipeline = NULL) {
+  level,
+  missingness_plan = NULL,
+  reliability = NULL,
+  invariance = NULL,
+  scoring_pipeline = NULL) {
 
+  level = .autoiml_normalize_measurement_level(level, default = NA_character_)
   checkmate::assert_choice(level,
     c("item", "scale", "factor_score", "plausible_values"))
 

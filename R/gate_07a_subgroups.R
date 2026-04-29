@@ -76,6 +76,20 @@ Gate7aSubgroups = R6::R6Class(
       }
 
       meas = .autoiml_as_list(ctx$measurement)
+      pv_cfg = .autoiml_as_list(ctx$plausible_values)
+      has_pv_tasks = {
+        pv_tasks = pv_cfg$pv_tasks %??% list()
+        if (inherits(pv_tasks, "Task")) {
+          TRUE
+        } else {
+          is.list(pv_tasks) && length(pv_tasks) > 0L
+        }
+      }
+      measurement_level = .autoiml_normalize_measurement_level(
+        meas$level,
+        default = if (isTRUE(has_pv_tasks)) "plausible_values" else "unknown"
+      )
+      measurement_invariance_required = measurement_level %in% c("scale", "factor_score", "plausible_values")
       measurement_invariance_present = isTRUE(has_content(meas$invariance))
 
       # subgroup variables: explicit declaration preferred
@@ -106,7 +120,7 @@ Gate7aSubgroups = R6::R6Class(
         ))
       }
 
-      if (isTRUE(high_stakes) && !isTRUE(measurement_invariance_present)) {
+      if (isTRUE(high_stakes) && isTRUE(measurement_invariance_required) && !isTRUE(measurement_invariance_present)) {
         return(GateResult$new(
           gate_id = self$id,
           gate_name = self$name,
@@ -116,6 +130,8 @@ Gate7aSubgroups = R6::R6Class(
           metrics = data.table::data.table(
             required = TRUE,
             provided = FALSE,
+            measurement_level = measurement_level,
+            measurement_invariance_required = TRUE,
             measurement_invariance_present = FALSE,
             stakes = stakes,
             purpose = purpose
@@ -147,7 +163,8 @@ Gate7aSubgroups = R6::R6Class(
           levs = unique(gg)
           mlr3misc::map_dtr(levs, function(lv) {
             idx = which(gg == lv)
-            yi = y[idx]; yhati = yhat[idx]
+            yi = y[idx]
+            yhati = yhat[idx]
             ss_res = sum((yi - yhati)^2)
             ss_tot = sum((yi - mean(yi))^2)
             data.table::data.table(

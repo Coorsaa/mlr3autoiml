@@ -153,6 +153,97 @@ NULL
   default
 }
 
+
+.autoiml_normalize_measurement_level = function(x, default = "unknown") {
+  if (is.null(x) || length(x) < 1L) {
+    return(default)
+  }
+
+  s_raw = as.character(x)[1L]
+  if (is.na(s_raw) || !nzchar(s_raw)) {
+    return(default)
+  }
+
+  s = tolower(gsub("[[:space:]-]+", "_", s_raw))
+
+  if (s %in% c("item", "scale", "factor_score", "plausible_values")) {
+    return(s)
+  }
+  if (s %in% c("composite", "scale_score", "scale_scores", "sum_score")) {
+    return("scale")
+  }
+  if (s %in% c("latent", "latent_score", "latent_scores", "factor", "factor_scores")) {
+    return("factor_score")
+  }
+  if (s %in% c("pv", "plausible_value")) {
+    return("plausible_values")
+  }
+
+  default
+}
+
+
+.autoiml_default_claim_boundaries = function(purpose, semantics, claims, decision_spec = list()) {
+  claims = .autoiml_as_list(claims)
+  decision_spec = .autoiml_as_list(decision_spec)
+
+  intended_use = switch(
+    purpose,
+    "exploratory" = "Exploratory description of fitted-model behavior under the declared semantics.",
+    "global_insight" = "Describe global patterns of fitted-model behavior under the declared semantics.",
+    "decision_support" = "Support reviewed decisions within the evaluated threshold range and validation setting.",
+    "deployment" = "Support monitored use within the validated setting and declared semantics."
+  )
+
+  intended_non_use = switch(
+    purpose,
+    "exploratory" = "Not for decision support, deployment, or intervention claims.",
+    "global_insight" = "Not for unsupported person-level guidance, deployment, or intervention claims.",
+    "decision_support" = "Not for unsupported automation, intervention claims, or use outside the evaluated decision range and validation setting.",
+    "deployment" = "Not for unsupported automation, intervention claims, or transport beyond the validated setting."
+  )
+
+  prohibited_interpretations = switch(
+    semantics,
+    "within_support" = "Interpret outputs as descriptive model behavior within empirically supported regions, not as causal effects or interventions.",
+    "marginal_model_query" = "Interpret outputs as model-based what-if queries about the fitted model, not as observational association or causal effect.",
+    "causal_recourse" = "Causal or recourse interpretations require external identification assumptions and are out of scope for AutoIML.",
+    "Interpret outputs under the declared semantics only."
+  )
+
+  decision_policy_rationale = NULL
+  if (isTRUE(claims$decision)) {
+    thr = suppressWarnings(as.numeric(decision_spec$thresholds %??% numeric()))
+    thr = thr[is.finite(thr) & thr > 0 & thr < 1]
+    has_utility = !is.null(decision_spec$utility) || !is.null(decision_spec$costs)
+
+    if (length(thr) >= 2L && isTRUE(has_utility)) {
+      decision_policy_rationale = sprintf(
+        "Decision support is evaluated over thresholds %.2f to %.2f with the supplied utility or cost framing.",
+        min(thr),
+        max(thr)
+      )
+    } else if (length(thr) >= 2L) {
+      decision_policy_rationale = sprintf(
+        "Decision support is evaluated over thresholds %.2f to %.2f. Without an explicit utility or cost framing, Gate 3 should be read as threshold-sensitivity evidence rather than a justified policy.",
+        min(thr),
+        max(thr)
+      )
+    } else if (isTRUE(has_utility)) {
+      decision_policy_rationale = "Decision support uses the declared utility or cost framing together with AutoIML's evaluated threshold sweep. Supply explicit thresholds to justify a narrower policy."
+    } else {
+      decision_policy_rationale = "Decision support uses AutoIML's evaluated threshold sweep. Supply explicit thresholds and utility or cost assumptions to justify a narrower policy."
+    }
+  }
+
+  list(
+    intended_use = intended_use,
+    intended_non_use = intended_non_use,
+    prohibited_interpretations = prohibited_interpretations,
+    decision_policy_rationale = decision_policy_rationale
+  )
+}
+
 .autoiml_clamp01 = function(p, eps = 1e-15) pmin(pmax(p, eps), 1 - eps)
 
 .autoiml_logit = function(p) {
@@ -449,7 +540,9 @@ NULL
     "support_check",
     "regionalize", "regional_method",
     "gadget_max_depth", "gadget_min_bucket", "gadget_gamma",
-    "gadget_top_k"
+    "gadget_top_k", "gadget_n_thresholds", "gadget_local_keep_n",
+    "pint_enabled", "pint_permutations", "pint_alpha",
+    "pint_max_features", "pint_grid_n", "pint_grid_type"
   )
 
   allowed_calibration = c("thresholds", "bins")

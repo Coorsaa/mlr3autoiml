@@ -83,15 +83,23 @@ Gate0BMeasurement = R6::R6Class(
       }
 
       # user-provided metadata
-      level = m$level %??% "unknown"
-      level = tolower(as.character(level)[1L])
-      level = gsub("[[:space:]-]", "_", level)
+      pv_cfg = .autoiml_as_list(ctx$plausible_values)
+      has_pv_tasks = {
+        pv_tasks = pv_cfg$pv_tasks %??% list()
+        if (inherits(pv_tasks, "Task")) {
+          TRUE
+        } else {
+          is.list(pv_tasks) && length(pv_tasks) > 0L
+        }
+      }
+
+      level_user = .autoiml_normalize_measurement_level(m$level, default = NA_character_)
+      level_source = if (!is.na(level_user)) "user" else if (isTRUE(has_pv_tasks)) "analysis" else "missing"
+      level = if (!is.na(level_user)) level_user else if (isTRUE(has_pv_tasks)) "plausible_values" else "unknown"
 
       has_reliability = isTRUE(has_content(m$reliability))
       has_invariance = isTRUE(has_content(m$invariance))
       has_construct_map = isTRUE(has_content(m$construct_map))
-      has_missingness_plan = isTRUE(has_content(m$missingness_plan))
-      has_scoring_pipeline = isTRUE(has_content(m$scoring_pipeline))
 
       # automatic missingness summary
       feats = task$feature_names
@@ -124,22 +132,76 @@ Gate0BMeasurement = R6::R6Class(
       status = "pass"
       msgs = character()
       critical_missing = character()
+      user_has_missingness_plan = isTRUE(has_content(m$missingness_plan))
+      user_has_scoring_pipeline = isTRUE(has_content(m$scoring_pipeline))
 
-      if (!level %in% c("item", "scale", "composite", "latent", "unknown")) {
-        level = "unknown"
+      if (identical(level_source, "analysis")) {
+        msgs = c(msgs, "Inferred measurement level='plausible_values' from ctx$plausible_values$pv_tasks.")
       }
+
       if (identical(level, "unknown")) {
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "measurement_level")
-          msgs = c(msgs, "Measurement level is not specified (item/scale/composite/latent); this is required for high-stakes interpretation claims.")
+          msgs = c(msgs, "Measurement level is not specified (item/scale/factor_score/plausible_values); this is required for high-stakes interpretation claims.")
         } else if (purpose != "exploratory") {
           status = "warn"
-          msgs = c(msgs, "Measurement level not specified (item/scale/composite/latent). In psychological applications, interpretation and transportability depend on construct definition and measurement quality.")
+          msgs = c(msgs, "Measurement level not specified (item/scale/factor_score/plausible_values). In psychological applications, interpretation and transportability depend on construct definition and measurement quality.")
         }
       }
 
-      if (!isTRUE(has_reliability)) {
+      reliability_required = level %in% c("scale", "factor_score")
+      invariance_required = isTRUE(has_groups) && level %in% c("scale", "factor_score", "plausible_values")
+
+      if (!isTRUE(user_has_missingness_plan)) {
+        m$missingness_plan = if (isTRUE(is.finite(miss_max) && miss_max == 0)) {
+          "No feature missingness was detected in the analyzed task data."
+        } else if (is.finite(miss_max) && is.finite(miss_mean)) {
+          sprintf(
+            "Feature missingness is present in the analyzed task data (max %.1f%%, mean %.1f%%). Interpret handling together with the fitted resampling pipeline used in Gate 1.",
+            100 * miss_max,
+            100 * miss_mean
+          )
+        } else {
+          "Read missingness handling from the analyzed task data and the fitted resampling pipeline used in Gate 1."
+        }
+      }
+
+      if (!isTRUE(user_has_scoring_pipeline)) {
+        m$scoring_pipeline = if (identical(level, "plausible_values") || isTRUE(has_pv_tasks)) {
+          "Outcome uncertainty is represented through the supplied plausible-value tasks, and Gate 1 pools predictive metrics across those tasks."
+        } else if (inherits(task, "TaskClassif")) {
+          "Use the observed task target and feature representation supplied to the fitted learner pipeline in Gate 1."
+        } else if (inherits(task, "TaskRegr")) {
+          "Use the observed numeric task target and feature representation supplied to the fitted learner pipeline in Gate 1."
+        } else {
+          "Use the task target and feature representation supplied to the fitted learner pipeline in Gate 1."
+        }
+      }
+
+      has_missingness_plan = isTRUE(has_content(m$missingness_plan))
+      has_scoring_pipeline = isTRUE(has_content(m$scoring_pipeline))
+      derived_fields = character()
+      if (level_source == "analysis") {
+        derived_fields = c(derived_fields, "level")
+      }
+      if (!isTRUE(user_has_missingness_plan)) {
+        derived_fields = c(derived_fields, "missingness_plan")
+      }
+      if (!isTRUE(user_has_scoring_pipeline)) {
+        derived_fields = c(derived_fields, "scoring_pipeline")
+      }
+      if (length(derived_fields) > 0L) {
+        msgs = c(
+          msgs,
+          sprintf(
+            "Derived %s from the analyzed task and fitted pipeline. Override ctx$measurement if you need a narrower measurement description.",
+            paste(unique(derived_fields), collapse = ", ")
+          )
+        )
+      }
+
+      if (isTRUE(reliability_required) && !isTRUE(has_reliability)) {
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "reliability")
@@ -150,29 +212,7 @@ Gate0BMeasurement = R6::R6Class(
         }
       }
 
-      if (!isTRUE(has_missingness_plan)) {
-        if (isTRUE(high_stakes)) {
-          status = "fail"
-          critical_missing = c(critical_missing, "missingness_plan")
-          msgs = c(msgs, "Missing ctx$measurement$missingness_plan; this is required for high-stakes use.")
-        } else if (purpose != "exploratory") {
-          if (identical(status, "pass")) status = "warn"
-          msgs = c(msgs, "Missing ctx$measurement$missingness_plan; document missingness assumptions and handling.")
-        }
-      }
-
-      if (!isTRUE(has_scoring_pipeline)) {
-        if (isTRUE(high_stakes)) {
-          status = "fail"
-          critical_missing = c(critical_missing, "scoring_pipeline")
-          msgs = c(msgs, "Missing ctx$measurement$scoring_pipeline; this is required for high-stakes use.")
-        } else if (purpose != "exploratory") {
-          if (identical(status, "pass")) status = "warn"
-          msgs = c(msgs, "Missing ctx$measurement$scoring_pipeline; document score construction and preprocessing pipeline.")
-        }
-      }
-
-      if (isTRUE(has_groups) && !isTRUE(has_invariance)) {
+      if (isTRUE(invariance_required) && !isTRUE(has_invariance)) {
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "invariance")
@@ -197,12 +237,15 @@ Gate0BMeasurement = R6::R6Class(
           ")."
         )
       } else {
-        summary = "Measurement readiness screened (requires user-supplied psychometric evidence; missingness summarized)."
+        summary = "Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived)."
       }
 
       metrics = data.table::data.table(
         measurement_level = level,
+        measurement_level_source = level_source,
+        reliability_required = isTRUE(reliability_required),
         has_reliability = isTRUE(has_reliability),
+        invariance_required = isTRUE(invariance_required),
         has_invariance = isTRUE(has_invariance),
         has_construct_map = isTRUE(has_construct_map),
         has_missingness_plan = isTRUE(has_missingness_plan),
@@ -227,6 +270,7 @@ Gate0BMeasurement = R6::R6Class(
           measurement = m,
           missingness = miss_tbl,
           group_vars = sensitive,
+          derived_fields = unique(derived_fields),
           critical_missing = unique(critical_missing)
         ),
         messages = msgs
