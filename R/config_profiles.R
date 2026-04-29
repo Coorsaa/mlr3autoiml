@@ -99,11 +99,23 @@ NULL
     regionalize = (profile != "fast"),
     gadget_max_depth = if (profile == "fast") 3L else 4L,
     gadget_min_bucket = max(25L, floor(sample_n / 8L)),
+    # Relative split-improvement threshold; 0 keeps the most sensitive GADGET tree.
     gadget_gamma = 0.00,
     gadget_top_k = 2L,
+    gadget_n_thresholds = if (profile == "fast") 5L else 7L,
+    gadget_local_keep_n = if (profile == "fast") min(sample_n, 60L) else min(sample_n, 150L),
 
-    ale_2d_bins      = if (profile == "fast") 8L  else 10L,
-    ale_2d_top_pairs = if (profile == "fast") 2L  else 3L,
+    # Optional GADGET-PINT permutation screen. Disabled by default because it
+    # refits the learner repeatedly; enable for final analyses when runtime allows.
+    pint_enabled = FALSE,
+    pint_permutations = if (profile == "fast") 0L else 19L,
+    pint_alpha = 0.05,
+    pint_max_features = min(hstat_max_features, max_features),
+    pint_grid_n = if (profile == "fast") 8L else 10L,
+    pint_grid_type = "quantile",
+
+    ale_2d_bins = if (profile == "fast") 8L else 10L,
+    ale_2d_top_pairs = if (profile == "fast") 2L else 3L,
 
     # Optional: off-manifold support screening for marginal model query semantics (Gate 2)
     support_check = list(

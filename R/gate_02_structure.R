@@ -59,6 +59,8 @@ Gate2Structure = R6::R6Class(
           "grid_n", "grid_type", "ice_center", "ale_bins",
           "cor_threshold", "hstat_max_features", "hstat_grid_n", "hstat_threshold",
           "regionalize", "regional_method", "gadget_max_depth", "gadget_min_bucket", "gadget_gamma", "gadget_top_k",
+          "gadget_n_thresholds", "gadget_local_keep_n",
+          "pint_enabled", "pint_permutations", "pint_alpha", "pint_max_features", "pint_grid_n", "pint_grid_type",
           "ale_2d_bins", "ale_2d_top_pairs",
           "support_check", "support_required_for_marginal"
         ),
@@ -97,7 +99,7 @@ Gate2Structure = R6::R6Class(
       # --- dependence screen
       cor_threshold = as.numeric(cfg$cor_threshold %??% 0.70)
 
-      ale_2d_bins      = as.integer(cfg$ale_2d_bins      %??% 8L)
+      ale_2d_bins = as.integer(cfg$ale_2d_bins %??% 8L)
       ale_2d_top_pairs = as.integer(cfg$ale_2d_top_pairs %??% 3L)
 
       # --- interaction screening
@@ -108,10 +110,21 @@ Gate2Structure = R6::R6Class(
       # --- regionalization (GADGET-style)
       regionalize = isTRUE(cfg$regionalize %??% FALSE)
       regional_method = as.character(cfg$regional_method %??% "auto")
+      regional_method_used = NA_character_
       gadget_max_depth = as.integer(cfg$gadget_max_depth %??% 3L)
       gadget_min_bucket = as.integer(cfg$gadget_min_bucket %??% 30L)
       gadget_gamma = as.numeric(cfg$gadget_gamma %??% 0.00)
       gadget_top_k = as.integer(cfg$gadget_top_k %??% 2L)
+      gadget_n_thresholds = as.integer(cfg$gadget_n_thresholds %??% 7L)
+      gadget_local_keep_n = as.integer(cfg$gadget_local_keep_n %??% min(150L, sample_n))
+
+      # --- optional GADGET-PINT interaction screen
+      pint_enabled = isTRUE(cfg$pint_enabled %??% FALSE)
+      pint_permutations = as.integer(cfg$pint_permutations %??% 19L)
+      pint_alpha = as.numeric(cfg$pint_alpha %??% 0.05)
+      pint_max_features = as.integer(cfg$pint_max_features %??% hstat_max_features)
+      pint_grid_n = as.integer(cfg$pint_grid_n %??% min(10L, pd_grid_n))
+      pint_grid_type = as.character(cfg$pint_grid_type %??% "quantile")
 
       set.seed(.autoiml_gate_seed(ctx, self$id))
 
@@ -165,6 +178,8 @@ Gate2Structure = R6::R6Class(
           class_labels = names(tab)[seq_len(min(3L, length(tab)))]
         }
       }
+      cls_main = if (is.null(class_labels)) NULL else as.character(class_labels[[1L]])
+      top_feats = character(0)
 
       # interaction screening helper (Friedman-Popescu H-statistic)
       # Uses batched predictions for efficiency instead of nested loops
@@ -234,12 +249,16 @@ Gate2Structure = R6::R6Class(
       }
 
       # --- main computations ------------------------------------------------
-      pd_curves  = NULL
+      pd_curves = NULL
       ice_curves = NULL
       ice_spread = NULL
       ale_curves = NULL
-      hstats     = NULL
-      gadget     = list()
+      hstats = NULL
+      pint = NULL
+      pint_null = NULL
+      pint_messages = character()
+      gadget = list()
+      gadget_multi = NULL
       ale2d_list = list()
 
       pred_mats = list()
@@ -259,13 +278,17 @@ Gate2Structure = R6::R6Class(
               feature = f,
               grid_n = pd_grid_n,
               grid_type = pd_grid_type,
-              class_label = cls,
+              class_labels = cls,
               ice_keep_n = ice_keep_n,
               ice_center = ice_center
             )
             if (!is.null(pdice)) {
               key = paste0(if (is.null(cls)) "__regr__" else as.character(cls), "::", f)
-              pred_mats[[key]] = pdice$pred_mat
+              pred_key = if (is.null(cls)) "response" else as.character(cls)
+              pred_mats[[key]] = pdice$pred_mats_centered[[pred_key]]
+              if (is.null(pred_mats[[key]]) && length(pdice$pred_mats_centered) > 0L) {
+                pred_mats[[key]] = pdice$pred_mats_centered[[1L]]
+              }
               grids[[key]] = pdice$grid
 
               pd_curves = data.table::rbindlist(list(pd_curves, pdice$pd), fill = TRUE)
@@ -286,7 +309,7 @@ Gate2Structure = R6::R6Class(
               X = X,
               feature = f,
               bins = ale_bins,
-              class_label = cls
+              class_labels = cls
             )
             if (!is.null(ale_dt) && nrow(ale_dt) > 0L) {
               ale_curves = data.table::rbindlist(list(ale_curves, ale_dt), fill = TRUE)
@@ -295,8 +318,7 @@ Gate2Structure = R6::R6Class(
         }
         # Interaction screening (H-statistic) on a smaller feature subset
         if (!is.null(ice_spread) && nrow(ice_spread) > 0L) {
-          # choose a primary class for screening (binary: positive; multiclass: most frequent)
-          cls_main = if (is.null(class_labels)) NULL else as.character(class_labels[[1L]])
+          # choose features with the largest centered-ICE spread for screening
           tmp = ice_spread
           if (!is.null(cls_main)) {
             tmp = ice_spread[class_label == cls_main]
@@ -307,7 +329,6 @@ Gate2Structure = R6::R6Class(
           top_feats = top_feats[seq_len(min(length(top_feats), hstat_max_features))]
         } else {
           top_feats = eval_feats[seq_len(min(length(eval_feats), hstat_max_features))]
-          cls_main = if (is.null(class_labels)) NULL else as.character(class_labels[[1L]])
         }
 
         if (length(top_feats) >= 2L) {
@@ -341,56 +362,101 @@ Gate2Structure = R6::R6Class(
           hstats = data.table::rbindlist(hlist, fill = TRUE)
         }
 
-        # Optional: GADGET-style regionalization if strong interaction signal
-        if (regionalize && !is.null(hstats) && nrow(hstats) > 0L) {
-          hs = hstats[is.finite(hstat)][order(-hstat)]
-          if (nrow(hs) > 0L && isTRUE(hs$hstat[1L] >= hstat_threshold)) {
-            cls_main = as.character(hs$class_label[1L])
-            f1 = hs$feature1[1L]
-            f2 = hs$feature2[1L]
+        # Optional: GADGET-PINT style permutation screen. Disabled by default because
+        # it refits the learner B times, but the artifacts are valuable for deciding
+        # whether heterogeneity is interaction-related rather than sampling noise.
+        if (isTRUE(pint_enabled) && length(top_feats) > 0L) {
+          pint_feats = unique(top_feats)
+          pint_feats = pint_feats[seq_len(min(length(pint_feats), pint_max_features))]
+          pint_out = tryCatch(
+            .autoiml_gadget_pint(
+              task = task,
+              model = model,
+              learner = ctx$learner,
+              X = X,
+              features = pint_feats,
+              class_label = cls_main,
+              permutations = pint_permutations,
+              alpha = pint_alpha,
+              grid_n = pint_grid_n,
+              grid_type = pint_grid_type,
+              ice_center = ice_center,
+              seed = .autoiml_gate_seed(ctx, paste0(self$id, "_PINT"))
+            ),
+            error = function(e) list(screen = NULL, null = NULL, messages = paste("PINT skipped:", conditionMessage(e)))
+          )
+          pint = pint_out$screen
+          pint_null = pint_out$null
+          pint_messages = unique(c(pint_messages, pint_out$messages))
+        }
 
-            # Determine which effect curves should be regionalized
-            rec_method = if (isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)) "ale" else "pdp"
-            regional_method_used = if (regional_method == "auto") rec_method else regional_method
+        # Optional: joint GADGET-style regionalization if interaction signal is material.
+        # The split objective is summed across the selected feature set S, rather than
+        # independently regionalizing one feature at a time.
+        if (regionalize) {
+          pint_focus = character(0)
+          if (!is.null(pint) && nrow(pint) > 0L && "pint_interaction" %in% names(pint)) {
+            pint_focus = pint[pint_interaction %in% TRUE][order(p_value, -observed_risk)]$feature
+            pint_focus = unique(pint_focus)
+          }
 
-            focus = unique(c(f1, f2))
+          hs = if (!is.null(hstats) && nrow(hstats) > 0L) hstats[is.finite(hstat)][order(-hstat)] else NULL
+          focus = character(0)
+          if (length(pint_focus) > 0L) {
+            focus = pint_focus
+          } else if (!is.null(hs) && nrow(hs) > 0L && isTRUE(hs$hstat[1L] >= hstat_threshold)) {
+            focus = unique(c(hs$feature1[1L], hs$feature2[1L]))
+          }
+
+          focus = intersect(unique(focus), eval_feats)
+          if (length(focus) > 0L) {
             focus = focus[seq_len(min(length(focus), gadget_top_k))]
 
+            rec_method = if (isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)) "ale" else "pdp"
+            regional_method_requested = if (regional_method == "auto") rec_method else regional_method
+            # This implementation follows GADGET's centered-local-effect objective.
+            # Exact ALE-GADGET would require regionwise local derivative/bin effects;
+            # keep the reporting label honest even when ALE is recommended elsewhere.
+            regional_method_used = "pdp_cice"
+            class_key = if (is.null(cls_main)) "__regr__" else as.character(cls_main)
+
+            pred_subset = list()
+            grid_subset = list()
             for (ff in focus) {
-              key = paste0(cls_main, "::", ff)
+              key = paste0(class_key, "::", ff)
               M = pred_mats[[key]]
               g = grids[[key]]
-              if (is.null(M) || is.null(g)) next
+              if (!is.null(M) && !is.null(g)) {
+                pred_subset[[ff]] = M
+                grid_subset[[ff]] = g
+              }
+            }
 
-              # GADGET uses centered ICE matrices to target *heterogeneous effects*
-              M_center = M # already centered according to ctx$structure$ice_center
-
-              gad = .autoiml_gadget_regionalize_feature(
+            if (length(pred_subset) > 0L) {
+              split_candidates = unique(c(focus, top_feats, eval_feats))
+              split_candidates = intersect(split_candidates, names(X))
+              gadget_multi = .autoiml_gadget_regionalize_multi(
                 X = X,
                 row_ids = rows,
-                feature = ff,
-                grid = as.numeric(g),
-                pred_mat = M_center,
-                split_candidates = setdiff(names(X), ff),
+                features = names(pred_subset),
+                grids = grid_subset,
+                pred_mats = pred_subset,
+                split_candidates = split_candidates,
                 max_depth = gadget_max_depth,
                 min_bucket = gadget_min_bucket,
-                gamma = gadget_gamma
+                gamma = gadget_gamma,
+                n_thresholds = gadget_n_thresholds,
+                local_keep_n = gadget_local_keep_n,
+                class_label = cls_main,
+                method = regional_method_used,
+                seed = .autoiml_gate_seed(ctx, paste0(self$id, "_GADGET"))
               )
 
-              if (!is.null(gad)) {
-                # annotate for downstream filtering / plotting
-                if (!is.null(gad$regions) && data.table::is.data.table(gad$regions)) {
-                  gad$regions[, class_label := cls_main]
-                  gad$regions[, method := regional_method_used]
+              if (!is.null(gadget_multi)) {
+                for (ff in names(pred_subset)) {
+                  view = .autoiml_gadget_feature_view(gadget_multi, ff)
+                  if (!is.null(view)) gadget[[ff]] = view
                 }
-                if (!is.null(gad$assignments) && data.table::is.data.table(gad$assignments)) {
-                  gad$assignments[, class_label := cls_main]
-                  gad$assignments[, method := regional_method_used]
-                }
-
-                gad$class_label = cls_main
-                gad$method = regional_method_used
-                gadget[[ff]] = gad
               }
             }
           }
@@ -525,6 +591,17 @@ Gate2Structure = R6::R6Class(
       if (!is.null(hstats) && nrow(hstats) > 0L) {
         hstats[, semantics_label := semantics]
       }
+      if (!is.null(pint) && nrow(pint) > 0L) {
+        pint[, semantics_label := semantics]
+      }
+      if (!is.null(gadget_multi) && !is.null(gadget_multi$regions) && nrow(gadget_multi$regions) > 0L) {
+        gadget_multi$regions[, semantics_label := semantics]
+        gadget_multi$curves[, semantics_label := semantics]
+        gadget_multi$assignments[, semantics_label := semantics]
+        if (!is.null(gadget_multi$splits) && nrow(gadget_multi$splits) > 0L) gadget_multi$splits[, semantics_label := semantics]
+        if (!is.null(gadget_multi$feature_metrics) && nrow(gadget_multi$feature_metrics) > 0L) gadget_multi$feature_metrics[, semantics_label := semantics]
+        if (!is.null(gadget_multi$total_metrics) && nrow(gadget_multi$total_metrics) > 0L) gadget_multi$total_metrics[, semantics_label := semantics]
+      }
       if (!is.null(support_dt) && nrow(support_dt) > 0L) {
         support_dt[, `:=`(
           semantics_label = semantics,
@@ -538,7 +615,20 @@ Gate2Structure = R6::R6Class(
       max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) max(ice_spread$ice_sd_mean, na.rm = TRUE) else NA_real_
       max_hstat = if (!is.null(hstats) && nrow(hstats) > 0L) max(hstats$hstat, na.rm = TRUE) else NA_real_
 
-      interaction_flag = isTRUE(is.finite(max_hstat) && max_hstat >= hstat_threshold)
+      pint_flag = if (!is.null(pint) && nrow(pint) > 0L && "pint_interaction" %in% names(pint)) {
+        isTRUE(any(pint$pint_interaction %in% TRUE, na.rm = TRUE))
+      } else {
+        FALSE
+      }
+      max_pint_observed_risk = if (!is.null(pint) && nrow(pint) > 0L) max(pint$observed_risk, na.rm = TRUE) else NA_real_
+      if (!is.finite(max_pint_observed_risk)) max_pint_observed_risk = NA_real_
+      gadget_r2_total = if (!is.null(gadget_multi) && !is.null(gadget_multi$total_metrics) && nrow(gadget_multi$total_metrics) > 0L) {
+        as.numeric(gadget_multi$total_metrics$heterogeneity_reduction[1L])
+      } else {
+        NA_real_
+      }
+
+      interaction_flag = isTRUE(is.finite(max_hstat) && max_hstat >= hstat_threshold) || isTRUE(pint_flag)
 
       # Recommendation depends on claim semantics.
       recommended_effect_method = if (identical(semantics, "within_support")) {
@@ -577,6 +667,14 @@ Gate2Structure = R6::R6Class(
         }
       }
 
+      regional_method_report = if (length(regional_method_used) == 1L && !is.na(regional_method_used)) {
+        regional_method_used
+      } else if (regional_method == "auto") {
+        recommended_effect_method
+      } else {
+        regional_method
+      }
+
       recommendation = list(
         semantics = semantics,
         recommended_effect_method = recommended_effect_method,
@@ -591,7 +689,17 @@ Gate2Structure = R6::R6Class(
         support_max_ratio = support_max_ratio,
         support_frac_flagged = support_frac_flagged,
         regionalize = regionalize,
-        regional_method_used = if (regional_method == "auto") recommended_effect_method else regional_method
+        regional_method_used = regional_method_report,
+        top_features = unique(top_feats),
+        pint_enabled = pint_enabled,
+        pint_available = !is.null(pint) && nrow(pint) > 0L,
+        pint_flag = pint_flag,
+        pint_alpha = pint_alpha,
+        pint_permutations = pint_permutations,
+        max_pint_observed_risk = max_pint_observed_risk,
+        gadget_available = !is.null(gadget_multi),
+        gadget_features = if (!is.null(gadget_multi)) gadget_multi$features else character(),
+        gadget_r2_total = gadget_r2_total
       )
 
       metrics = data.table::data.table(
@@ -603,6 +711,12 @@ Gate2Structure = R6::R6Class(
         max_ice_sd_mean = max_ice_sd,
         max_hstat = max_hstat,
         interaction_flag = interaction_flag,
+        pint_enabled = pint_enabled,
+        pint_available = !is.null(pint) && nrow(pint) > 0L,
+        pint_flag = pint_flag,
+        max_pint_observed_risk = max_pint_observed_risk,
+        gadget_available = !is.null(gadget_multi),
+        gadget_r2_total = gadget_r2_total,
         support_enabled = isTRUE(support_enabled),
         support_available = isTRUE(support_available),
         support_flag = isTRUE(support_flag),
@@ -612,9 +726,15 @@ Gate2Structure = R6::R6Class(
         sample_n = sample_n
       )
 
-      # Summarize all regionalization outputs (optional convenience table)
+      # Summarize all regionalization outputs (optional convenience tables)
       gadget_regions = NULL
-      if (!is.null(gadget) && length(gadget) > 0L) {
+      gadget_splits = NULL
+      gadget_feature_metrics = NULL
+      if (!is.null(gadget_multi)) {
+        gadget_regions = gadget_multi$regions
+        gadget_splits = gadget_multi$splits
+        gadget_feature_metrics = gadget_multi$feature_metrics
+      } else if (!is.null(gadget) && length(gadget) > 0L) {
         grlist = lapply(names(gadget), function(ff) {
           one = gadget[[ff]]
           if (is.null(one) || is.null(one$regions) || nrow(one$regions) == 0L) {
@@ -649,13 +769,20 @@ Gate2Structure = R6::R6Class(
           pd_curves = pd_curves,
           ale_curves = ale_curves,
           hstats = hstats,
-          ale2d  = ale2d_list,
+          pint = pint,
+          pint_null = pint_null,
+          ale2d = ale2d_list,
           gadget = gadget,
-          gadget_regions = gadget_regions
+          gadget_multi = gadget_multi,
+          gadget_regions = gadget_regions,
+          gadget_splits = gadget_splits,
+          gadget_feature_metrics = gadget_feature_metrics
         ),
         messages = c(
           sprintf("Semantics=\"%s\": PDP/ICE answer marginal model query (may extrapolate); ALE answers an on-manifold (associational) effect question.", semantics),
-          "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects* rather than baseline risk differences."
+          "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects* rather than baseline risk differences.",
+          "GADGET regionalization, when triggered, jointly partitions across the selected feature set to reduce interaction-related heterogeneity of centered local effects.",
+          pint_messages
         )
       )
     }
