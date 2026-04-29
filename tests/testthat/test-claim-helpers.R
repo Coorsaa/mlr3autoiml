@@ -17,13 +17,13 @@ test_that("make_claim_card returns only non-NULL fields", {
 
 test_that("make_claim_card includes narrative fields when supplied", {
   card = make_claim_card(
-    purpose           = "exploratory",
-    semantics         = "within_support",
-    stakes            = "low",
-    claims            = list(global = TRUE),
-    audience          = "research team",
+    purpose = "exploratory",
+    semantics = "within_support",
+    stakes = "low",
+    claims = list(global = TRUE),
+    audience = "research team",
     target_population = "Adults 18+",
-    intended_use      = "Hypothesis generation",
+    intended_use = "Hypothesis generation",
     prohibited_interpretations = "No causal claims."
   )
   expect_equal(card$audience, "research team")
@@ -114,13 +114,18 @@ test_that("make_measurement_card rejects invalid level", {
   )
 })
 
+test_that("make_measurement_card normalizes legacy measurement-level aliases", {
+  card = make_measurement_card("latent")
+  expect_equal(card$level, "factor_score")
+})
+
 # ---- Gate round-trip integration --------------------------------------------
 
 test_that("make_claim_card output passes Gate0A for low-stakes global claim", {
   gate = mlr3autoiml:::Gate0AClaim$new()
   ctx = list(
     purpose = "global_insight",
-    claim   = make_claim_card(
+    claim = make_claim_card(
       purpose   = "global_insight",
       semantics = "within_support",
       stakes    = "low",
@@ -135,21 +140,21 @@ test_that("make_claim_card output passes Gate0A for high-stakes deployment", {
   gate = mlr3autoiml:::Gate0AClaim$new()
   ctx = list(
     purpose = "deployment",
-    claim   = make_claim_card(
-      purpose                    = "deployment",
-      semantics                  = "within_support",
-      stakes                     = "high",
-      claims                     = list(global = TRUE, local = TRUE, decision = TRUE),
-      decision_spec              = list(thresholds = c(0.2, 0.4),
-                                        utility = list(tp = 1, tn = 0, fp = -1, fn = -2)),
-      target_population          = "Adults in outpatient setting",
-      setting                    = "Outpatient primary care",
-      time_horizon               = "12 months",
-      transport_boundary         = "No transport beyond OECD outpatient cohorts",
-      intended_use               = "Risk stratification support",
-      intended_non_use           = "Not for autonomous treatment decisions",
+    claim = make_claim_card(
+      purpose = "deployment",
+      semantics = "within_support",
+      stakes = "high",
+      claims = list(global = TRUE, local = TRUE, decision = TRUE),
+      decision_spec = list(thresholds = c(0.2, 0.4),
+        utility = list(tp = 1, tn = 0, fp = -1, fn = -2)),
+      target_population = "Adults in outpatient setting",
+      setting = "Outpatient primary care",
+      time_horizon = "12 months",
+      transport_boundary = "No transport beyond OECD outpatient cohorts",
+      intended_use = "Risk stratification support",
+      intended_non_use = "Not for autonomous treatment decisions",
       prohibited_interpretations = "No causal attribution",
-      decision_policy_rationale  = "Thresholds chosen by stakeholder utility workshop"
+      decision_policy_rationale = "Thresholds chosen by stakeholder utility workshop"
     )
   )
   out = gate$run(ctx)
@@ -161,8 +166,8 @@ test_that("make_claim_card output passes Gate0A for high-stakes deployment", {
 test_that("make_measurement_card output passes Gate0B for medium-stakes claim", {
   gate = mlr3autoiml:::Gate0BMeasurement$new()
   ctx = list(
-    task        = mlr3::tsk("iris"),
-    claim       = list(purpose = "global_insight", stakes = "medium"),
+    task = mlr3::tsk("iris"),
+    claim = list(purpose = "global_insight", stakes = "medium"),
     measurement = make_measurement_card(
       level            = "scale",
       missingness_plan = "Median impute.",
@@ -175,21 +180,21 @@ test_that("make_measurement_card output passes Gate0B for medium-stakes claim", 
 
 test_that("make_measurement_card + make_claim_card feed AutoIML without error", {
   skip_if_not_installed("rpart")
-  task      = make_task_iris()
-  learner   = make_learner_classif()
-  auto      = mlr3autoiml::AutoIML$new(
-    task       = task,
-    learner    = learner,
+  task = make_task_iris()
+  learner = make_learner_classif()
+  auto = mlr3autoiml::AutoIML$new(
+    task = task,
+    learner = learner,
     resampling = make_resampling_cv(folds = 3L),
-    purpose    = "global_insight",
+    purpose = "global_insight",
     quick_start = TRUE,
-    seed       = 1L
+    seed = 1L
   )
   auto$ctx$claim = make_claim_card(
-    purpose   = "global_insight",
+    purpose = "global_insight",
     semantics = "within_support",
-    stakes    = "low",
-    claims    = list(global = TRUE, local = FALSE, decision = FALSE),
+    stakes = "low",
+    claims = list(global = TRUE, local = FALSE, decision = FALSE),
     intended_use = "Testing helper integration."
   )
   auto$ctx$measurement = make_measurement_card(
