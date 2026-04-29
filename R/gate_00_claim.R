@@ -127,43 +127,25 @@ Gate0AClaim = R6::R6Class(
       time_horizon = claim$time_horizon %??% NULL
       transport_boundary = claim$transport_boundary %??% NULL
 
+      has_transport_scope = has_text(target_population) && has_text(setting) && has_text(time_horizon) && has_text(transport_boundary)
+
       intended_use = claim$intended_use %??% NULL
       intended_non_use = claim$intended_non_use %??% NULL
       prohibited_interpretations = claim$prohibited_interpretations %??% NULL
 
-      has_transport_scope = has_text(target_population) && has_text(setting) && has_text(time_horizon) && has_text(transport_boundary)
-      has_use_boundaries = has_text(intended_use) && has_text(intended_non_use) && has_text(prohibited_interpretations)
-
       high_stakes = isTRUE(stakes == "high" || purpose %in% c("decision_support", "deployment"))
 
-      if (!has_transport_scope) {
-        if (isTRUE(high_stakes)) {
-          status = "fail"
-          missing_codes = c(missing_codes, "transport_scope")
-          msgs = c(msgs, "Missing transport scope metadata in ctx$claim (target_population, setting, time_horizon, transport_boundary), required for high-stakes claims.")
-        } else if (purpose != "exploratory") {
-          status = "warn"
-          msgs = c(msgs, "Transport scope metadata is incomplete (target_population, setting, time_horizon, transport_boundary).")
-        }
-      }
-
-      if (!has_use_boundaries) {
-        if (isTRUE(high_stakes)) {
-          status = "fail"
-          missing_codes = c(missing_codes, "use_boundaries")
-          msgs = c(msgs, "Missing use-boundary metadata in ctx$claim (intended_use, intended_non_use, prohibited_interpretations), required for high-stakes claims.")
-        } else if (purpose != "exploratory") {
-          status = "warn"
-          msgs = c(msgs, "Use-boundary metadata is incomplete (intended_use, intended_non_use, prohibited_interpretations).")
-        }
+      if (!has_transport_scope && any(vapply(
+        list(target_population, setting, time_horizon, transport_boundary),
+        has_text,
+        logical(1L)
+      ))) {
+        msgs = c(msgs, "Transport scope metadata is partial. AutoIML treats transport as task-specific unless you declare a wider boundary explicitly.")
       }
 
       # ---- decision specification (optional) ----------------------------
       decision_spec = .autoiml_as_list(claim$decision_spec)
       .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
-
-      decision_policy_rationale = claim$decision_policy_rationale %??% NULL
-      has_decision_policy_rationale = has_text(decision_policy_rationale)
 
       # If a decision claim is requested but thresholds are missing, populate them.
       if (isTRUE(claims$decision) && is.null(decision_spec$thresholds)) {
@@ -193,15 +175,44 @@ Gate0AClaim = R6::R6Class(
         status = "warn"
       }
 
-      if (isTRUE(claims$decision) && !isTRUE(has_decision_policy_rationale)) {
-        if (isTRUE(high_stakes)) {
-          status = "fail"
-          missing_codes = c(missing_codes, "decision_policy_rationale")
-          msgs = c(msgs, "Decision claims in high-stakes contexts require ctx$claim$decision_policy_rationale.")
-        } else {
-          status = "warn"
-          msgs = c(msgs, "Decision claim enabled without decision_policy_rationale; provide policy justification.")
-        }
+      defaults = .autoiml_default_claim_boundaries(
+        purpose = purpose,
+        semantics = sem_norm,
+        claims = claims,
+        decision_spec = decision_spec
+      )
+      derived_fields = character()
+
+      if (!has_text(intended_use)) {
+        intended_use = defaults$intended_use
+        derived_fields = c(derived_fields, "intended_use")
+      }
+      if (!has_text(intended_non_use)) {
+        intended_non_use = defaults$intended_non_use
+        derived_fields = c(derived_fields, "intended_non_use")
+      }
+      if (!has_text(prohibited_interpretations)) {
+        prohibited_interpretations = defaults$prohibited_interpretations
+        derived_fields = c(derived_fields, "prohibited_interpretations")
+      }
+
+      decision_policy_rationale = claim$decision_policy_rationale %??% NULL
+      if (isTRUE(claims$decision) && !has_text(decision_policy_rationale) && has_text(defaults$decision_policy_rationale)) {
+        decision_policy_rationale = defaults$decision_policy_rationale
+        derived_fields = c(derived_fields, "decision_policy_rationale")
+      }
+
+      has_use_boundaries = has_text(intended_use) && has_text(intended_non_use) && has_text(prohibited_interpretations)
+      has_decision_policy_rationale = has_text(decision_policy_rationale)
+
+      if (length(derived_fields) > 0L) {
+        msgs = c(
+          msgs,
+          sprintf(
+            "Filled %s from the declared purpose, semantics, and decision specification. Override ctx$claim if the analysis warrants narrower wording.",
+            paste(derived_fields, collapse = ", ")
+          )
+        )
       }
 
       # ---- actionability constraints (optional; required for recourse) ----
@@ -268,8 +279,11 @@ Gate0AClaim = R6::R6Class(
         has_actionability = isTRUE(has_actionability),
         has_utility = isTRUE(has_utility),
         has_transport_scope = isTRUE(has_transport_scope),
+        has_user_transport_scope = isTRUE(has_transport_scope),
         has_use_boundaries = isTRUE(has_use_boundaries),
+        has_user_use_boundaries = !any(c("intended_use", "intended_non_use", "prohibited_interpretations") %in% derived_fields),
         has_decision_policy_rationale = isTRUE(has_decision_policy_rationale),
+        has_user_decision_policy_rationale = !("decision_policy_rationale" %in% derived_fields),
         hard_stop = isTRUE(ctx$hard_stop %??% FALSE)
       )
 
@@ -292,6 +306,7 @@ Gate0AClaim = R6::R6Class(
         artifacts = list(
           claim = claim_norm,
           claim_card = claim_card,
+          derived_fields = unique(derived_fields),
           missing_codes = unique(missing_codes)
         ),
         messages = msgs
