@@ -305,7 +305,9 @@ Plot type identifier. Supported values:
 \item \code{"g2_ice_spread"}: Gate 2 ICE heterogeneity summary.
 \item \code{"g2_hstats"}: Gate 2 interaction screening (Friedman H-statistics).
 \item \code{"g2_ale_2d"}: Gate 2 ALE interaction surface heatmap for top interacting pair.
-\item \code{"g2_gadget"}: Gate 2 regionalization summary (if available).
+\item \code{"g2_gadget"}: Gate 2 regionalized local-effect curves (if available).
+\item \code{"g2_gadget_tree"}: Gate 2 GADGET split tree / split-gain summary.
+\item \code{"g2_pint"}: Gate 2 optional GADGET-PINT interaction screen.
 \item \code{"g3_calibration"}: Gate 3 reliability (calibration) curve.
 \item \code{"g3_dca"}: Gate 3 decision curve analysis (net benefit vs threshold).
 \item \code{"g5_stability"}: Gate 5 permutation importance with bootstrap CIs.

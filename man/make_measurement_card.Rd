@@ -33,14 +33,14 @@ A named list ready to assign to \code{auto$ctx$measurement}.
 }
 \description{
 Constructs a named list suitable for assignment to \code{auto$ctx$measurement}.
-\code{level} is required and operative (affects G0B checks and narration scope).
-All other fields are narrative documentation stored in the G0B artifact.
+\code{level} is the main operative field.
+Gate 0B normalizes legacy aliases such as \code{"composite"} and \code{"latent"},
+infers \code{"plausible_values"} when \code{ctx$plausible_values$pv_tasks} is present,
+and derives conservative pipeline notes when \code{missingness_plan} or
+\code{scoring_pipeline} are omitted.
 }
 \examples{
-card <- make_measurement_card(
-  level            = "scale",
-  missingness_plan = "Median impute numerics, mode impute categoricals.",
-  reliability      = list(method = "Cronbach alpha", note = "alpha = 0.87"),
-  invariance       = list(status = "partial", note = "Loadings invariant, intercepts not tested.")
+card = make_measurement_card(
+  level = "item"
 )
 }

@@ -4,12 +4,11 @@
 \alias{gadget_regionalization}
 \title{GADGET-style Regionalization for Gate 2}
 \description{
-Internal lightweight GADGET-style regionalization used by Gate 2 to identify
-regions of heterogeneous feature effects. This implementation avoids heavy
-dependencies and uses centered ICE matrices.
-
-The regionalization recursively partitions the feature space to minimize
-within-region variance of effect curves, producing interpretable subgroup-specific
-effect summaries.
+Internal GADGET-style regionalization used by Gate 2 to identify regions of
+heterogeneous feature effects. The implementation uses centered ICE matrices
+as local effect curves and can jointly regionalize multiple features by
+minimizing the sum of within-region curve risks across the selected feature
+set. This mirrors the key GADGET idea: decompose global effects into
+interpretable regions when interactions make a single global curve too coarse.
 }
 \keyword{internal}

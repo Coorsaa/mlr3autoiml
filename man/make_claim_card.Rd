@@ -71,22 +71,20 @@ A named list ready to assign to \code{auto$ctx$claim}.
 \description{
 Constructs a named list suitable for assignment to \code{auto$ctx$claim}. The
 four operative fields — \code{purpose}, \code{semantics}, \code{stakes}, \code{claims} — are
-required and validated. All narrative documentation fields are optional and
-default to \code{NULL}; they are stored verbatim in the G0A artifact but never
-branch gate logic.
+required and validated. All narrative documentation fields are optional.
+When they are omitted, Gate 0A derives conservative defaults from the
+declared purpose, semantics, and decision specification, and users can
+override those defaults whenever the analysis warrants narrower wording.
 }
 \examples{
-card <- make_claim_card(
-  purpose  = "decision_support",
+card = make_claim_card(
+  purpose = "decision_support",
   semantics = "within_support",
-  stakes   = "medium",
-  claims   = list(global = TRUE, local = TRUE, decision = TRUE),
+  stakes = "medium",
+  claims = list(global = TRUE, local = FALSE, decision = TRUE),
   decision_spec = list(
     thresholds = seq(0.05, 0.25, by = 0.05),
     utility    = list(tp = 1, fp = 0, fn = 0, tn = 0)
-  ),
-  target_population = "Adults aged 18+",
-  intended_use = "Prioritise follow-up contacts.",
-  prohibited_interpretations = "Causal claims; individual diagnosis."
+  )
 )
 }
