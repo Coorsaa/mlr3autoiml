@@ -10,6 +10,7 @@ export_analysis_bundle(
   prefix = "run",
   extra_tables = list(),
   extra_figures = list(),
+  exclude_plot_types = character(),
   fig_width = 10,
   fig_height = 6
 )
@@ -26,6 +27,9 @@ each element is forwarded to \code{\link[=save_analysis_table]{save_analysis_tab
 
 \item{extra_figures}{(\code{list}) Named list of \code{list(p = ..., path = ..., ...)};
 each element is forwarded to \code{\link[=save_analysis_plot]{save_analysis_plot()}}.}
+
+\item{exclude_plot_types}{(\code{character()}) Standard \code{auto$plot()} types to
+skip when exporting the default figure set.}
 
 \item{fig_width, fig_height}{(\code{numeric(1)}) Default figure dimensions in inches.}
 }

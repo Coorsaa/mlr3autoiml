@@ -40,12 +40,12 @@ task$set_col_roles("personal_status_sex", add_to = "group")
 learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
 ```
 
-The `ctx$claim` block is a pre-analysis declaration, not a model
-output. Before fitting anything, five questions are worth writing down:
-who is the target population, what use is intended, what is out of
-scope, where should interpretation stop, and why is this threshold
-reasonable? The wording here is illustrative; the structure is the same
-you would use in a real audit.
+The `ctx$claim` block is a pre-analysis declaration, not a model output.
+The operative part is the claim scope, semantics, stakes, and any
+decision thresholds. AutoIML can derive conservative defaults for
+non-use, prohibited interpretations, and decision-policy wording from
+those declarations, so you only need to spell them out when the analysis
+warrants narrower boundaries.
 
 ``` r
 auto = AutoIML$new(
@@ -64,30 +64,11 @@ auto$ctx$claim = make_claim_card(
   decision_spec = list(
     thresholds = seq(0.20, 0.60, by = 0.05),
     utility = list(tp = 1, fp = -0.5, fn = -1, tn = 0)
-  ),
-  target_population = "Loan applicants in the German Credit benchmark population",
-  setting = "Illustrative credit-risk screening benchmark",
-  time_horizon = "Single application review",
-  transport_boundary =
-    "Interpretation limited to applicants similar to the benchmark sample and the declared subgroup structure",
-  intended_use = "Support analyst review of credit-risk screening decisions.",
-  intended_non_use = "Not for automated approval, denial, or enforcement.",
-  prohibited_interpretations = "Causal claims; individual enforcement decisions.",
-  decision_policy_rationale =
-    paste(
-      "Thresholds reflect a conservative screening range where missed high-risk cases",
-      "are costlier than extra manual review."
-    )
+  )
 )
 
 auto$ctx$measurement = make_measurement_card(
-  level = "item",
-  missingness_plan = "Use the benchmark task encoding as provided.",
-  reliability =
-    list(note = "Observed benchmark variables are treated as recorded inputs rather than latent scales."),
-  invariance =
-    list(status = "not-applicable", note = "Subgroup comparisons are descriptive audits of observed benchmark fields."),
-  scoring_pipeline = "Use the provided encoded predictors and binary outcome without additional score construction."
+  level = "item"
 )
 auto$ctx$sensitive_features = "personal_status_sex"
 auto$ctx$alt_learners = list(
@@ -96,10 +77,11 @@ auto$ctx$alt_learners = list(
 auto$ctx$multiplicity$transport_mode = "group_performance"
 ```
 
-The measurement card is declared for the same reason. It documents how
-we are treating the variables, missingness, and subgroup comparisons,
-rather than pretending those assumptions can be inferred from the fitted
-model.
+The measurement card now only needs the part the analysis cannot infer
+reliably. Here that is just the measurement level. Gate 0B derives task-
+and pipeline-level notes for missingness and scoring automatically, and
+only asks for comparability or reliability evidence when the measurement
+type makes those claims material.
 
 ``` r
 res = auto$run()
@@ -112,7 +94,7 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | gate_id | gate_name | status | summary |
 |:---|:---|:---|:---|
 | G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=TRUE) with semantics=within_support. |
-| G0B | Measurement readiness | pass | Measurement readiness screened (requires user-supplied psychometric evidence; missingness summarized). |
+| G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
 | G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
 | G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
 | G3 | Calibration and decision utility | warn | Binary calibration/utility checks computed (intercept/slope, ECE, reliability, net benefit, cost-/utility sweep). |
@@ -122,11 +104,11 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 
 **IEL (overall):** IEL-1
 
-With the claim card, measurement notes, and subgroup transport check
-filled in, the remaining warnings are substantive rather than
-setup-related: calibration, net benefit in the declared threshold range,
-and the interaction pattern that makes a simple one-feature story too
-thin.
+With the operative claim card, analysis-derived measurement notes, and
+subgroup audit in place, the remaining warnings are substantive rather
+than setup-related: calibration, net benefit in the declared threshold
+range, and the interaction pattern that makes a simple one-feature story
+too thin.
 
 ``` r
 auto$plot("g3_calibration")
@@ -145,6 +127,25 @@ auto$plot("g2_ale_2d", feature1 = "amount", feature2 = "duration", class_label =
 ```
 
 <img src="man/figures/README-classif-g2-1.png" width="49%" /><img src="man/figures/README-classif-g2-2.png" width="49%" />
+
+When Gate 2 regionalization is enabled
+(`auto$ctx$structure$regionalize = TRUE`) and the interaction screen
+finds materially heterogeneous effects, the GADGET-style views decompose
+the global effect into interpretable regions and show the split rules
+that produced those regions. If no such regions are found, the
+paper-aligned Gate 2 evidence remains the global effect plot, the
+interaction screen, and the top 2D ALE surface. Optional
+`pint_enabled = TRUE` adds a permutation-based interaction screen before
+regionalization.
+
+``` r
+if (!is.null(auto$result$gate_results$G2$artifacts$gadget_regions) &&
+    nrow(auto$result$gate_results$G2$artifacts$gadget_regions) > 0L) {
+  auto$plot("g2_gadget")
+  auto$plot("g2_gadget_tree")
+}
+auto$plot("g2_pint")
+```
 
 ``` r
 export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_credit")
@@ -173,12 +174,10 @@ learner = lrn(
 )
 ```
 
-The claim card here is not extra decoration; it makes the analysis
-design explicit before Gate 6 compares models. Because we restrict to
-complete cases, the declared target population, transport boundary, and
-missingness plan all refer to that filtered analysis set. Write down the
-population you are actually analyzing, not the broader one you might
-wish you had.
+The claim card here is not extra decoration; it fixes the semantics and
+scope before Gate 6 compares models. Analysis-specific transport and
+preprocessing notes can remain implicit unless you need to declare a
+narrower boundary than the task- and pipeline-level defaults.
 
 ``` r
 auto = AutoIML$new(
@@ -193,26 +192,11 @@ auto$ctx$claim = make_claim_card(
   purpose = "global_insight",
   semantics = "within_support",
   stakes = "low",
-  claims = list(global = TRUE, local = FALSE, decision = FALSE),
-  target_population = "Californian housing blocks (1990 census) with complete predictor information",
-  setting = "Illustrative housing-value benchmark",
-  time_horizon = "Cross-sectional snapshot",
-  transport_boundary =
-    "Interpretation limited to blocks similar to the observed 1990 census sample after complete-case filtering",
-  intended_use = "Identify global drivers of median house value.",
-  intended_non_use = "Not for causal policy claims or parcel-level appraisal.",
-  prohibited_interpretations = "Causal claims; individual valuation."
+  claims = list(global = TRUE, local = FALSE, decision = FALSE)
 )
 
 auto$ctx$measurement = make_measurement_card(
-  level = "item",
-  missingness_plan =
-    "Restrict the README example to complete cases so the mixed learner family shares the same input matrix.",
-  reliability =
-    list(note = "Observed benchmark variables are treated as recorded inputs rather than latent scales."),
-  invariance =
-    list(status = "not-applicable", note = "Subgroup comparisons are descriptive audits of observed benchmark fields."),
-  scoring_pipeline = "Use the provided encoded predictors and numeric outcome without additional score construction."
+  level = "item"
 )
 auto$ctx$sensitive_features = "ocean_proximity"
 auto$ctx$alt_learners = list(
@@ -246,7 +230,7 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | gate_id | gate_name | status | summary |
 |:---|:---|:---|:---|
 | G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=FALSE) with semantics=within_support. |
-| G0B | Measurement readiness | pass | Measurement readiness screened (requires user-supplied psychometric evidence; missingness summarized). |
+| G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
 | G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
 | G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
 | G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |

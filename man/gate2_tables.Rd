@@ -22,6 +22,10 @@ A \code{list()} containing (when available):
 \item \code{max_cor_pair}: Most correlated numeric feature pair (proxy for dependence).
 \item \code{ice_spread_top}: Top ICE spread features (heterogeneity proxy).
 \item \code{hstats_top}: Top interaction diagnostics (Friedman--Popescu H).
+\item \code{pint}: Optional GADGET-PINT permutation interaction screen.
+\item \code{gadget_regions}: Joint GADGET region table.
+\item \code{gadget_splits}: GADGET split rules and split gains.
+\item \code{gadget_feature_metrics}: Feature-wise GADGET heterogeneity reduction.
 \item \code{support_check_flagged}: Off-manifold support flags for PDP grids (if computed).
 }
 }
@@ -30,7 +34,8 @@ Extract key Gate 2 (structure) tables and recommendations from an AutoIML run.
 
 Gate 2 assesses whether global effect summaries are likely to be misleading
 under feature dependence and/or heterogeneity. It computes global effect
-curves (PDP + ICE and ALE), lightweight interaction diagnostics, and optional off-manifold support screening.
+curves (PDP + ICE and ALE), lightweight interaction diagnostics, optional GADGET-style
+regionalization, optional GADGET-PINT screening, and off-manifold support screening.
 
 The returned object is intended for programmatic reporting (tables); plotting
 is performed via \link{AutoIML} \verb{$plot(type = ...)}.
