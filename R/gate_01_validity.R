@@ -85,7 +85,7 @@ Gate1Validity = R6::R6Class(
 
       # choose default measures
       measures = private$default_measures(task)
-      rr = mlr3::resample(task, learner, resampling, store_models = TRUE, store_backends = TRUE)
+      rr = mlr3::resample(task, learner, resampling, store_models = TRUE, store_backends = FALSE)
 
       scores = rr$score(measures)
       # NOTE: In current mlr3 versions, `$aggregate()` returns a *named numeric()* (not a data.table).
