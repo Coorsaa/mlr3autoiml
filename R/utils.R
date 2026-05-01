@@ -549,7 +549,7 @@ NULL
   allowed_validation = c("split_policy", "cluster_var", "time_var", "site_var")
   allowed_plausible_values = c("pv_tasks")
 
-  allowed_stability = c("B", "max_features", "grouping", "sanity_checks", "instability_rel_sd_warn")
+  allowed_stability = c("B", "max_features", "features", "screen_n", "grouping", "sanity_checks", "instability_rel_sd_warn")
   allowed_multiplicity = c(
     "enabled", "max_alt_learners", "rashomon_rule", "epsilon", "importance_n", "importance_max_features",
     "require_transport_for_high_stakes", "group_col", "transport_mode", "transport_measure_id"

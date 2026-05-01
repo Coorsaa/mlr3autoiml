@@ -248,6 +248,9 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
   g5 = .autoiml_get_gate_result(res, "G5")
   if (!is.null(g5)) {
     paths$g5_perf_ci = .save_tbl(g5$artifacts$perf_ci, "g5_stability_perf_ci")
+    paths$g5_feature_selection = .save_tbl(
+      g5$artifacts$feature_selection, "g5_feature_selection"
+    )
     paths$g5_perm_imp = .save_tbl(g5$artifacts$perm_importance, "g5_perm_importance")
   }
 
@@ -265,6 +268,9 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
     }
     paths$g6_pred_mult = .save_tbl(
       g6$artifacts$predictive_multiplicity, "g6_predictive_multiplicity"
+    )
+    paths$g6_importance_feature_selection = .save_tbl(
+      g6$artifacts$importance_feature_selection, "g6_importance_feature_selection"
     )
     imp = g6$artifacts$rashomon_importance
     if (!is.null(imp) && nrow(imp) > 0L) {

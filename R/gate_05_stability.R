@@ -40,10 +40,15 @@ Gate5Stability = R6::R6Class(
       }
 
       stab = ctx$stability %??% list()
-      .autoiml_assert_known_names(stab, c("B", "max_features", "grouping", "sanity_checks", "instability_rel_sd_warn"), "ctx$stability")
+      .autoiml_assert_known_names(
+        stab,
+        c("B", "max_features", "features", "screen_n", "grouping", "sanity_checks", "instability_rel_sd_warn"),
+        "ctx$stability"
+      )
 
       B = as.integer(stab$B %??% 25L)
       max_features = as.integer(stab$max_features %??% 10L)
+      screening_n = as.integer(stab$screen_n %??% min(task$nrow, 1000L))
       grouping = stab$grouping %??% NULL
       sanity_checks = isTRUE(stab$sanity_checks %??% TRUE)
       instability_rel_sd_warn = as.numeric(stab$instability_rel_sd_warn %??% 0.75)
@@ -51,23 +56,20 @@ Gate5Stability = R6::R6Class(
       set.seed(.autoiml_gate_seed(ctx, self$id))
 
       feat_all = task$feature_names
-      ft = task$feature_types
-      num_cols = intersect(ft[type %in% c("numeric", "integer"), id], feat_all)
-
-      feat = num_cols
-      if (length(feat) > max_features) {
-        # crude but deterministic: highest variance numeric subset
-        dat_num = task$data(cols = feat)
-        v = vapply(dat_num, function(x) stats::var(as.numeric(x), na.rm = TRUE), numeric(1))
-        feat = feat[order(v, decreasing = TRUE)]
-        feat = feat[seq_len(max_features)]
+      requested_features = unique(as.character(unlist(stab$features %??% character(), use.names = FALSE)))
+      requested_features = requested_features[nzchar(requested_features)]
+      invalid_requested = setdiff(requested_features, feat_all)
+      candidate_features = if (length(requested_features) > 0L) {
+        intersect(requested_features, feat_all)
+      } else {
+        feat_all
       }
 
-      if (length(feat) == 0L) {
+      if (length(candidate_features) == 0L) {
         return(GateResult$new(
           gate_id = self$id, gate_name = self$name, pdr = self$pdr,
           status = "skip",
-          summary = "No numeric features available for stability checks.",
+          summary = "No eligible task features available for stability checks.",
           metrics = NULL
         ))
       }
@@ -80,6 +82,32 @@ Gate5Stability = R6::R6Class(
 
       # baseline predictions precomputed ONCE (major speed-up)
       p_full = private$predict_numeric(model, X_full, task)
+
+      feature_selection = private$select_features_for_stability(
+        task = task,
+        model = model,
+        X_full = X_full,
+        y_full = y_full,
+        scorer = scorer,
+        features = candidate_features,
+        max_features = max_features,
+        screening_n = screening_n,
+        seed = .autoiml_gate_seed(ctx, paste0(self$id, "_feature_screen"))
+      )
+      feat = feature_selection$features
+      feature_selection_tbl = feature_selection$selection
+      feature_selection_mode = feature_selection$mode
+      feature_screen_n = feature_selection$screen_n
+
+      if (length(feat) == 0L) {
+        return(GateResult$new(
+          gate_id = self$id, gate_name = self$name, pdr = self$pdr,
+          status = "skip",
+          summary = "No eligible task features available for stability checks after screening.",
+          metrics = NULL,
+          artifacts = list(feature_selection = feature_selection_tbl)
+        ))
+      }
 
       # grouping support: list of groups (each is character vector of feature names)
       groups = NULL
@@ -347,24 +375,96 @@ Gate5Stability = R6::R6Class(
           max_rel_sd = max_rel_sd,
           stability_tier = stability_tier,
           sanity_checks = sanity_checks,
-          sanity_pass = if (nrow(sanity_dt) > 0L) isTRUE(sanity_dt$sanity_pass[[1L]]) else NA
+          sanity_pass = if (nrow(sanity_dt) > 0L) isTRUE(sanity_dt$sanity_pass[[1L]]) else NA,
+          n_candidate_features = length(candidate_features),
+          feature_screen_n = as.integer(feature_screen_n),
+          feature_selection_mode = feature_selection_mode
         ),
         artifacts = list(
           perm_importance = perm_imp_summary,
           perm_importance_raw = perm_imp,
           perf_ci = ci_dt,
+          feature_selection = feature_selection_tbl,
           grouping_used = if (isTRUE(group_mode)) groups else NULL,
           grouping_auto = if (exists("auto_grouping")) auto_grouping else FALSE,
           sanity_check_result = sanity_dt
         ),
         messages = c(
-          "Permutation stability is a heuristic: correlated features and strong model regularization can blur attributions."
+          "Permutation stability is a heuristic: correlated features and strong model regularization can blur attributions.",
+          "Gate 5 feature screening considers all task features, including categorical predictors; automatic correlation grouping is numeric-only unless user groups are supplied.",
+          if (length(invalid_requested) > 0L) sprintf("Ignored unknown stability features: %s", paste(invalid_requested, collapse = ", ")) else character()
         )
       )
     }
   ),
 
   private = list(
+
+    select_features_for_stability = function(task, model, X_full, y_full, scorer, features, max_features = 10L, screening_n = 1000L, seed = 1L) {
+      features = unique(as.character(features))
+      features = intersect(features[nzchar(features)], task$feature_names)
+      max_features = max(1L, as.integer(max_features))
+      n_full = nrow(X_full)
+      screening_n = max(1L, min(as.integer(screening_n), n_full))
+
+      if (length(features) == 0L) {
+        return(list(
+          features = character(),
+          selection = data.table::data.table(feature = character(), screen_importance = numeric(), selected = logical(), selection_reason = character()),
+          mode = "none",
+          screen_n = screening_n
+        ))
+      }
+
+      if (length(features) <= max_features) {
+        sel = data.table::data.table(
+          feature = features,
+          screen_importance = NA_real_,
+          selected = TRUE,
+          selection_reason = "all_features_fit_budget"
+        )
+        return(list(features = features, selection = sel, mode = "all_features_fit_budget", screen_n = screening_n))
+      }
+
+      set.seed(seed)
+      rows = if (n_full > screening_n) sample.int(n_full, screening_n) else seq_len(n_full)
+      X = data.table::as.data.table(X_full[rows, , drop = FALSE])
+      y = y_full[rows]
+      base_pred = tryCatch(private$predict_numeric(model, X, task), error = function(e) rep(NA_real_, length(rows)))
+      base = tryCatch(scorer(y, base_pred), error = function(e) NA_real_)
+
+      importance = rep(NA_real_, length(features))
+      names(importance) = features
+      if (is.finite(base)) {
+        for (f in features) {
+          Xp = data.table::copy(X)
+          perm = sample.int(nrow(Xp))
+          data.table::set(Xp, j = f, value = Xp[[f]][perm])
+          p1 = tryCatch(private$predict_numeric(model, Xp, task), error = function(e) rep(NA_real_, nrow(Xp)))
+          s1 = tryCatch(scorer(y, p1), error = function(e) NA_real_)
+          importance[[f]] = if (is.finite(s1)) private$importance_delta(base, s1, task) else NA_real_
+        }
+      }
+
+      finite = is.finite(importance)
+      if (any(finite)) {
+        ord = names(sort(importance[finite], decreasing = TRUE))
+        selected = utils::head(ord, max_features)
+        mode = "all_feature_pfi_screen"
+      } else {
+        selected = utils::head(features, max_features)
+        mode = "fallback_original_order"
+      }
+
+      sel = data.table::data.table(
+        feature = features,
+        screen_importance = as.numeric(importance[features]),
+        selected = features %in% selected,
+        selection_reason = mode
+      )
+      data.table::setorder(sel, -selected, -screen_importance, na.last = TRUE)
+      list(features = selected, selection = sel, mode = mode, screen_n = screening_n)
+    },
 
     primary_scorer = function(task) {
       if (inherits(task, "TaskRegr")) {

@@ -130,6 +130,7 @@ NULL
   stability = list(
     B = stability_B,
     max_features = stability_max_features,
+    screen_n = min(n, if (profile == "fast") 500L else 1000L),
     grouping = NULL,
     sanity_checks = TRUE,
     instability_rel_sd_warn = 0.75
