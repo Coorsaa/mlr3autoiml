@@ -60,6 +60,8 @@ Gate6Multiplicity = R6::R6Class(
       rashomon_tbl = NULL
       imp_tbl = NULL
       rankcorr_tbl = NULL
+      importance_feature_selection = NULL
+      importance_feature_selection_mode = NA_character_
       predictive_multiplicity = NULL
 
       multiplicity_flag = NA
@@ -164,7 +166,6 @@ Gate6Multiplicity = R6::R6Class(
           rows = sample(rows, importance_n)
         }
 
-        feats = private$.select_features_for_importance(task, max_features = importance_max_features)
         msr = mlr3::msr(primary_id)
 
         imp_list = list()
@@ -183,6 +184,29 @@ Gate6Multiplicity = R6::R6Class(
             trained_learners[[lid]] = scores_dt$learner[[idx]]
           }
         }
+
+        if (length(trained_learners) > 0L) {
+          screen_candidates = intersect(c(as.character(ctx$learner$id %??% character()), learners_in), names(trained_learners))
+          screen_lid = if (length(screen_candidates) > 0L) screen_candidates[[1L]] else names(trained_learners)[[1L]]
+          feat_sel = private$.select_features_for_importance(
+            task = task,
+            learner = trained_learners[[screen_lid]],
+            rows = rows,
+            measure = msr,
+            max_features = importance_max_features
+          )
+        } else {
+          feat_sel = private$.select_features_for_importance(
+            task = task,
+            learner = NULL,
+            rows = rows,
+            measure = msr,
+            max_features = importance_max_features
+          )
+        }
+        feats = feat_sel$features
+        importance_feature_selection = feat_sel$selection
+        importance_feature_selection_mode = feat_sel$mode
 
         for (lid in learners_in) {
           lr_trained = trained_learners[[lid]]
@@ -349,6 +373,8 @@ Gate6Multiplicity = R6::R6Class(
         n_alt_learners_declared = if (is.list(ctx$alt_learners)) length(ctx$alt_learners) else 0L,
         importance_n = as.integer(cfg$importance_n %??% min(task$nrow, 800L)),
         importance_max_features = as.integer(cfg$importance_max_features %??% 15L),
+        importance_feature_candidates = length(task$feature_names),
+        importance_feature_selection_mode = importance_feature_selection_mode,
         seed = as.integer(ctx$seed %??% NA_integer_)
       )
 
@@ -364,6 +390,7 @@ Gate6Multiplicity = R6::R6Class(
           rashomon_set = rashomon_tbl,
           rashomon_importance = imp_tbl,
           rashomon_rankcorr = rankcorr_tbl,
+          importance_feature_selection = importance_feature_selection,
           predictive_multiplicity = predictive_multiplicity$summary,
           pred_range_dist = predictive_multiplicity$pred_range_dist,
           group_performance = transport_tbl,
@@ -576,22 +603,56 @@ Gate6Multiplicity = R6::R6Class(
       )
     },
 
-    .select_features_for_importance = function(task, max_features = 15L) {
-      max_features = as.integer(max_features)
-      feats = task$feature_names
+    .select_features_for_importance = function(task, learner = NULL, rows = NULL, measure = NULL, max_features = 15L) {
+      max_features = max(1L, as.integer(max_features))
+      feats = unique(as.character(task$feature_names))
+      feats = feats[nzchar(feats)]
+      if (length(feats) == 0L) {
+        return(list(
+          features = character(),
+          selection = data.table::data.table(feature = character(), screen_importance = numeric(), selected = logical(), selection_reason = character()),
+          mode = "none"
+        ))
+      }
       if (length(feats) <= max_features) {
-        return(feats)
+        sel = data.table::data.table(
+          feature = feats,
+          screen_importance = NA_real_,
+          selected = TRUE,
+          selection_reason = "all_features_fit_budget"
+        )
+        return(list(features = feats, selection = sel, mode = "all_features_fit_budget"))
       }
 
-      ft = tryCatch(task$feature_types, error = function(e) NULL)
-      num = if (!is.null(ft)) ft$id[ft$type %in% c("numeric", "integer")] else feats
-      if (length(num) == 0L) {
-        return(utils::head(feats, max_features))
+      imp = NULL
+      if (!is.null(learner) && !is.null(rows) && !is.null(measure)) {
+        imp = tryCatch(
+          private$.perm_importance(task, learner, rows = rows, features = feats, measure = measure),
+          error = function(e) NULL
+        )
       }
 
-      X = task$data(cols = num)
-      vars = vapply(num, function(f) stats::var(X[[f]], na.rm = TRUE), numeric(1))
-      num[order(vars, decreasing = TRUE)][seq_len(min(max_features, length(num)))]
+      if (!is.null(imp) && nrow(imp) > 0L && any(is.finite(imp$importance))) {
+        imp = data.table::as.data.table(imp)
+        data.table::setorder(imp, -importance)
+        selected = utils::head(imp[is.finite(importance), feature], max_features)
+        mode = "all_feature_pfi_screen"
+        sel = data.table::data.table(feature = feats)
+        sel = merge(sel, imp[, .(feature, screen_importance = importance)], by = "feature", all.x = TRUE)
+        sel[, selected := feature %in% selected]
+        sel[, selection_reason := mode]
+        data.table::setorder(sel, -selected, -screen_importance, na.last = TRUE)
+        return(list(features = selected, selection = sel, mode = mode))
+      }
+
+      selected = utils::head(feats, max_features)
+      sel = data.table::data.table(
+        feature = feats,
+        screen_importance = NA_real_,
+        selected = feats %in% selected,
+        selection_reason = "fallback_original_order"
+      )
+      list(features = selected, selection = sel, mode = "fallback_original_order")
     },
 
     .score_prediction = function(task, measure, truth, pred_prob = NULL, pred_response = NULL) {
