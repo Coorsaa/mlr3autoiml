@@ -265,8 +265,8 @@ NULL
 
   # Accept both AutoIML and AutoIMLResult
   ctx = NULL
-  if (inherits(result, "AutoIML")) ctx <- result$ctx
-  if (inherits(result, "AutoIMLResult")) ctx <- result$extras$ctx
+  if (inherits(result, "AutoIML")) ctx = result$ctx
+  if (inherits(result, "AutoIMLResult")) ctx = result$extras$ctx
 
   if (!is.environment(ctx) || is.null(ctx$task) || is.null(ctx$final_model)) {
     stop("SHAP requires a trained model. Run `auto$run()` first.", call. = FALSE)
@@ -279,7 +279,10 @@ NULL
   cache = ctx$.cache_shap_global
 
   cl = as.character(class_label)[1L]
-  key = paste(cl, as.integer(sample_rows), as.integer(sample_size), as.integer(background_n), as.integer(seed), sep = "|")
+  key = paste(
+    cl, as.integer(sample_rows), as.integer(sample_size), as.integer(background_n), as.integer(seed),
+    sep = "|"
+  )
 
   if (exists(key, envir = cache, inherits = FALSE)) {
     return(get(key, envir = cache, inherits = FALSE))
@@ -360,7 +363,7 @@ NULL
   dt = shap_dt[feature %in% top_feats]
   dt[, feature_f := factor(feature, levels = rev(top_feats))]
 
-  # scale feature values for colouring (iml/shapviz-style)
+  # scale feature values for coloring (iml/shapviz-style)
   dt[, value_scaled := .autoiml_scale_feature_values(feature_value), by = feature]
   dt[!is.finite(value_scaled), value_scaled := NA_real_]
 

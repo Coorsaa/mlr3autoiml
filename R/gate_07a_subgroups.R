@@ -64,7 +64,11 @@ Gate7aSubgroups = R6::R6Class(
       decision_claim = isTRUE(claims$decision %??% FALSE)
 
       decision_spec = (claim$decision_spec %??% list())
-      .autoiml_assert_known_names(.autoiml_as_list(decision_spec), c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
+      .autoiml_assert_known_names(
+        .autoiml_as_list(decision_spec),
+        c("thresholds", "costs", "utility", "positive_class"),
+        "ctx$claim$decision_spec"
+      )
 
       has_content = function(x) {
         if (is.null(x)) {
@@ -96,13 +100,27 @@ Gate7aSubgroups = R6::R6Class(
       group_vars = ctx$sensitive_features %??% task$col_roles$stratum %??% character()
       group_vars = unique(as.character(group_vars))
       group_vars = group_vars[nzchar(group_vars)]
+      group_vars_in_features = intersect(group_vars, task$feature_names)
+      subgroup_feature_msg = if (length(group_vars_in_features) > 0L) {
+        paste(
+          "Audited subgroup variables are also model features:",
+          paste(group_vars_in_features, collapse = ", "),
+          "Interpret subgroup audits as descriptive performance checks,",
+          "not as evidence that group membership is innocuous."
+        )
+      } else {
+        character()
+      }
 
       if (length(group_vars) < 1L) {
         status = if (isTRUE(high_stakes)) "fail" else if (purpose != "exploratory") "warn" else "skip"
         summary = if (isTRUE(high_stakes)) {
           "High-stakes use requires declared subgroup variables (ctx$sensitive_features or task stratum roles)."
         } else {
-          "No subgroup variables declared (ctx$sensitive_features or task stratum roles). Provide subgroup variables to audit heterogeneity and (for decision use) differential consequences."
+          paste(
+            "No subgroup variables declared (ctx$sensitive_features or task stratum roles).",
+            "Provide subgroup variables to audit heterogeneity and differential consequences for decision use."
+          )
         }
 
         return(GateResult$new(
@@ -126,7 +144,10 @@ Gate7aSubgroups = R6::R6Class(
           gate_name = self$name,
           pdr = self$pdr,
           status = "fail",
-          summary = "High-stakes subgroup claims require measurement comparability evidence (ctx$measurement$invariance).",
+          summary = paste(
+            "High-stakes subgroup claims require measurement comparability evidence",
+            "(ctx$measurement$invariance)."
+          ),
           metrics = data.table::data.table(
             required = TRUE,
             provided = FALSE,
@@ -187,9 +208,20 @@ Gate7aSubgroups = R6::R6Class(
           pdr = self$pdr,
           status = status,
           summary = summary,
-          metrics = data.table::data.table(n_groups = nrow(out), n_group_vars = length(group_vars)),
+          metrics = data.table::data.table(
+            n_groups = nrow(out),
+            n_group_vars = length(group_vars),
+            n_group_vars_in_features = length(group_vars_in_features),
+            group_vars_in_features = paste(group_vars_in_features, collapse = ",")
+          ),
           artifacts = list(subgroup = out),
-          messages = c("Interpret subgroup differences cautiously: they can reflect sampling variability, construct non-comparability, and/or distribution shift.")
+          messages = c(
+            subgroup_feature_msg,
+            paste(
+              "Interpret subgroup differences cautiously: they can reflect sampling variability,",
+              "construct non-comparability, and/or distribution shift."
+            )
+          )
         ))
       }
 
@@ -302,7 +334,9 @@ Gate7aSubgroups = R6::R6Class(
               if (utility_spec == "costs") {
                 out[, expected_cost := (costs$fp * fp + costs$fn * fn) / nloc]
               } else if (utility_spec == "utility") {
-                out[, expected_utility := (utility$tp * tp + utility$fp * fp + utility$tn * tn + utility$fn * fn) / nloc]
+                out[, expected_utility := (
+                  utility$tp * tp + utility$fp * fp + utility$tn * tn + utility$fn * fn
+                ) / nloc]
               }
             }
 
@@ -313,7 +347,7 @@ Gate7aSubgroups = R6::R6Class(
         status = "pass"
 
         # Flag large subgroup calibration dispersion heuristically
-        if (any(is.finite(subgroup$ece) & subgroup$ece > 0.10, na.rm = TRUE)) status <- "warn"
+        if (any(is.finite(subgroup$ece) & subgroup$ece > 0.10, na.rm = TRUE)) status = "warn"
 
         summary = "Subgroup audit computed (binary classification performance + calibration; utility if specified)."
 
@@ -386,10 +420,17 @@ Gate7aSubgroups = R6::R6Class(
         }
 
         msgs = c(
-          "If subgroup gaps are observed, consider (i) measurement non-comparability, (ii) differential missingness, (iii) label shift, (iv) model misspecification, and (v) decision policy differences."
+          paste(
+            "If subgroup gaps are observed, consider (i) measurement non-comparability,",
+            "(ii) differential missingness, (iii) label shift, (iv) model misspecification,",
+            "and (v) decision policy differences."
+          )
         )
         if (isTRUE(decision_claim) && utility_spec == "none") {
-          msgs = c(msgs, "Decision claim requested but no utility/cost spec provided: subgroup utility comparisons are omitted.")
+          msgs = c(
+            msgs,
+            "Decision claim requested but no utility/cost spec provided: subgroup utility comparisons are omitted."
+          )
         }
 
         return(GateResult$new(
@@ -404,6 +445,8 @@ Gate7aSubgroups = R6::R6Class(
             utility_spec = utility_spec,
             thr_use = thr_use,
             measurement_invariance_present = measurement_invariance_present,
+            n_group_vars_in_features = length(group_vars_in_features),
+            group_vars_in_features = paste(group_vars_in_features, collapse = ","),
             explanation_stability_available = nrow(expl_stability_summary) > 0L
           ),
           artifacts = list(
@@ -411,7 +454,7 @@ Gate7aSubgroups = R6::R6Class(
             subgroup_explanation_stability = subgroup_expl_stability,
             subgroup_explanation_stability_summary = expl_stability_summary
           ),
-          messages = msgs
+          messages = c(subgroup_feature_msg, msgs)
         ))
       }
 
@@ -450,6 +493,8 @@ Gate7aSubgroups = R6::R6Class(
         metrics = data.table::data.table(
           n_group_vars = length(group_vars),
           measurement_invariance_present = measurement_invariance_present,
+          n_group_vars_in_features = length(group_vars_in_features),
+          group_vars_in_features = paste(group_vars_in_features, collapse = ","),
           explanation_stability_available = FALSE
         ),
         artifacts = list(
@@ -457,7 +502,13 @@ Gate7aSubgroups = R6::R6Class(
           subgroup_explanation_stability = data.table::data.table(),
           subgroup_explanation_stability_summary = data.table::data.table()
         ),
-        messages = c("Subgroup audit is descriptive: confirm whether measurement/comparability assumptions hold before attributing subgroup differences to substantive effects.")
+        messages = c(
+          subgroup_feature_msg,
+          paste(
+            "Subgroup audit is descriptive: confirm whether measurement/comparability assumptions hold",
+            "before attributing subgroup differences to substantive effects."
+          )
+        )
       )
     }
   )

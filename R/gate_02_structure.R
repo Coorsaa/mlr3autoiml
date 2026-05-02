@@ -78,10 +78,18 @@ Gate2Structure = R6::R6Class(
           gate_name = self$name,
           pdr = self$pdr,
           status = "skip",
-          summary = "Causal/recourse semantics requested: Gate 2 is skipped (hard stop). Use a causal estimation workflow before interpreting effects as actionable.",
+          summary = paste(
+            "Causal/recourse semantics requested: Gate 2 is skipped (hard stop).",
+            "Use a causal estimation workflow before interpreting effects as actionable."
+          ),
           metrics = data.table::data.table(semantics = semantics, recommended_effect_method = NA_character_),
           artifacts = list(recommendation = list(semantics = semantics)),
-          messages = c("Hard stop: causal/recourse requires explicit causal assumptions and identification; AutoIML does not implement this.")
+          messages = c(
+            paste(
+              "Hard stop: causal/recourse requires explicit causal assumptions and identification;",
+              "AutoIML does not implement this."
+            )
+          )
         ))
       }
 
@@ -136,8 +144,17 @@ Gate2Structure = R6::R6Class(
       max_abs_cor = NA_real_
       cor_pairs = NULL
       if (length(num_cols) >= 2L) {
-        dat_num = task$data(cols = num_cols)
-        cm = tryCatch(stats::cor(dat_num, use = "pairwise.complete.obs"), error = function(e) NULL)
+        dat_num = data.table::as.data.table(task$data(cols = num_cols))
+        numeric_sd = vapply(dat_num, function(x) stats::sd(as.numeric(x), na.rm = TRUE), numeric(1L))
+        cor_cols = names(numeric_sd)[is.finite(numeric_sd) & numeric_sd > 0]
+        cm = if (length(cor_cols) >= 2L) {
+          tryCatch(
+            stats::cor(dat_num[, cor_cols, with = FALSE], use = "pairwise.complete.obs"),
+            error = function(e) NULL
+          )
+        } else {
+          NULL
+        }
         if (!is.null(cm)) {
           cm[upper.tri(cm, diag = TRUE)] = NA_real_
           max_abs_cor = suppressWarnings(max(abs(cm), na.rm = TRUE))
@@ -158,9 +175,10 @@ Gate2Structure = R6::R6Class(
       if (length(num_cols) > 0L) {
         dat_num_full = task$data(cols = num_cols)
         v = vapply(dat_num_full, function(x) stats::var(as.numeric(x), na.rm = TRUE), numeric(1))
-        ord = order(v, decreasing = TRUE)
+        v[!is.finite(v) | v <= 0] = NA_real_
+        ord = order(v, decreasing = TRUE, na.last = NA)
         eval_feats = num_cols[ord]
-        if (length(eval_feats) > max_features) eval_feats <- eval_feats[seq_len(max_features)]
+        if (length(eval_feats) > max_features) eval_feats = eval_feats[seq_len(max_features)]
       }
 
       # Sample rows for IML computations
@@ -322,7 +340,7 @@ Gate2Structure = R6::R6Class(
           tmp = ice_spread
           if (!is.null(cls_main)) {
             tmp = ice_spread[class_label == cls_main]
-            if (nrow(tmp) == 0L) tmp <- ice_spread
+            if (nrow(tmp) == 0L) tmp = ice_spread
           }
           top_feats = tmp[order(-ice_sd_mean)]$feature
           top_feats = unique(top_feats)
@@ -494,8 +512,12 @@ Gate2Structure = R6::R6Class(
       support_frac_flagged = NA_real_
 
       support_cfg = cfg$support_check %??% list()
-      if (!is.list(support_cfg)) support_cfg <- list()
-      .autoiml_assert_known_names(support_cfg, c("enabled", "sample_n", "ratio_threshold", "k"), "ctx$structure$support_check")
+      if (!is.list(support_cfg)) support_cfg = list()
+      .autoiml_assert_known_names(
+        support_cfg,
+        c("enabled", "sample_n", "ratio_threshold", "k"),
+        "ctx$structure$support_check"
+      )
 
       support_enabled = isTRUE(support_cfg$enabled %??% (semantics == "marginal_model_query"))
       support_required_for_marginal = isTRUE(cfg$support_required_for_marginal %??% TRUE)
@@ -598,9 +620,15 @@ Gate2Structure = R6::R6Class(
         gadget_multi$regions[, semantics_label := semantics]
         gadget_multi$curves[, semantics_label := semantics]
         gadget_multi$assignments[, semantics_label := semantics]
-        if (!is.null(gadget_multi$splits) && nrow(gadget_multi$splits) > 0L) gadget_multi$splits[, semantics_label := semantics]
-        if (!is.null(gadget_multi$feature_metrics) && nrow(gadget_multi$feature_metrics) > 0L) gadget_multi$feature_metrics[, semantics_label := semantics]
-        if (!is.null(gadget_multi$total_metrics) && nrow(gadget_multi$total_metrics) > 0L) gadget_multi$total_metrics[, semantics_label := semantics]
+        if (!is.null(gadget_multi$splits) && nrow(gadget_multi$splits) > 0L) {
+          gadget_multi$splits[, semantics_label := semantics]
+        }
+        if (!is.null(gadget_multi$feature_metrics) && nrow(gadget_multi$feature_metrics) > 0L) {
+          gadget_multi$feature_metrics[, semantics_label := semantics]
+        }
+        if (!is.null(gadget_multi$total_metrics) && nrow(gadget_multi$total_metrics) > 0L) {
+          gadget_multi$total_metrics[, semantics_label := semantics]
+        }
       }
       if (!is.null(support_dt) && nrow(support_dt) > 0L) {
         support_dt[, `:=`(
@@ -612,7 +640,11 @@ Gate2Structure = R6::R6Class(
 
       # --- gate decision ----------------------------------------------------
       dependence_flag = isTRUE(is.finite(max_abs_cor) && max_abs_cor >= cor_threshold)
-      max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) max(ice_spread$ice_sd_mean, na.rm = TRUE) else NA_real_
+      max_ice_sd = if (!is.null(ice_spread) && nrow(ice_spread) > 0L) {
+        max(ice_spread$ice_sd_mean, na.rm = TRUE)
+      } else {
+        NA_real_
+      }
       max_hstat = if (!is.null(hstats) && nrow(hstats) > 0L) max(hstats$hstat, na.rm = TRUE) else NA_real_
 
       pint_flag = if (!is.null(pint) && nrow(pint) > 0L && "pint_interaction" %in% names(pint)) {
@@ -620,9 +652,16 @@ Gate2Structure = R6::R6Class(
       } else {
         FALSE
       }
-      max_pint_observed_risk = if (!is.null(pint) && nrow(pint) > 0L) max(pint$observed_risk, na.rm = TRUE) else NA_real_
+      max_pint_observed_risk = if (!is.null(pint) && nrow(pint) > 0L) {
+        max(pint$observed_risk, na.rm = TRUE)
+      } else {
+        NA_real_
+      }
       if (!is.finite(max_pint_observed_risk)) max_pint_observed_risk = NA_real_
-      gadget_r2_total = if (!is.null(gadget_multi) && !is.null(gadget_multi$total_metrics) && nrow(gadget_multi$total_metrics) > 0L) {
+      has_gadget_total = !is.null(gadget_multi) &&
+        !is.null(gadget_multi$total_metrics) &&
+        nrow(gadget_multi$total_metrics) > 0L
+      gadget_r2_total = if (isTRUE(has_gadget_total)) {
         as.numeric(gadget_multi$total_metrics$heterogeneity_reduction[1L])
       } else {
         NA_real_
@@ -640,12 +679,22 @@ Gate2Structure = R6::R6Class(
       fallback_effect_method = if (identical(semantics, "marginal_model_query")) "ale" else NA_character_
 
       status = "pass"
-      summary = sprintf("Claim semantics=\"%s\": dependence/heterogeneity assessed; global effect curves computed (PDP/ICE + ALE).", semantics)
+      restriction_flag = isTRUE(dependence_flag) || isTRUE(interaction_flag)
+      summary = sprintf(
+        paste(
+          "Claim semantics=\"%s\": dependence/heterogeneity assessed;",
+          "global effect curves computed (PDP/ICE + ALE)."
+        ),
+        semantics
+      )
 
-      if (isTRUE(dependence_flag) || isTRUE(interaction_flag)) {
-        status = "warn"
+      if (isTRUE(restriction_flag)) {
         summary = sprintf(
-          "Claim semantics=\"%s\": dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives.",
+          paste(
+            "Claim semantics=\"%s\": dependence and/or heterogeneity detected;",
+            "Gate 2 passes with claim restrictions: prefer dependence- and interaction-aware summaries",
+            "(ALE/ICE + regionalization) and avoid overinterpreting simple global narratives."
+          ),
           semantics
         )
       }
@@ -654,16 +703,31 @@ Gate2Structure = R6::R6Class(
       if (identical(semantics, "marginal_model_query") && isTRUE(support_enabled)) {
         if (isTRUE(support_required_for_marginal) && !isTRUE(support_available)) {
           status = "fail"
-          summary = paste0(summary, " Marginal model query semantics require support diagnostics, but diagnostics could not be computed (install 'FNN' and ensure numeric features).")
+          summary = paste(
+            summary,
+            paste(
+              "Marginal model query semantics require support diagnostics, but diagnostics could not be computed",
+              "(install 'FNN' and ensure numeric features)."
+            )
+          )
         } else if (!isTRUE(support_available)) {
           status = "warn"
-          summary = paste0(summary, " Support diagnostics were requested but could not be computed (install 'FNN' and ensure numeric features).")
+          summary = paste(
+            summary,
+            "Support diagnostics were requested but could not be computed (install 'FNN' and ensure numeric features)."
+          )
         } else if (isTRUE(support_required_for_marginal) && (is.null(support_dt) || nrow(support_dt) < 1L)) {
           status = "fail"
           summary = paste0(summary, " Marginal model query semantics require non-empty support diagnostics.")
         } else if (isTRUE(support_flag)) {
           status = "warn"
-          summary = paste0(summary, " Off-manifold risk detected for some PDP grid points (see support_check table); marginal model query interpretations may be driven by extrapolation.")
+          summary = paste(
+            summary,
+            paste(
+              "Off-manifold risk detected for some PDP grid points (see support_check table);",
+              "marginal model query interpretations may be driven by extrapolation."
+            )
+          )
         }
       }
 
@@ -688,6 +752,7 @@ Gate2Structure = R6::R6Class(
         support_flag = isTRUE(support_flag),
         support_max_ratio = support_max_ratio,
         support_frac_flagged = support_frac_flagged,
+        restriction_flag = restriction_flag,
         regionalize = regionalize,
         regional_method_used = regional_method_report,
         top_features = unique(top_feats),
@@ -722,6 +787,7 @@ Gate2Structure = R6::R6Class(
         support_flag = isTRUE(support_flag),
         support_max_ratio = support_max_ratio,
         support_frac_flagged = support_frac_flagged,
+        restriction_flag = restriction_flag,
         analyzed_numeric_features = length(eval_feats),
         sample_n = sample_n
       )
@@ -779,9 +845,27 @@ Gate2Structure = R6::R6Class(
           gadget_feature_metrics = gadget_feature_metrics
         ),
         messages = c(
-          sprintf("Semantics=\"%s\": PDP/ICE answer marginal model query (may extrapolate); ALE answers an on-manifold (associational) effect question.", semantics),
-          "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects* rather than baseline risk differences.",
-          "GADGET regionalization, when triggered, jointly partitions across the selected feature set to reduce interaction-related heterogeneity of centered local effects.",
+          sprintf(
+            paste(
+              "Semantics=\"%s\": PDP/ICE answer marginal model query (may extrapolate);",
+              "ALE answers an on-manifold (associational) effect question."
+            ),
+            semantics
+          ),
+          paste(
+            "ICE spread is computed on centered ICE curves (cICE) to reflect heterogeneity of *effects*",
+            "rather than baseline risk differences."
+          ),
+          paste(
+            "GADGET regionalization, when triggered, jointly partitions across the selected feature set",
+            "to reduce interaction-related heterogeneity of centered local effects."
+          ),
+          if (isTRUE(restriction_flag)) {
+            paste(
+              "Detected dependence or interaction structure is recorded as a claim restriction,",
+              "not as a failed diagnostic, because the relevant evidence was computed."
+            )
+          },
           pint_messages
         )
       )

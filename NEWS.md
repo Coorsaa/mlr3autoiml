@@ -7,8 +7,12 @@
 - Added `AutoIML$plot("g2_gadget")`, `AutoIML$plot("g2_gadget_tree")`, and `AutoIML$plot("g2_pint")` outputs, and exported the corresponding tables and figures through `export_analysis_bundle()`.
 
 ## Analysis workflow
-- `gate2_tables()` and `guide_workflow()` now expose and recommend the GADGET/PINT artifacts when they are available.
+- `AutoIML$tables("all")` now returns all supported table groups (`g0`, `g2`, and `g6`) as documented.
+- Gate 0B now treats reliability or invariance entries marked as pending, unknown, not assessed, or unsupported as provisional rather than completed evidence, and IEL-2/IEL-3 now require Gate 0B to pass so unresolved measurement comparability caps interpretation at IEL-1.
 - Gate 0A now derives conservative non-use, prohibited-interpretation, and decision-policy wording from the declared claims and semantics, while Gate 0B derives pipeline-level missingness and scoring notes from the analyzed task and only requires reliability or comparability evidence when the measurement type makes those claims material.
+- Gate 2 now records detected dependence or interaction structure as an explicit claim restriction while keeping the gate at pass status when the relevant diagnostics were successfully computed.
+- Gate 7A now records and warns in its messages when audited subgroup variables are also model features, so subgroup audits are easier to interpret as descriptive checks rather than causal or fairness guarantees.
+- `gate2_tables()` and `guide_workflow()` now expose and recommend the GADGET/PINT artifacts when they are available.
 
 # mlr3autoiml 0.0.6
 
@@ -65,7 +69,7 @@ verbatim with the Python companion `pyautoiml`.
 Gate 1 (`Gate1Validity`) now supports outcome targets given as multiple
 plausible values. Pass them through:
 ```r
-auto$ctx$plausible_values$pv_tasks <- list(task_pv2, task_pv3, ..., task_pvm)
+auto$ctx$plausible_values$pv_tasks = list(task_pv2, task_pv3, ..., task_pvm)
 ```
 where each element is an `mlr3::TaskRegr` whose target column holds an
 alternative plausible value of the same outcome. Gate 1 will resample each

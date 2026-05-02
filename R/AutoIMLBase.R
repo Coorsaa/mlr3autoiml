@@ -112,7 +112,7 @@ AutoIML = R6::R6Class(
       self$profile = profile
 
       # Context is an environment to allow in-place configuration:
-      # auto$ctx$structure$sample_n <- 200
+      # auto$ctx$structure$sample_n = 200
       self$ctx = new.env(parent = emptyenv())
       self$ctx$task = task
       self$ctx$learner = learner
@@ -335,12 +335,19 @@ AutoIML = R6::R6Class(
     #' Return key tables produced by the workflow.
     #'
     #' @param which (`character(1)`)
-    #'   Which tables to return. Currently supports `"all"` and gate-specific options.
+    #'   Which tables to return. Supports `"all"` and gate-specific options `"g0"`, `"g2"`, and `"g6"`.
     #' @param ... Additional arguments forwarded to table helpers.
     #' @return A named list of tables (usually `data.table`s).
-    tables = function(which = c("g2", "g0", "g6"), ...) {
+    tables = function(which = c("all", "g0", "g2", "g6"), ...) {
       if (is.null(self$result)) stop("No result available: call $run() first.", call. = FALSE)
       which = match.arg(which)
+      if (which == "all") {
+        return(list(
+          g0 = gate0_tables(self$result, ...),
+          g2 = gate2_tables(self$result, ...),
+          g6 = gate6_tables(self$result, ...)
+        ))
+      }
       if (which == "g0") {
         return(gate0_tables(self$result, ...))
       }
@@ -363,7 +370,13 @@ AutoIML = R6::R6Class(
       res = self$result
       cat("\n=== AutoIML Overview ===\n")
       cat("Task: ", res$task_id, " | Learner: ", res$learner_id, " | Resampling: ", self$resampling$id, "\n", sep = "")
-      cat("Purpose: ", res$purpose, " | quick_start: ", res$quick_start, " | profile: ", self$profile, " | seed: ", self$seed, "\n", sep = "")
+      cat(
+        "Purpose: ", res$purpose,
+        " | quick_start: ", res$quick_start,
+        " | profile: ", self$profile,
+        " | seed: ", self$seed, "\n",
+        sep = ""
+      )
       iel_txt = .autoiml_format_iel(res$iel)
       scope_txt = .autoiml_format_claim_scope(res$claim_scope)
       cat("IEL: ", iel_txt, "\n", sep = "")
@@ -502,10 +515,13 @@ AutoIML = R6::R6Class(
 
       # Semantics: default SHAP mode depends on the declared semantics (Gate 0A),
       # but can be overridden via ctx$shap$mode.
-      sem = .autoiml_normalize_semantics(((ctx$claim %??% list())$semantics %??% "within_support"), default = "within_support")
+      sem = .autoiml_normalize_semantics(
+        ((ctx$claim %??% list())$semantics %??% "within_support"),
+        default = "within_support"
+      )
 
       shap_cfg = ctx$shap %??% list()
-      if (!is.list(shap_cfg)) shap_cfg <- list()
+      if (!is.list(shap_cfg)) shap_cfg = list()
 
       shap_mode = .autoiml_normalize_shap_mode(
         shap_cfg$mode %??% if (identical(sem, "within_support")) "conditional" else "marginal",

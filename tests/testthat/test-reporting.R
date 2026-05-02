@@ -16,7 +16,9 @@ test_that("report_card works for AutoIML and AutoIMLResult", {
   expect_true(data.table::is.data.table(rce1))
   expect_true(data.table::is.data.table(rce2))
   expect_equal(rce1, rce2)
-  expect_true(all(c("requirement_id", "gate", "gate_status", "artifact_keys_ok", "applicable", "evidence_status") %in% names(rce1)))
+  expect_true(all(c(
+    "requirement_id", "gate", "gate_status", "artifact_keys_ok", "applicable", "evidence_status"
+  ) %in% names(rce1)))
 
   expect_true(data.table::is.data.table(result$report_card_extended()))
 
@@ -32,6 +34,11 @@ test_that("AutoIML$tables and AutoIML$overview work", {
   tabs_g2 = auto$tables("g2")
   expect_true(is.list(tabs_g2))
   expect_true(all(c("metrics", "max_cor_pair", "ice_spread_top", "hstats_top") %in% names(tabs_g2)))
+
+  tabs_all = auto$tables("all")
+  expect_true(is.list(tabs_all))
+  expect_true(all(c("g0", "g2", "g6") %in% names(tabs_all)))
+  expect_true(is.list(tabs_all$g2))
 
   out = auto$overview()
   expect_true(inherits(out, "AutoIMLResult"))

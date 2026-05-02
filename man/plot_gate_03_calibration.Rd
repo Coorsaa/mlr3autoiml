@@ -8,8 +8,9 @@ Internal ggplot2-based plotting helpers for Gate 3 (Calibration and Decision Uti
 
 These functions visualize:
 \itemize{
-\item Reliability (calibration) curve for the primary model
-\item Decision Curve Analysis (DCA) with net benefit and treat-all baseline
+\item Reliability (calibration) curve with bootstrap 95\\% CI bands
+\item Decision Curve Analysis (DCA) with net benefit, bootstrap 95\\% CI,
+and treat-all / treat-none baselines
 }
 }
 \keyword{internal}

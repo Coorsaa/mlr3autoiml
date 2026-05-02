@@ -82,6 +82,37 @@ Gate0BMeasurement = R6::R6Class(
         any(nzchar(trimws(vals)))
       }
 
+      normalize_evidence_status = function(x) {
+        vals = as.character(x)
+        vals = vals[!is.na(vals)]
+        vals = tolower(trimws(vals))
+        vals = gsub("[[:space:]-]+", "_", vals)
+        vals[nzchar(vals)]
+      }
+
+      evidence_status = function(x) {
+        if (is.null(x)) {
+          return(character())
+        }
+        if (is.list(x)) {
+          x = .autoiml_as_list(x)
+          return(normalize_evidence_status(x$status %??% character()))
+        }
+        normalize_evidence_status(x)
+      }
+
+      incomplete_status = c(
+        "pending", "unknown", "not_assessed", "missing", "none", "unavailable", "not_tested", "tbd",
+        "planned"
+      )
+      negative_status = c("fail", "failed", "not_supported", "unsupported", "violated")
+      reliability_status = evidence_status(m$reliability)
+      invariance_status = evidence_status(m$invariance)
+      reliability_pending = any(reliability_status %in% incomplete_status)
+      invariance_pending = any(invariance_status %in% incomplete_status)
+      reliability_not_supported = any(reliability_status %in% negative_status)
+      invariance_not_supported = any(invariance_status %in% negative_status)
+
       # user-provided metadata
       pv_cfg = .autoiml_as_list(ctx$plausible_values)
       has_pv_tasks = {
@@ -97,8 +128,12 @@ Gate0BMeasurement = R6::R6Class(
       level_source = if (!is.na(level_user)) "user" else if (isTRUE(has_pv_tasks)) "analysis" else "missing"
       level = if (!is.na(level_user)) level_user else if (isTRUE(has_pv_tasks)) "plausible_values" else "unknown"
 
-      has_reliability = isTRUE(has_content(m$reliability))
-      has_invariance = isTRUE(has_content(m$invariance))
+      has_reliability = isTRUE(
+        has_content(m$reliability) && !reliability_pending && !reliability_not_supported
+      )
+      has_invariance = isTRUE(
+        has_content(m$invariance) && !invariance_pending && !invariance_not_supported
+      )
       has_construct_map = isTRUE(has_content(m$construct_map))
 
       # automatic missingness summary
@@ -143,10 +178,23 @@ Gate0BMeasurement = R6::R6Class(
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "measurement_level")
-          msgs = c(msgs, "Measurement level is not specified (item/scale/factor_score/plausible_values); this is required for high-stakes interpretation claims.")
+          msgs = c(
+            msgs,
+            paste(
+              "Measurement level is not specified (item/scale/factor_score/plausible_values);",
+              "this is required for high-stakes interpretation claims."
+            )
+          )
         } else if (purpose != "exploratory") {
           status = "warn"
-          msgs = c(msgs, "Measurement level not specified (item/scale/factor_score/plausible_values). In psychological applications, interpretation and transportability depend on construct definition and measurement quality.")
+          msgs = c(
+            msgs,
+            paste(
+              "Measurement level not specified (item/scale/factor_score/plausible_values).",
+              "In psychological applications, interpretation and transportability depend on construct definition",
+              "and measurement quality."
+            )
+          )
         }
       }
 
@@ -158,7 +206,10 @@ Gate0BMeasurement = R6::R6Class(
           "No feature missingness was detected in the analyzed task data."
         } else if (is.finite(miss_max) && is.finite(miss_mean)) {
           sprintf(
-            "Feature missingness is present in the analyzed task data (max %.1f%%, mean %.1f%%). Interpret handling together with the fitted resampling pipeline used in Gate 1.",
+            paste(
+              "Feature missingness is present in the analyzed task data (max %.1f%%, mean %.1f%%).",
+              "Interpret handling together with the fitted resampling pipeline used in Gate 1."
+            ),
             100 * miss_max,
             100 * miss_mean
           )
@@ -169,11 +220,17 @@ Gate0BMeasurement = R6::R6Class(
 
       if (!isTRUE(user_has_scoring_pipeline)) {
         m$scoring_pipeline = if (identical(level, "plausible_values") || isTRUE(has_pv_tasks)) {
-          "Outcome uncertainty is represented through the supplied plausible-value tasks, and Gate 1 pools predictive metrics across those tasks."
+          paste(
+            "Outcome uncertainty is represented through the supplied plausible-value tasks,",
+            "and Gate 1 pools predictive metrics across those tasks."
+          )
         } else if (inherits(task, "TaskClassif")) {
           "Use the observed task target and feature representation supplied to the fitted learner pipeline in Gate 1."
         } else if (inherits(task, "TaskRegr")) {
-          "Use the observed numeric task target and feature representation supplied to the fitted learner pipeline in Gate 1."
+          paste(
+            "Use the observed numeric task target and feature representation supplied to",
+            "the fitted learner pipeline in Gate 1."
+          )
         } else {
           "Use the task target and feature representation supplied to the fitted learner pipeline in Gate 1."
         }
@@ -195,7 +252,10 @@ Gate0BMeasurement = R6::R6Class(
         msgs = c(
           msgs,
           sprintf(
-            "Derived %s from the analyzed task and fitted pipeline. Override ctx$measurement if you need a narrower measurement description.",
+            paste(
+              "Derived %s from the analyzed task and fitted pipeline.",
+              "Override ctx$measurement if you need a narrower measurement description."
+            ),
             paste(unique(derived_fields), collapse = ", ")
           )
         )
@@ -205,10 +265,58 @@ Gate0BMeasurement = R6::R6Class(
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "reliability")
-          msgs = c(msgs, "No reliability evidence provided in ctx$measurement (e.g., omega/alpha, test-retest, interrater); this is required for high-stakes use.")
+          if (isTRUE(reliability_pending)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Reliability evidence in ctx$measurement$reliability is marked pending/unknown;",
+                "completed evidence is required for high-stakes use."
+              )
+            )
+          } else if (isTRUE(reliability_not_supported)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Reliability evidence in ctx$measurement$reliability is marked unsupported;",
+                "this is not sufficient for high-stakes use."
+              )
+            )
+          } else {
+            msgs = c(
+              msgs,
+              paste(
+                "No reliability evidence provided in ctx$measurement (e.g., omega/alpha, test-retest, interrater);",
+                "this is required for high-stakes use."
+              )
+            )
+          }
         } else if (purpose != "exploratory") {
           status = "warn"
-          msgs = c(msgs, "No reliability evidence provided in ctx$measurement (e.g., omega/alpha, test-retest, interrater). Consider documenting available evidence or limitations.")
+          if (isTRUE(reliability_pending)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Reliability evidence in ctx$measurement$reliability is marked pending/unknown.",
+                "Treat construct-level interpretation as provisional."
+              )
+            )
+          } else if (isTRUE(reliability_not_supported)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Reliability evidence in ctx$measurement$reliability is marked unsupported.",
+                "Treat construct-level interpretation as limited."
+              )
+            )
+          } else {
+            msgs = c(
+              msgs,
+              paste(
+                "No reliability evidence provided in ctx$measurement (e.g., omega/alpha, test-retest, interrater).",
+                "Consider documenting available evidence or limitations."
+              )
+            )
+          }
         }
       }
 
@@ -216,10 +324,59 @@ Gate0BMeasurement = R6::R6Class(
         if (isTRUE(high_stakes)) {
           status = "fail"
           critical_missing = c(critical_missing, "invariance")
-          msgs = c(msgs, "Subgroups declared (ctx$sensitive_features / Task stratum roles) but no invariance/comparability evidence provided (ctx$measurement$invariance); this is required for high-stakes subgroup claims.")
+          if (isTRUE(invariance_pending)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Invariance/comparability evidence in ctx$measurement$invariance is marked pending/unknown;",
+                "completed evidence is required for high-stakes subgroup claims."
+              )
+            )
+          } else if (isTRUE(invariance_not_supported)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Invariance/comparability evidence in ctx$measurement$invariance is marked unsupported;",
+                "this is not sufficient for high-stakes subgroup claims."
+              )
+            )
+          } else {
+            msgs = c(
+              msgs,
+              paste(
+                "Subgroups declared (ctx$sensitive_features / Task stratum roles) but no invariance/comparability",
+                "evidence provided (ctx$measurement$invariance); this is required for high-stakes subgroup claims."
+              )
+            )
+          }
         } else if (purpose != "exploratory") {
           status = "warn"
-          msgs = c(msgs, "Subgroups declared (ctx$sensitive_features / Task stratum roles) but no invariance/comparability evidence provided (ctx$measurement$invariance). Consider testing measurement invariance or justifying comparability assumptions.")
+          if (isTRUE(invariance_pending)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Invariance/comparability evidence in ctx$measurement$invariance is marked pending/unknown.",
+                "Treat cross-group interpretation as provisional."
+              )
+            )
+          } else if (isTRUE(invariance_not_supported)) {
+            msgs = c(
+              msgs,
+              paste(
+                "Invariance/comparability evidence in ctx$measurement$invariance is marked unsupported.",
+                "Treat cross-group interpretation as limited."
+              )
+            )
+          } else {
+            msgs = c(
+              msgs,
+              paste(
+                "Subgroups declared (ctx$sensitive_features / Task stratum roles) but no invariance/comparability",
+                "evidence provided (ctx$measurement$invariance). Consider testing measurement invariance",
+                "or justifying comparability assumptions."
+              )
+            )
+          }
         }
       }
 
@@ -227,7 +384,17 @@ Gate0BMeasurement = R6::R6Class(
         if (identical(status, "pass")) {
           status = "warn"
         }
-        msgs = c(msgs, sprintf("High missingness detected (max missing rate %.1f%% >= %.1f%%). Document missingness mechanism assumptions and handling (imputation/modeling).", 100 * miss_max, 100 * miss_warn))
+        msgs = c(
+          msgs,
+          sprintf(
+            paste(
+              "High missingness detected (max missing rate %.1f%% >= %.1f%%).",
+              "Document missingness mechanism assumptions and handling (imputation/modeling)."
+            ),
+            100 * miss_max,
+            100 * miss_warn
+          )
+        )
       }
 
       if (identical(status, "fail") && length(critical_missing) > 0L) {
@@ -237,7 +404,10 @@ Gate0BMeasurement = R6::R6Class(
           ")."
         )
       } else {
-        summary = "Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived)."
+        summary = paste(
+          "Measurement readiness screened (psychometric evidence is user-supplied when needed,",
+          "and pipeline notes may be analysis-derived)."
+        )
       }
 
       metrics = data.table::data.table(
@@ -245,8 +415,12 @@ Gate0BMeasurement = R6::R6Class(
         measurement_level_source = level_source,
         reliability_required = isTRUE(reliability_required),
         has_reliability = isTRUE(has_reliability),
+        reliability_pending = isTRUE(reliability_pending),
+        reliability_not_supported = isTRUE(reliability_not_supported),
         invariance_required = isTRUE(invariance_required),
         has_invariance = isTRUE(has_invariance),
+        invariance_pending = isTRUE(invariance_pending),
+        invariance_not_supported = isTRUE(invariance_not_supported),
         has_construct_map = isTRUE(has_construct_map),
         has_missingness_plan = isTRUE(has_missingness_plan),
         has_scoring_pipeline = isTRUE(has_scoring_pipeline),

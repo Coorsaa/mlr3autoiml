@@ -12,6 +12,8 @@ scopes: [global, local, decision]
 #   required for user-facing / non-technical audiences.
 # - Upper IEL tiers require stronger gate statuses (pass, not merely warn)
 #   where the manuscript treats the corresponding evidence as decisive.
+# - IEL-2 and IEL-3 require Gate 0B to pass; pending measurement comparability
+#   evidence caps interpretation at IEL-1 even if downstream predictive gates pass.
 # - Gate 6 is only universal for IEL-3, not for IEL-2.
 
 rules:
@@ -29,6 +31,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G5]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G5: [pass]
@@ -42,6 +45,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G5, G6]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G5: [pass]
@@ -67,6 +71,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G4, G5]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G4: [pass]
@@ -80,6 +85,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G4, G5, G6]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G4: [pass]
@@ -97,6 +103,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G4, G5, G6, G7B]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G4: [pass]
@@ -128,6 +135,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G3, G5, G7A]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G3: [pass]
@@ -144,6 +152,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G3, G5, G6, G7A]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G3: [pass]
@@ -165,6 +174,7 @@ rules:
     requires_any_status_in: [pass, warn]
     required_gates: [G0A, G0B, G1, G2, G3, G5, G6, G7A, G7B]
     gate_status_requirements:
+      G0B: [pass]
       G1: [pass]
       G2: [pass]
       G3: [pass]

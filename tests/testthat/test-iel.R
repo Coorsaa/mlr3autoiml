@@ -65,6 +65,33 @@ test_that("iel_from_gates returns claim-scoped IELs aligned with paper logic", {
   expect_equal(iel3$overall, "IEL-3")
 })
 
+test_that("iel_from_gates caps IEL-2 when Gate 0B is provisional", {
+  claim_art = list(claim = list(
+    claims = list(global = TRUE, local = FALSE, decision = FALSE),
+    stakes = "medium",
+    purpose = "global_insight",
+    audience = "technical"
+  ))
+
+  gates = list(
+    G0A = make_test_gate_result("G0A", "pass", artifacts = claim_art),
+    G0B = make_test_gate_result("G0B", "warn"),
+    G1 = make_test_gate_result("G1", "pass"),
+    G2 = make_test_gate_result("G2", "pass", artifacts = list(
+      recommendation = "ALE with ICE under within-support semantics",
+      ale_curves = data.table::data.table(feature = "x", x = 1, ale = 0)
+    )),
+    G5 = make_test_gate_result("G5", "pass", artifacts = list(
+      perm_importance = data.table::data.table(feature = "x", importance = 0.1)
+    ))
+  )
+
+  iel = mlr3autoiml::iel_from_gates(gates)
+  expect_equal(iel$global, "IEL-1")
+  expect_equal(iel$overall, "IEL-1")
+  expect_true(any(grepl("status_mismatch:G0B", iel$iel_justification$global$reason, fixed = TRUE)))
+})
+
 test_that("decision IELs do not require local-faithfulness or human factors unless scoped", {
   claim_art = list(claim = list(
     claims = list(global = TRUE, local = FALSE, decision = TRUE),
@@ -136,7 +163,10 @@ test_that("user-facing high-stakes decision IEL-3 requires human-factors evidenc
 
   iel_no_hf = mlr3autoiml::iel_from_gates(g_base)
   expect_equal(iel_no_hf$decision, "IEL-2")
-  expect_true(any(grepl("user_facing_condition_not_met|missing_gates:G7B|status_mismatch:G7B", iel_no_hf$iel_justification$decision$reason)))
+  expect_true(any(grepl(
+    "user_facing_condition_not_met|missing_gates:G7B|status_mismatch:G7B",
+    iel_no_hf$iel_justification$decision$reason
+  )))
 
   g_base$G7B = make_test_gate_result("G7B", "pass", artifacts = list(
     human_factors_evidence = list(task_study = "completed")
@@ -183,7 +213,13 @@ test_that("claim_scope_from_iel returns paper-aligned scope statements", {
   expect_match(scope0$local, "Avoid case-level")
   expect_match(scope0$decision, "Avoid decision")
 
-  iel2 = list(overall = "IEL-2", global = "IEL-2", local = "IEL-2", decision = "IEL-2", requested = c("global", "local"))
+  iel2 = list(
+    overall = "IEL-2",
+    global = "IEL-2",
+    local = "IEL-2",
+    decision = "IEL-2",
+    requested = c("global", "local")
+  )
   scope2 = mlr3autoiml::claim_scope_from_iel(iel2, "global_insight")
   expect_match(scope2$global, "Controlled global/regional reporting")
   expect_match(scope2$local, "Controlled local/regional support")

@@ -45,6 +45,28 @@ test_that("Gate0BMeasurement derives plausible-values level and pipeline notes",
   expect_true(all(c("level", "missingness_plan", "scoring_pipeline") %in% out$artifacts$derived_fields))
 })
 
+test_that("Gate0BMeasurement treats pending invariance as provisional evidence", {
+  gate = mlr3autoiml:::Gate0BMeasurement$new()
+  ctx = list(
+    task = mlr3::tsk("iris"),
+    claim = list(purpose = "global_insight", stakes = "medium"),
+    sensitive_features = "Petal.Length",
+    measurement = list(
+      level = "plausible_values",
+      invariance = list(
+        status = "pending",
+        note = "Cross-country comparability checks are planned."
+      )
+    )
+  )
+
+  out = gate$run(ctx)
+  expect_equal(out$status, "warn")
+  expect_false(out$metrics$has_invariance[[1L]])
+  expect_true(out$metrics$invariance_pending[[1L]])
+  expect_match(paste(out$messages, collapse = " "), "pending/unknown")
+})
+
 test_that("Gate0BMeasurement fails high-stakes subgroup use without invariance", {
   gate = mlr3autoiml:::Gate0BMeasurement$new()
   ctx = list(

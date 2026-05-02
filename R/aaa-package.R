@@ -21,7 +21,7 @@
 #' }
 #'
 #' @importFrom data.table data.table rbindlist setnames := .N .SD .I
-#' @importFrom stats cor quantile sd var coef glm predict lm setNames reorder
+#' @importFrom stats cor quantile sd var coef glm predict lm median setNames reorder
 #' @importFrom R6 R6Class
 #' @importFrom checkmate assert_flag
 #' @importFrom cli cli_abort cli_warn cli_inform
@@ -43,7 +43,7 @@ utils::globalVariables(c(
   "importance", "learner_id", "measure_id", "mean", "sd", "se", "ci_low", "ci_high",
   "in_rashomon", "rashomon_threshold",
   "ice_sd_mean", "hstat", "grid_n", "sample_n",
-  "type", "id", "group", "n", "logloss",
+  "type", "id", "group", "n", "N", "logloss",
   "status", "gate_id", "gate_name", "pdr", "summary",
   "iel_overall", "iel_global", "iel_local", "iel_decision",
   "purpose", "quick_start", "semantics", "stakes",
@@ -51,5 +51,17 @@ utils::globalVariables(c(
   "missing_rate", "iteration", "value", "rank", "pred_range", "learner",
   "x_mid", "y_mean", "bin", "threshold", "net_benefit", "nb_treat_all", "nb_treat_none",
   "mean_importance", "flag_off_support", "ratio_to_baseline", "region_id",
-  "feature1", "feature2", "pair", "x", "y", "yhat", "m", "shap_mode"
+  "feature1", "feature2", "pair", "x", "y", "yhat", "m", "shap_mode",
+  "bounds", "branch_label", "child_frac", "child_half_height", "child_kind",
+  "child_order", "depth", "feature_plot", "fill_key", "flag", "gain", "gain_ratio",
+  "group_var", "heterogeneity_reduction", "label", "label_main", "label_stats",
+  "label_text", "level", "line_dy", "line_label", "local_effect", "loss", "n_leaf",
+  "n_parent", "nb_ci_high", "nb_ci_low", "node_kind", "null_quantile",
+  "null_quantile.from_null", "null_risk", "observed_risk", "p_value", "parent_depth",
+  "parent_frac", "parent_half_height", "path", "path_chr", "permutation",
+  "pint_interaction", "root_loss", "rule_left", "rule_right", "semantics_label",
+  "split_feature", "split_type", "split_value", "target_features", "terminal_loss",
+  "threshold_pct", "total_loss", "x_child", "x_from", "x_label", "x_parent", "x_to",
+  "y_child", "y_ci_high", "y_ci_low", "y_from", "y_global", "y_label", "y_parent",
+  "y_region", "y_to"
 ))

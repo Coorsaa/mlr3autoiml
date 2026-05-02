@@ -3,6 +3,13 @@
 ^IML_ARTICLE$
 ^Simulation_Study\.R$
 ^mlr3autoiml\.zip$
+^.*[.]pdf$
+^AGENTS[.]md$
+^CLAUDE[.]md$
+^README[.]Rmd$
+^\.DS_Store$
+^\.claude$
+^\.claude/.*
 ^data/PISA$
 ^data/SHILD$
 ^data/PISA/.*

@@ -549,7 +549,10 @@ NULL
       if (!is.null(class_label) && "class_label" %in% names(assignments)) {
         assignments = assignments[class_label == as.character(class_label)[1L]]
       }
-      vals = tryCatch(ctx$task$data(rows = assignments$row_id, cols = feature_sel)[[feature_sel]], error = function(e) NULL)
+      vals = tryCatch(
+        ctx$task$data(rows = assignments$row_id, cols = feature_sel)[[feature_sel]],
+        error = function(e) NULL
+      )
       if (!is.null(vals)) {
         rug_dt = data.table::data.table(
           row_id = assignments$row_id,
@@ -567,7 +570,9 @@ NULL
   }
 
   pal = .autoiml_plot_palette()
-  region_values = .autoiml_gadget_region_colors(unique(c(curves$path, if (!is.null(rug_dt)) rug_dt$path else character())))
+  region_values = .autoiml_gadget_region_colors(
+    unique(c(curves$path, if (!is.null(rug_dt)) rug_dt$path else character()))
+  )
   class_txt = if (!is.null(class_label)) sprintf(" - %s", as.character(class_label)[1L]) else ""
 
   if (mode == "facet") {
@@ -870,14 +875,23 @@ NULL
     split_value = make_split_value(.SD),
     child_left = vapply(seq_len(.N), function(i) child_path(path[i], rule_left[i]), character(1L)),
     child_right = vapply(seq_len(.N), function(i) child_path(path[i], rule_right[i]), character(1L)),
-    branch_left = vapply(seq_len(.N), function(i) short_rule(split_feature[i], split_type[i], threshold[i], level[i], "left"), character(1L)),
-    branch_right = vapply(seq_len(.N), function(i) short_rule(split_feature[i], split_type[i], threshold[i], level[i], "right"), character(1L))
+    branch_left = vapply(
+      seq_len(.N),
+      function(i) short_rule(split_feature[i], split_type[i], threshold[i], level[i], "left"),
+      character(1L)
+    ),
+    branch_right = vapply(
+      seq_len(.N),
+      function(i) short_rule(split_feature[i], split_type[i], threshold[i], level[i], "right"),
+      character(1L)
+    )
   )]
 
   split_lookup = split(seq_len(nrow(splits)), splits$path_chr)
   node_map = new.env(parent = emptyenv())
-  edge_rows = list()
-  order_counter = 0L
+  walk_state = new.env(parent = emptyenv())
+  walk_state$edge_rows = list()
+  walk_state$order_counter = 0L
 
   add_or_update_node = function(path, depth, node_kind, split_idx = NA_integer_) {
     key = as.character(path)
@@ -908,14 +922,14 @@ NULL
       left_path = splits$child_left[[idx]]
       right_path = splits$child_right[[idx]]
 
-      edge_rows[[length(edge_rows) + 1L]] <<- data.table::data.table(
+      walk_state$edge_rows[[length(walk_state$edge_rows) + 1L]] = data.table::data.table(
         parent_path = path,
         child_path = left_path,
         branch_side = "left",
         branch_label = splits$branch_left[[idx]],
         child_order = 1L
       )
-      edge_rows[[length(edge_rows) + 1L]] <<- data.table::data.table(
+      walk_state$edge_rows[[length(walk_state$edge_rows) + 1L]] = data.table::data.table(
         parent_path = path,
         child_path = right_path,
         branch_side = "right",
@@ -936,10 +950,10 @@ NULL
     }
 
     add_or_update_node(path, depth, "leaf")
-    order_counter <<- order_counter + 1L
+    walk_state$order_counter = walk_state$order_counter + 1L
     node = get(path, envir = node_map, inherits = FALSE)
-    node$x = order_counter
-    node$order = order_counter
+    node$x = walk_state$order_counter
+    node$order = walk_state$order_counter
     assign(path, node, envir = node_map)
     invisible(NULL)
   }
@@ -1026,13 +1040,26 @@ NULL
   )]
   nodes[, label_text := paste(label_main, label_stats, sep = "\n")]
 
+  edge_rows = walk_state$edge_rows
   edge_dt = if (length(edge_rows) > 0L) data.table::rbindlist(edge_rows, fill = TRUE) else data.table::data.table()
   if (nrow(edge_dt) == 0L) {
     return(NULL)
   }
 
-  edge_dt = merge(edge_dt, nodes[, .(parent_path = path, x_parent = x, y_parent = y, parent_depth = depth)], by = "parent_path", all.x = TRUE, sort = FALSE)
-  edge_dt = merge(edge_dt, nodes[, .(child_path = path, x_child = x, y_child = y, child_kind = node_kind)], by = "child_path", all.x = TRUE, sort = FALSE)
+  edge_dt = merge(
+    edge_dt,
+    nodes[, .(parent_path = path, x_parent = x, y_parent = y, parent_depth = depth)],
+    by = "parent_path",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  edge_dt = merge(
+    edge_dt,
+    nodes[, .(child_path = path, x_child = x, y_child = y, child_kind = node_kind)],
+    by = "child_path",
+    all.x = TRUE,
+    sort = FALSE
+  )
   leaf_height = 0.90
   split_height = 0.26
   edge_dt[, parent_half_height := split_height / 2]
@@ -1112,7 +1139,7 @@ NULL
         data = branch_label_dt,
         mapping = ggplot2::aes(x = x_label, y = y_label, label = branch_label),
         size = 3.0,
-        label.size = 0,
+        linewidth = 0,
         label.padding = grid::unit(0.11, "lines"),
         fill = "white",
         color = pal$reference[["neutral"]],
@@ -1125,7 +1152,7 @@ NULL
       ggplot2::geom_label(
         data = internal_nodes,
         mapping = ggplot2::aes(x = x, y = y, label = label_text, fill = fill_key),
-        label.size = 0.25,
+        linewidth = 0.25,
         label.padding = grid::unit(0.23, "lines"),
         label.r = grid::unit(0.13, "lines"),
         size = 3.3,
@@ -1212,7 +1239,10 @@ NULL
     ) +
     ggplot2::labs(
       title = "G2: GADGET split tree",
-      subtitle = "Internal nodes show split and gain; branch labels are shown for higher-level splits; terminal nodes contain detailed GADGET regional curves",
+      subtitle = paste(
+        "Internal nodes show split and gain; branch labels are shown for higher-level splits;",
+        "terminal nodes contain detailed GADGET regional curves"
+      ),
       x = NULL,
       y = NULL
     ) +

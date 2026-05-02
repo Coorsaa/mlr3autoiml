@@ -253,14 +253,14 @@ A list of gate objects in execution order.
 \subsection{Method \code{tables()}}{
 Return key tables produced by the workflow.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{AutoIML$tables(which = c("g2", "g0", "g6"), ...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{AutoIML$tables(which = c("all", "g0", "g2", "g6"), ...)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{which}}{(\code{character(1)})
-Which tables to return. Currently supports \code{"all"} and gate-specific options.}
+Which tables to return. Supports \code{"all"} and gate-specific options \code{"g0"}, \code{"g2"}, and \code{"g6"}.}
 
 \item{\code{...}}{Additional arguments forwarded to table helpers.}
 }
