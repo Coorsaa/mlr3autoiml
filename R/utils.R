@@ -404,17 +404,66 @@ NULL
   )
 }
 
-.autoiml_dca = function(truth01, p_hat, thresholds = seq(0.01, 0.99, by = 0.01)) {
+.autoiml_dca = function(truth01, p_hat, thresholds = seq(0, 1, by = 0.01)) {
   N = length(truth01)
   out = lapply(thresholds, function(tau) {
     pred_pos = p_hat >= tau
     TP = sum(pred_pos & truth01 == 1)
     FP = sum(pred_pos & truth01 == 0)
-    nb = TP / N - FP / N * (tau / (1 - tau))
+    nb = if (tau >= 1) 0 else TP / N - FP / N * (tau / (1 - tau))
     data.table::data.table(threshold = tau, TP = TP, FP = FP, N = N, net_benefit = nb)
   })
   data.table::rbindlist(out)
 }
+
+# ---- bootstrap CIs for calibration/DCA (Gate 3, IEL-2D requirement) ---------
+
+.autoiml_reliability_curve_boot = function(truth01, p_hat, bins = 10L, B = 200L,
+                                            level = 0.95) {
+  # Point estimate
+  point = .autoiml_reliability_curve_binary(truth01, p_hat, bins = bins)
+  if (is.null(point) || nrow(point) == 0L) return(point)
+
+  n = length(truth01)
+  alpha = 1 - level
+  boot_y = matrix(NA_real_, nrow = nrow(point), ncol = B)
+
+  for (b in seq_len(B)) {
+    idx = sample.int(n, n, replace = TRUE)
+    rc_b = .autoiml_reliability_curve_binary(truth01[idx], p_hat[idx], bins = bins)
+    if (!is.null(rc_b) && nrow(rc_b) == nrow(point)) {
+      boot_y[, b] = rc_b$y_mean
+    }
+  }
+
+  point[, y_ci_low  := apply(boot_y, 1L, quantile, probs = alpha / 2,   na.rm = TRUE)]
+  point[, y_ci_high := apply(boot_y, 1L, quantile, probs = 1 - alpha/2, na.rm = TRUE)]
+  point[]
+}
+
+.autoiml_dca_boot = function(truth01, p_hat, thresholds = seq(0.01, 0.99, by = 0.01),
+                              B = 200L, level = 0.95) {
+  # Point estimate
+  point = .autoiml_dca(truth01, p_hat, thresholds = thresholds)
+  if (is.null(point) || nrow(point) == 0L) return(point)
+
+  n = length(truth01)
+  alpha = 1 - level
+  boot_nb = matrix(NA_real_, nrow = nrow(point), ncol = B)
+
+  for (b in seq_len(B)) {
+    idx = sample.int(n, n, replace = TRUE)
+    dca_b = .autoiml_dca(truth01[idx], p_hat[idx], thresholds = thresholds)
+    if (!is.null(dca_b) && nrow(dca_b) == nrow(point)) {
+      boot_nb[, b] = dca_b$net_benefit
+    }
+  }
+
+  point[, nb_ci_low  := apply(boot_nb, 1L, quantile, probs = alpha / 2,   na.rm = TRUE)]
+  point[, nb_ci_high := apply(boot_nb, 1L, quantile, probs = 1 - alpha/2, na.rm = TRUE)]
+  point[]
+}
+
 
 .autoiml_mode = function(x) {
   x = x[!is.na(x)]

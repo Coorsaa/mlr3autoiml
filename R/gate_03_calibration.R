@@ -48,8 +48,10 @@ Gate3Calibration = R6::R6Class(
 
       decision_spec = (claim$decision_spec %??% list())
       .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
-      claim_thr = decision_spec$thresholds %??% NULL
-      thresholds = claim_thr %??% cfg$thresholds %??% seq(0.01, 0.99, by = 0.01)
+
+      # DCA is always evaluated over the full [0, 1] range.
+      # decision_spec$thresholds defines only the decision-relevant shading region.
+      thresholds = cfg$thresholds %??% seq(0, 1, by = 0.01)
 
       bins = as.integer(cfg$bins %??% 10L)
 
@@ -73,15 +75,18 @@ Gate3Calibration = R6::R6Class(
 
       utility_spec = if (isTRUE(has_utility)) "utility" else if (isTRUE(has_costs)) "costs" else "none"
 
-      thr_num = suppressWarnings(as.numeric(thresholds))
-      thr_num = thr_num[is.finite(thr_num) & thr_num > 0 & thr_num < 1]
-      thr_num = sort(unique(thr_num))
+      # decision_range for plot shading: derived from decision_spec$thresholds only
+      shade_num = if (!is.null(decision_spec$thresholds)) {
+        v = suppressWarnings(as.numeric(decision_spec$thresholds))
+        v[is.finite(v) & v > 0 & v < 1]
+      } else numeric(0)
+
       decision_range = data.table::data.table(
         decision_claim = isTRUE(decision_claim),
         utility_spec = utility_spec,
-        n_thresholds = length(thr_num),
-        thr_min = if (length(thr_num) > 0L) min(thr_num) else NA_real_,
-        thr_max = if (length(thr_num) > 0L) max(thr_num) else NA_real_
+        n_thresholds = length(shade_num),
+        thr_min = if (length(shade_num) > 0L) min(shade_num) else NA_real_,
+        thr_max = if (length(shade_num) > 0L) max(shade_num) else NA_real_
       )
 
       pred = ctx$pred
@@ -154,10 +159,10 @@ Gate3Calibration = R6::R6Class(
         ll = pred$score(mlr3::msr("classif.logloss"))
         auc = pred$score(mlr3::msr("classif.auc"))
 
-        rel = .autoiml_reliability_curve_binary(truth01, p_hat, bins = bins)
-        dca = .autoiml_dca(truth01, p_hat, thresholds = thresholds)
+        rel = .autoiml_reliability_curve_boot(truth01, p_hat, bins = bins, B = 200L)
+        dca = .autoiml_dca_boot(truth01, p_hat, thresholds = thresholds, B = 200L)
         prev = mean(truth01)
-        dca[, nb_treat_all := prev - (1 - prev) * threshold / (1 - threshold)]
+        dca[, nb_treat_all := ifelse(threshold >= 1, NA_real_, prev - (1 - prev) * threshold / (1 - threshold))]
         dca[, nb_treat_none := 0]
 
         # ---- cost-/utility-sensitive threshold sweep ---------------------
@@ -282,7 +287,7 @@ Gate3Calibration = R6::R6Class(
 
         rel = .autoiml_reliability_curve_binary(truth01, p_hat, bins = bins)
         dca = .autoiml_dca(truth01, p_hat, thresholds = thresholds)
-        dca[, nb_treat_all := prev - (1 - prev) * threshold / (1 - threshold)]
+        dca[, nb_treat_all := ifelse(threshold >= 1, NA_real_, prev - (1 - prev) * threshold / (1 - threshold))]
         dca[, nb_treat_none := 0]
 
         list(
