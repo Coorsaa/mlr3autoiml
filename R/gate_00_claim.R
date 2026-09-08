@@ -140,7 +140,13 @@ Gate0AClaim = R6::R6Class(
         has_text,
         logical(1L)
       ))) {
-        msgs = c(msgs, "Transport scope metadata is partial. AutoIML treats transport as task-specific unless you declare a wider boundary explicitly.")
+        msgs = c(
+          msgs,
+          paste(
+            "Transport scope metadata is incomplete.",
+            "AutoIML treats transport as task-specific unless you declare a wider boundary explicitly."
+          )
+        )
       }
 
       # ---- decision specification (optional) ----------------------------

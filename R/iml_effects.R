@@ -273,6 +273,7 @@ NULL
   feature,
   bins = 10L,
   trim = c(0.05, 0.95),
+  grid = NULL,
   class_labels = NULL,
   seed = 1L
 ) {
@@ -293,15 +294,22 @@ NULL
   X_ok = X[ok]
   x_ok = as.numeric(X_ok[[feature]])
 
-  # Preserve the full observed support for low-cardinality features so ordered
-  # response scales and similar discrete variables are not truncated to trimmed
-  # quantiles in the exported ALE curve.
-  x_unique = sort(unique(x_ok))
-  if (length(x_unique) <= as.integer(bins) + 1L) {
-    g = x_unique
+  if (!is.null(grid)) {
+    g = sort(unique(as.numeric(grid)))
+    if (length(g) < 3L || any(!is.finite(g))) {
+      stop("`grid` must contain at least three unique finite ALE boundaries.", call. = FALSE)
+    }
   } else {
-    # Quantile-based grid (iml-style ALE binning)
-    g = .autoiml_grid_1d_iml(x_ok, grid_n = as.integer(bins) + 1L, grid_type = "quantile", trim = trim)
+    # Preserve the full observed support for low-cardinality features so ordered
+    # response scales and similar discrete variables are not truncated to trimmed
+    # quantiles in the exported ALE curve.
+    x_unique = sort(unique(x_ok))
+    if (length(x_unique) <= as.integer(bins) + 1L) {
+      g = x_unique
+    } else {
+      # Quantile-based grid (iml-style ALE binning)
+      g = .autoiml_grid_1d_iml(x_ok, grid_n = as.integer(bins) + 1L, grid_type = "quantile", trim = trim)
+    }
   }
   if (length(g) < 3L) {
     return(NULL)
@@ -358,15 +366,19 @@ NULL
     delta[agg$interval] = agg$delta
     n_bin[agg$interval] = agg$n_interval
 
-    ale_raw = cumsum(delta)
+    # Accumulated differences live on interval boundaries. Report their
+    # trapezoidal average at each exported interval midpoint so the effect and
+    # x-coordinate describe the same location, including on uneven quantile grids.
+    ale_boundary = c(0, cumsum(delta))
+    ale_midpoint = (ale_boundary[-length(ale_boundary)] + ale_boundary[-1L]) / 2
 
     if (sum(n_bin) > 0L) {
-      center = sum(ale_raw * n_bin) / sum(n_bin)
+      center = sum(ale_midpoint * n_bin) / sum(n_bin)
     } else {
       center = 0
     }
 
-    ale = ale_raw - center
+    ale = ale_midpoint - center
 
     out_list[[k]] = data.table::data.table(
       class_label = if (inherits(task, "TaskClassif")) as.character(k) else NA_character_,
@@ -383,6 +395,62 @@ NULL
 }
 
 # ---- 2D ALE (interaction surface) -----------------------------------------
+
+.autoiml_center_ale_2d = function(delta_mat, n_mat) {
+  B1 = nrow(delta_mat)
+  B2 = ncol(delta_mat)
+
+  # Accumulate the local second differences on the grid boundaries.
+  # The leading zero row and column are the lower integration anchors.
+  cumulative = t(apply(delta_mat, 1L, cumsum))
+  cumulative = apply(cumulative, 2L, cumsum)
+  accumulated = matrix(0, nrow = B1 + 1L, ncol = B2 + 1L)
+  accumulated[-1L, -1L] = cumulative
+
+  # A second-order ALE surface must be orthogonalized against both main effects.
+  # For each interval, average the accumulated surface increment over the other
+  # feature using the observed joint-cell counts and trapezoidal boundary values.
+  marginal_delta1 = numeric(B1)
+  for (i in seq_len(B1)) {
+    boundary_delta = accumulated[i + 1L, ] - accumulated[i, ]
+    cell_delta = (boundary_delta[-length(boundary_delta)] + boundary_delta[-1L]) / 2
+    weight = n_mat[i, ]
+    if (sum(weight) > 0L) {
+      marginal_delta1[i] = sum(weight * cell_delta) / sum(weight)
+    }
+  }
+
+  marginal_delta2 = numeric(B2)
+  for (j in seq_len(B2)) {
+    boundary_delta = accumulated[, j + 1L] - accumulated[, j]
+    cell_delta = (boundary_delta[-length(boundary_delta)] + boundary_delta[-1L]) / 2
+    weight = n_mat[, j]
+    if (sum(weight) > 0L) {
+      marginal_delta2[j] = sum(weight * cell_delta) / sum(weight)
+    }
+  }
+
+  marginal1 = c(0, cumsum(marginal_delta1))
+  marginal2 = c(0, cumsum(marginal_delta2))
+  interaction = accumulated - outer(marginal1, rep(1, B2 + 1L)) -
+    outer(rep(1, B1 + 1L), marginal2)
+
+  # Report one value per rectangular output cell. Averaging its four boundary
+  # values aligns the effect with the exported cell geometry.
+  cell_effect = (
+    interaction[seq_len(B1), seq_len(B2), drop = FALSE] +
+      interaction[seq_len(B1), seq_len(B2) + 1L, drop = FALSE] +
+      interaction[seq_len(B1) + 1L, seq_len(B2), drop = FALSE] +
+      interaction[seq_len(B1) + 1L, seq_len(B2) + 1L, drop = FALSE]
+  ) / 4
+
+  total_n = sum(n_mat)
+  if (total_n > 0L) {
+    cell_effect = cell_effect - sum(cell_effect * n_mat) / total_n
+  }
+
+  cell_effect
+}
 
 .autoiml_ale_2d = function(
   task,
@@ -491,17 +559,7 @@ NULL
   # Replace any residual NAs (all-empty grid — degenerate case) with 0
   delta_mat[is.na(delta_mat)] = 0
 
-  # 2D cumulative sum: first along feature2 (cols), then along feature1 (rows)
-  # ale_mat[I,J] = sum_{i<=I, j<=J} delta[i,j]
-  ale_mat = t(apply(delta_mat, 1, cumsum)) # cumsum across cols (feature2 dir)
-  ale_mat = apply(ale_mat, 2, cumsum) # cumsum down rows   (feature1 dir)
-
-  # Centre by weighted mean (weights = observed cell counts; empty cells weight 0)
-  total_n = sum(n_mat)
-  if (total_n > 0L) {
-    center = sum(ale_mat * (n_mat / total_n), na.rm = TRUE)
-    ale_mat = ale_mat - center
-  }
+  ale_mat = .autoiml_center_ale_2d(delta_mat, n_mat)
 
   x1_mid = (g1[seq_len(B1)] + g1[seq_len(B1) + 1L]) / 2
   x2_mid = (g2[seq_len(B2)] + g2[seq_len(B2) + 1L]) / 2

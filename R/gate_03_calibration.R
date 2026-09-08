@@ -40,14 +40,43 @@ Gate3Calibration = R6::R6Class(
       task = ctx$task
       purpose = ctx$purpose %??% "exploratory"
       cfg = ctx$calibration %??% list()
-      .autoiml_assert_known_names(cfg, c("thresholds", "bins"), "ctx$calibration")
+      .autoiml_assert_known_names(
+        cfg,
+        c("thresholds", "bins", "maximum_ece", "calibration_slope_range", "maximum_abs_intercept"),
+        "ctx$calibration"
+      )
+
+      maximum_ece = cfg$maximum_ece %??% NULL
+      calibration_slope_range = cfg$calibration_slope_range %??% NULL
+      maximum_abs_intercept = cfg$maximum_abs_intercept %??% NULL
+      checkmate::assert_number(maximum_ece, lower = 0, finite = TRUE, null.ok = TRUE)
+      checkmate::assert_numeric(
+        calibration_slope_range,
+        lower = 0,
+        finite = TRUE,
+        len = 2L,
+        null.ok = TRUE
+      )
+      checkmate::assert_number(maximum_abs_intercept, lower = 0, finite = TRUE, null.ok = TRUE)
+      if (!is.null(calibration_slope_range) && calibration_slope_range[[1L]] > calibration_slope_range[[2L]]) {
+        stop("`ctx$calibration$calibration_slope_range` must be ordered from lower to upper.", call. = FALSE)
+      }
+      calibration_criteria_declared = any(vapply(
+        list(maximum_ece, calibration_slope_range, maximum_abs_intercept),
+        Negate(is.null),
+        logical(1L)
+      ))
 
       claim = ctx$claim %??% list()
       claims = (claim$claims %??% list())
       decision_claim = isTRUE(claims$decision %??% FALSE)
 
       decision_spec = (claim$decision_spec %??% list())
-      .autoiml_assert_known_names(decision_spec, c("thresholds", "costs", "utility", "positive_class"), "ctx$claim$decision_spec")
+      .autoiml_assert_known_names(
+        decision_spec,
+        c("thresholds", "costs", "utility", "positive_class"),
+        "ctx$claim$decision_spec"
+      )
 
       # DCA is always evaluated over the full [0, 1] range.
       # decision_spec$thresholds defines only the decision-relevant shading region.
@@ -111,8 +140,11 @@ Gate3Calibration = R6::R6Class(
         # Use mlr3 Prediction scoring directly
         rmse = pred$score(mlr3::msr("regr.rmse"))
 
-        status = "pass"
-        summary = "Regression: basic error metrics computed (calibration/utility mainly relevant for probabilistic forecasts)."
+        status = "warn"
+        summary = paste(
+          "Regression error was computed, but this compatibility gate does not adjudicate regression calibration.",
+          "Use the claim-scoped CSDG calibration module when a regression calibration claim is in scope."
+        )
 
         metrics = data.table::data.table(
           rmse = rmse,
@@ -211,21 +243,51 @@ Gate3Calibration = R6::R6Class(
           }
         }
 
-        # Heuristic gate decision
-        status = "pass"
-
-        # calibration concern heuristics
-        if (is.finite(ece) && ece > 0.10) status <- "warn"
-        if (is.finite(cal$slope) && (cal$slope < 0.8 || cal$slope > 1.2)) status <- "warn"
+        calibration_concerns = character()
+        if (!is.null(maximum_ece) && is.finite(ece) && ece > maximum_ece) {
+          calibration_concerns = c(calibration_concerns, "ECE exceeds the declared maximum")
+        }
+        if (!is.null(calibration_slope_range) && is.finite(cal$slope) &&
+            (cal$slope < calibration_slope_range[[1L]] || cal$slope > calibration_slope_range[[2L]])) {
+          calibration_concerns = c(calibration_concerns, "calibration slope is outside the declared range")
+        }
+        if (!is.null(maximum_abs_intercept) && is.finite(cal$intercept) &&
+            abs(cal$intercept) > maximum_abs_intercept) {
+          calibration_concerns = c(calibration_concerns, "absolute calibration intercept exceeds the declared maximum")
+        }
+        status = if (!calibration_criteria_declared || length(calibration_concerns)) "warn" else "pass"
 
         # decision-support concern heuristics
         msgs = character()
         if (isTRUE(decision_claim) && utility_spec == "none") {
           status = "warn"
-          msgs = c(msgs, "Decision claim requested but no utility/cost specification provided; threshold recommendations are not cost-sensitive without explicit utilities/costs.")
+          msgs = c(
+            msgs,
+            paste(
+              "Decision claim requested but no utility/cost specification was provided;",
+              "threshold recommendations are not cost-sensitive without explicit utilities/costs."
+            )
+          )
         }
 
-        summary = "Binary calibration/utility checks computed (intercept/slope, ECE, reliability, net benefit, cost-/utility sweep)."
+        summary = if (calibration_criteria_declared) {
+          paste(
+            paste(
+              "Binary calibration and decision-utility diagnostics were computed against",
+              "the declared calibration criteria."
+            ),
+            if (length(calibration_concerns)) {
+              paste(calibration_concerns, collapse = "; ")
+            } else {
+              "No declared criterion was exceeded."
+            }
+          )
+        } else {
+          paste(
+            "Binary calibration and decision-utility diagnostics were computed.",
+            "Calibration adequacy remains unadjudicated because no claim-specific criteria were declared."
+          )
+        }
         metrics = data.table::data.table(
           task_type = "classif",
           nclass = nclass,
@@ -236,6 +298,11 @@ Gate3Calibration = R6::R6Class(
           ece = ece,
           cal_intercept = cal$intercept,
           cal_slope = cal$slope,
+          calibration_criteria_declared = calibration_criteria_declared,
+          maximum_ece_criterion = maximum_ece %??% NA_real_,
+          minimum_slope_criterion = if (is.null(calibration_slope_range)) NA_real_ else calibration_slope_range[[1L]],
+          maximum_slope_criterion = if (is.null(calibration_slope_range)) NA_real_ else calibration_slope_range[[2L]],
+          maximum_abs_intercept_criterion = maximum_abs_intercept %??% NA_real_,
           utility_spec = utility_spec,
           opt_threshold = thr_opt,
           opt_value = thr_opt_value
@@ -257,7 +324,18 @@ Gate3Calibration = R6::R6Class(
           ),
           messages = c(
             msgs,
-            "For decision support, justify threshold policy (utilities/costs, prevalence, constraints) and validate net benefit / expected utility on OOF or external data."
+            if (!calibration_criteria_declared) {
+              paste(
+                "Declare claim- and use-specific calibration criteria to adjudicate adequacy;",
+                "the package supplies no universal cutoff."
+              )
+            } else if (length(calibration_concerns)) {
+              paste("Declared calibration concern(s):", paste(calibration_concerns, collapse = "; "))
+            },
+            paste(
+              "For decision support, justify the threshold policy through utilities, costs, prevalence, and constraints,",
+              "and validate net benefit or expected utility on out-of-fold or external data."
+            )
           )
         ))
       }
@@ -313,17 +391,56 @@ Gate3Calibration = R6::R6Class(
       max_ece = max(per_class_metrics$ece_ovr, na.rm = TRUE)
       slope_rng = range(per_class_metrics$cal_slope, na.rm = TRUE)
 
-      status = "pass"
-      if (is.finite(max_ece) && max_ece > 0.10) status <- "warn"
-      if (all(is.finite(slope_rng)) && (slope_rng[1] < 0.7 || slope_rng[2] > 1.3)) status <- "warn"
+      calibration_concerns = character()
+      if (!is.null(maximum_ece) && is.finite(max_ece) && max_ece > maximum_ece) {
+        calibration_concerns = c(calibration_concerns, "maximum one-vs-rest ECE exceeds the declared maximum")
+      }
+      if (!is.null(calibration_slope_range) && all(is.finite(slope_rng)) &&
+          (slope_rng[[1L]] < calibration_slope_range[[1L]] ||
+            slope_rng[[2L]] > calibration_slope_range[[2L]])) {
+        calibration_concerns = c(calibration_concerns, "one-vs-rest calibration slopes exceed the declared range")
+      }
+      if (!is.null(maximum_abs_intercept)) {
+        maximum_observed_abs_intercept = max(abs(per_class_metrics$cal_intercept), na.rm = TRUE)
+        if (is.finite(maximum_observed_abs_intercept) && maximum_observed_abs_intercept > maximum_abs_intercept) {
+          calibration_concerns = c(
+            calibration_concerns,
+            "maximum absolute one-vs-rest calibration intercept exceeds the declared maximum"
+          )
+        }
+      }
+      status = if (!calibration_criteria_declared || length(calibration_concerns)) "warn" else "pass"
 
       msgs = character()
       if (isTRUE(decision_claim) && utility_spec == "none") {
         status = "warn"
-        msgs = c(msgs, "Decision claim requested but no utility/cost specification provided; multiclass cost-sensitive decision analysis is not implemented here.")
+        msgs = c(
+          msgs,
+          paste(
+            "Decision claim requested but no utility/cost specification was provided;",
+            "multiclass cost-sensitive decision analysis is not implemented here."
+          )
+        )
       }
 
-      summary = "Multiclass classification: one-vs-rest calibration and decision-utility checks computed per class."
+      summary = if (calibration_criteria_declared) {
+        paste(
+          paste(
+            "Multiclass one-vs-rest calibration and decision-utility diagnostics were computed",
+            "against the declared criteria."
+          ),
+          if (length(calibration_concerns)) {
+            paste(calibration_concerns, collapse = "; ")
+          } else {
+            "No declared criterion was exceeded."
+          }
+        )
+      } else {
+        paste(
+          "Multiclass one-vs-rest calibration and decision-utility diagnostics were computed.",
+          "Calibration adequacy remains unadjudicated because no claim-specific criteria were declared."
+        )
+      }
 
       metrics = data.table::data.table(
         task_type = "classif",
@@ -333,6 +450,11 @@ Gate3Calibration = R6::R6Class(
         max_ece_ovr = max_ece,
         slope_min = slope_rng[1],
         slope_max = slope_rng[2],
+        calibration_criteria_declared = calibration_criteria_declared,
+        maximum_ece_criterion = maximum_ece %??% NA_real_,
+        minimum_slope_criterion = if (is.null(calibration_slope_range)) NA_real_ else calibration_slope_range[[1L]],
+        maximum_slope_criterion = if (is.null(calibration_slope_range)) NA_real_ else calibration_slope_range[[2L]],
+        maximum_abs_intercept_criterion = maximum_abs_intercept %??% NA_real_,
         utility_spec = utility_spec
       )
 
@@ -352,7 +474,18 @@ Gate3Calibration = R6::R6Class(
         ),
         messages = c(
           msgs,
-          "OVR calibration/utility curves are provided per class; for deployment-grade multiclass calibration consider dedicated multiclass calibration (e.g., Dirichlet, temperature scaling) and validate on OOF / external data."
+          if (!calibration_criteria_declared) {
+            paste(
+              "Declare claim- and use-specific calibration criteria to adjudicate adequacy;",
+              "the package supplies no universal cutoff."
+            )
+          } else if (length(calibration_concerns)) {
+            paste("Declared calibration concern(s):", paste(calibration_concerns, collapse = "; "))
+          },
+          paste(
+            "One-vs-rest calibration and utility curves are provided per class; for deployment-grade multiclass",
+            "calibration, consider a dedicated method and validate it on out-of-fold or external data."
+          )
         )
       )
     }

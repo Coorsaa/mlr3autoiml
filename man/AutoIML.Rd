@@ -118,7 +118,7 @@ Learner used to fit the predictive model.}
 Resampling strategy used for Gate 1 and related diagnostics.}
 
 \item{\code{purpose}}{(\code{character(1)})
-Intended use. Influences default thresholds and which gates are executed.}
+Intended use. Influences the default analysis scope and which gates are executed.}
 
 \item{\code{profile}}{(\code{character(1)})
 Configuration profile: \code{"high_resolution"} (default) or \code{"fast"}.}

@@ -14,7 +14,7 @@ test_that("AutoIML run returns AutoIMLResult with gate results and report card",
   # report_card is a method, not a field
   rc = result$report_card()
   expect_true(data.table::is.data.table(rc))
-  expect_true(all(c("gate_id", "gate_name", "pdr", "status", "summary", "iel_overall", "purpose") %in% names(rc)))
+  expect_true(all(c("gate_id", "gate_name", "pdr", "status", "summary", "requested_scopes", "purpose") %in% names(rc)))
   expect_gte(nrow(rc), 5L)
 
   # ctx should contain final model

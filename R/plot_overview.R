@@ -39,7 +39,7 @@ NULL
 }
 
 
-.autoiml_overview_iel_lines = function(result) {
+.autoiml_overview_claim_lines = function(result) {
   if (inherits(result, "AutoIML")) {
     res = result$result
   } else {
@@ -49,16 +49,7 @@ NULL
     return(character())
   }
 
-  iel = res$iel %??% list()
-  lines = character()
-
-  iel_str = paste0(
-    "IEL: G=", iel$global %??% "?",
-    "  L=", iel$local %??% "?",
-    "  D=", iel$decision %??% "?",
-    "  (overall ", iel$overall %??% "?", ")"
-  )
-  lines = c(lines, iel_str)
+  lines = paste0("Requested scopes: ", paste(.autoiml_requested_scopes(res), collapse = ", "))
 
   g0a = .autoiml_get_gate_result(res, "G0A")
   if (!is.null(g0a)) {
@@ -84,11 +75,6 @@ NULL
     }
   }
 
-  cs = res$claim_scope %??% list()
-  if (!is.null(cs$overall) && nzchar(cs$overall)) {
-    lines = c(lines, paste0("Claim: ", cs$overall))
-  }
-
   lines
 }
 
@@ -112,11 +98,11 @@ NULL
   # Gate strip (row 0)
   p_strip = tryCatch(.autoiml_plot_gate_strip(result), error = function(e) NULL)
 
-  # IEL text panel (row 1)
-  iel_lines = .autoiml_overview_iel_lines(result)
-  p_text = if (length(iel_lines) > 0L) {
+  # Claim summary panel (row 1)
+  claim_lines = .autoiml_overview_claim_lines(result)
+  p_text = if (length(claim_lines) > 0L) {
     tryCatch(
-      .autoiml_plot_text_panel(iel_lines, title = "Claim summary"),
+      .autoiml_plot_text_panel(claim_lines, title = "Claim summary"),
       error = function(e) NULL
     )
   } else {
@@ -170,7 +156,7 @@ NULL
   if (!requireNamespace("patchwork", quietly = TRUE)) {
     return(Filter(Negate(is.null), list(
       gate_strip = p_strip,
-      iel_text   = p_text,
+      claim_text = p_text,
       g1         = p_g1,
       g3_or_g6   = p_g3,
       g2_ale     = p_g2_ale,

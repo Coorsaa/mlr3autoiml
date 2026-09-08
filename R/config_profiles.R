@@ -146,8 +146,8 @@ NULL
   multiplicity = list(
     enabled = isTRUE(multiplicity_enabled),
     max_alt_learners = as.integer(multiplicity_max_alt),
-    # Rashomon selection rule: "1se" is conservative and data-driven.
-    rashomon_rule = "1se",
+    # Heuristic tolerance based on descriptive fold-score spread, not uncertainty.
+    rashomon_rule = "descriptive_sd",
     importance_n = min(n, if (profile == "fast") 300L else 800L),
     importance_max_features = min(p, if (profile == "fast") 10L else 15L),
     require_transport_for_high_stakes = TRUE

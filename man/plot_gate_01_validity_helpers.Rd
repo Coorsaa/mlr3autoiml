@@ -10,8 +10,8 @@
 \description{
 Internal ggplot2-based plotting helpers for Gate 1 (Modeling and Data Validity).
 
-Visualizes CV fold-level performance as a boxplot with individual fold points,
-a featureless baseline reference line, and significance annotations.
+Visualizes resampling-iteration performance as a boxplot with individual points
+and a descriptive featureless-baseline reference line.
 }
 \section{Functions}{
 \itemize{

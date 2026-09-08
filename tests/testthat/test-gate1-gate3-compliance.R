@@ -19,10 +19,14 @@ test_that("Gate1Validity emits uncertainty and leakage checklist artifacts", {
   expect_true("leakage_checklist" %in% names(out$artifacts))
   expect_true(data.table::is.data.table(out$artifacts$uncertainty))
   expect_true(data.table::is.data.table(out$artifacts$leakage_checklist))
+  expect_true(all(c("median", "q10", "q90", "minimum", "maximum", "uncertainty_label") %in%
+    names(out$artifacts$uncertainty)))
+  expect_false(any(c("se", "ci_low", "ci_high") %in% names(out$artifacts$uncertainty)))
+  expect_match(out$artifacts$uncertainty$uncertainty_label[[1L]], "not independent-sample inference")
 })
 
 
-test_that("Gate1Validity pools plausible values on identical resampling splits", {
+test_that("Gate1Validity summarizes plausible values on identical resampling splits", {
   g1 = mlr3autoiml:::Gate1Validity$new()
 
   task = make_task_mtcars_regr()
@@ -43,13 +47,17 @@ test_that("Gate1Validity pools plausible values on identical resampling splits",
   )
 
   out = g1$run(ctx)
-  pv_pool = out$artifacts$pv_pool
+  pv_summary = out$artifacts$pv_summary
+  pv_per_value = out$artifacts$pv_per_value
 
   expect_true(out$status %in% c("pass", "warn"))
-  expect_true(data.table::is.data.table(pv_pool))
-  expect_setequal(pv_pool$measure_id, c("regr.rmse", "regr.rsq"))
-  expect_true(all(pv_pool$n_pv == 2L))
-  expect_true(all(c("total_var", "df", "ci_low", "ci_high") %in% names(pv_pool)))
+  expect_true(data.table::is.data.table(pv_summary))
+  expect_true(data.table::is.data.table(pv_per_value))
+  expect_setequal(pv_summary$measure_id, c("regr.rmse", "regr.rsq"))
+  expect_true(all(pv_summary$n_pv == 2L))
+  expect_true(all(c("mean_across_pv", "sd_across_pv", "uncertainty_label") %in% names(pv_summary)))
+  expect_false(any(c("pooled_se", "total_var", "df", "ci_low", "ci_high") %in% names(pv_summary)))
+  expect_match(pv_summary$uncertainty_label[[1L]], "descriptive variation")
 })
 
 
@@ -94,10 +102,23 @@ test_that("Gate3Calibration emits decision_range artifact", {
 
   res = auto$run(verbose = FALSE)
   out3 = res$gate_results[["G3"]]
-  expect_true(out3$status %in% c("pass", "warn"))
+  expect_equal(out3$status, "warn")
+  expect_false(out3$metrics$calibration_criteria_declared[[1L]])
+  expect_true(any(grepl("no universal cutoff", out3$messages, fixed = TRUE)))
   expect_true("decision_range" %in% names(out3$artifacts))
   dr = out3$artifacts$decision_range
   expect_true(data.table::is.data.table(dr))
   expect_equal(dr$decision_claim[[1L]], TRUE)
   expect_equal(dr$n_thresholds[[1L]], 3L)
+
+  declared_ctx = as.list.environment(res$extras$ctx, all.names = TRUE)
+  declared_ctx$calibration = list(
+    bins = 10L,
+    maximum_ece = 1,
+    calibration_slope_range = c(0, 100),
+    maximum_abs_intercept = 100
+  )
+  declared = mlr3autoiml:::Gate3Calibration$new()$run(declared_ctx)
+  expect_equal(declared$status, "pass")
+  expect_true(declared$metrics$calibration_criteria_declared[[1L]])
 })

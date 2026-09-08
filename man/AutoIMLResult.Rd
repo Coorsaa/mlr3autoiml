@@ -9,10 +9,9 @@
 \description{
 Lightweight, print-friendly container returned by \link{AutoIML} and \code{\link[=autoiml]{autoiml()}}.
 
-An \link{AutoIMLResult} stores the executed gate outcomes (\link{GateResult} objects),
-the computed Interpretation Evidence Level (IEL), and any gate artifacts
-(tables, intermediate objects, model surrogates, etc.) required for
-reproducibility and reporting.
+An \link{AutoIMLResult} stores the executed gate outcomes (\link{GateResult} objects)
+and any gate artifacts (tables, intermediate objects, model surrogates, etc.)
+required for reproducibility and reporting.
 }
 \examples{
 \dontrun{
@@ -35,12 +34,6 @@ Declared purpose used for gate selection and claim-scope text.}
 
 \item{\code{quick_start}}{(\code{logical(1)})
 Whether the reduced gate set was used.}
-
-\item{\code{iel}}{(\code{list()})
-Claim-scoped Interpretation Evidence Levels returned by \code{\link[=iel_from_gates]{iel_from_gates()}}.}
-
-\item{\code{claim_scope}}{(\code{list()})
-Human-readable claim-scope guidance derived from IEL and purpose.}
 
 \item{\code{gate_results}}{(\code{list()})
 List of \link{GateResult} objects in gate order (G0A/G0B, G1..G6, G7A/G7B).}
@@ -79,8 +72,6 @@ Create a new \code{AutoIMLResult} object.
   learner_id,
   purpose,
   quick_start,
-  iel,
-  claim_scope,
   gate_results,
   report,
   timings,
@@ -98,10 +89,6 @@ Create a new \code{AutoIMLResult} object.
 \item{\code{purpose}}{(\code{character(1)}) Declared purpose.}
 
 \item{\code{quick_start}}{(\code{logical(1)}) Whether quick_start mode was used.}
-
-\item{\code{iel}}{(\code{list()}) Interpretation Evidence Levels.}
-
-\item{\code{claim_scope}}{(\code{list()}) Claim-scope guidance.}
 
 \item{\code{gate_results}}{(\code{list()}) List of \link{GateResult} objects.}
 

@@ -1,5 +1,37 @@
 # FILE: tests/testthat/test-shap.R
 
+test_that("conditional Shapley distance does not treat missing values as exact observed matches", {
+  background = data.table::data.table(
+    numeric_feature = c(0, NA_real_, 2),
+    categorical_feature = factor(c("a", NA, "b"), levels = c("a", "b"))
+  )
+  observed_case = data.table::data.table(
+    numeric_feature = 0,
+    categorical_feature = factor("a", levels = c("a", "b"))
+  )
+  missing_case = data.table::data.table(
+    numeric_feature = NA_real_,
+    categorical_feature = factor(NA_character_, levels = c("a", "b"))
+  )
+  scale = c(numeric_feature = 1, categorical_feature = NA_real_)
+
+  observed_distance = .autoiml_conditional_distance(
+    background,
+    observed_case,
+    c("numeric_feature", "categorical_feature"),
+    scale
+  )
+  missing_distance = .autoiml_conditional_distance(
+    background,
+    missing_case,
+    c("numeric_feature", "categorical_feature"),
+    scale
+  )
+
+  expect_equal(observed_distance, c(0, 2, 3))
+  expect_equal(missing_distance, c(2, 0, 2))
+})
+
 test_that("AutoIML$shap returns additive Shapley-style contributions", {
   skip_on_cran()
   auto = get_auto_iris(quick_start = FALSE)
@@ -20,9 +52,12 @@ test_that("AutoIML$shap returns additive Shapley-style contributions", {
   # compute shap for a single row
   seed = 123
   sh = auto$shap(row_id = 1L, sample_size = 40L, background_n = 30L, seed = seed)
+  set.seed(999L)
+  sh_repeated = auto$shap(row_id = 1L, sample_size = 40L, background_n = 30L, seed = seed)
 
   expect_true(data.table::is.data.table(sh))
   expect_true(all(c("feature", "phi", "class_label") %in% names(sh)))
+  expect_identical(sh, sh_repeated)
 
   # Reconstruct expected baseline: mean prediction on the sampled background rows
   set.seed(seed)

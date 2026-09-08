@@ -1,23 +1,10 @@
-test_that("framework requirements and IEL rules remain internally consistent", {
+test_that("framework requirements remain internally consistent", {
   req = .autoiml_framework_requirements()
   req_val = .autoiml_validate_framework_requirements(req)
   expect_true(isTRUE(req_val$ok))
 
-  rules = .autoiml_iel_rules()
-  rules_val = .autoiml_validate_iel_rules(rules)
-  expect_true(isTRUE(rules_val$ok))
-
   req_ids = vapply(req$requirements, function(r) as.character(r$id), character(1L))
   expect_equal(length(unique(req_ids)), length(req_ids))
-
-  rule_ids = vapply(rules$rules, function(r) as.character(r$id), character(1L))
-  expect_equal(length(unique(rule_ids)), length(rule_ids))
-
-  rule_levels = vapply(rules$rules, function(r) as.character(r$level), character(1L))
-  expect_true(all(rule_levels %in% c("IEL-0", "IEL-1", "IEL-2", "IEL-3")))
-
-  rule_scopes = vapply(rules$rules, function(r) as.character(r$scope), character(1L))
-  expect_true(all(rule_scopes %in% c("global", "local", "decision")))
 })
 
 
@@ -45,8 +32,8 @@ test_that("export_audit_bundle emits reproducibility artifacts", {
 
   expect_true(is.list(files))
   expect_true(all(c(
-    "report_card", "report_card_extended", "gate_results", "iel",
-    "claim_scope", "traceability_status", "session_info"
+    "report_card", "report_card_extended", "gate_results",
+    "traceability_status", "session_info"
   ) %in% names(files)))
   expect_true(all(file.exists(unlist(files, use.names = FALSE))))
 })

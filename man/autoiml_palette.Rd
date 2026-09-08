@@ -4,7 +4,11 @@
 \alias{autoiml_palette}
 \title{Plot color palette for mlr3autoiml}
 \usage{
-autoiml_palette()
+autoiml_palette(style = c("color", "monochrome"))
+}
+\arguments{
+\item{style}{Either \code{"color"} for the default blue-red palette or \code{"monochrome"} for an achromatic
+print-oriented palette.}
 }
 \value{
 A named list with sublists \code{status}, \code{metric}, \code{gradient},

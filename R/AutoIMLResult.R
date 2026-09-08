@@ -8,10 +8,9 @@
 #' @description
 #' Lightweight, print-friendly container returned by [AutoIML] and [autoiml()].
 #'
-#' An [AutoIMLResult] stores the executed gate outcomes ([GateResult] objects),
-#' the computed Interpretation Evidence Level (IEL), and any gate artifacts
-#' (tables, intermediate objects, model surrogates, etc.) required for
-#' reproducibility and reporting.
+#' An [AutoIMLResult] stores the executed gate outcomes ([GateResult] objects)
+#' and any gate artifacts (tables, intermediate objects, model surrogates, etc.)
+#' required for reproducibility and reporting.
 #'
 #' @examples
 #' \dontrun{
@@ -39,14 +38,6 @@ AutoIMLResult = R6::R6Class(
     #' Whether the reduced gate set was used.
     quick_start = NULL,
 
-    #' @field iel (`list()`)
-    #' Claim-scoped Interpretation Evidence Levels returned by [iel_from_gates()].
-    iel = NULL,
-
-    #' @field claim_scope (`list()`)
-    #' Human-readable claim-scope guidance derived from IEL and purpose.
-    claim_scope = NULL,
-
     #' @field gate_results (`list()`)
     #' List of [GateResult] objects in gate order (G0A/G0B, G1..G6, G7A/G7B).
     gate_results = NULL,
@@ -70,8 +61,6 @@ AutoIMLResult = R6::R6Class(
     #' @param learner_id (`character(1)`) Learner identifier.
     #' @param purpose (`character(1)`) Declared purpose.
     #' @param quick_start (`logical(1)`) Whether quick_start mode was used.
-    #' @param iel (`list()`) Interpretation Evidence Levels.
-    #' @param claim_scope (`list()`) Claim-scope guidance.
     #' @param gate_results (`list()`) List of [GateResult] objects.
     #' @param report ([data.table::data.table]) Report card table.
     #' @param timings (`list()` | `NULL`) Optional timing information.
@@ -82,8 +71,6 @@ AutoIMLResult = R6::R6Class(
       learner_id,
       purpose,
       quick_start,
-      iel,
-      claim_scope,
       gate_results,
       report,
       timings,
@@ -93,8 +80,6 @@ AutoIMLResult = R6::R6Class(
       self$learner_id = learner_id
       self$purpose = purpose
       self$quick_start = quick_start
-      self$iel = iel
-      self$claim_scope = claim_scope
       self$gate_results = gate_results
       self$report = report
       self$timings = timings
@@ -141,14 +126,13 @@ AutoIMLResult = R6::R6Class(
     print = function(...) {
       cat(sprintf("<AutoIMLResult task=%s learner=%s>\n", self$task_id, self$learner_id))
       cat(sprintf("  Purpose: %s (quick_start=%s)\n", self$purpose, self$quick_start))
-      cat(sprintf("  IEL: %s\n", .autoiml_format_iel(self$iel)))
+      cat(sprintf("  Requested scopes: %s\n", paste(.autoiml_requested_scopes(self), collapse = ", ")))
       if (!is.null(self$report) && inherits(self$report, "data.table")) {
         cat("  Gates:\n")
         for (i in seq_len(nrow(self$report))) {
           cat(sprintf("   - %s: %s\n", self$report$gate_id[i], self$report$status[i]))
         }
       }
-      cat(sprintf("  Claim scope: %s\n", .autoiml_format_claim_scope(self$claim_scope)))
       invisible(self)
     }
   )

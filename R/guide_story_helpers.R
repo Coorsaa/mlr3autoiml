@@ -92,8 +92,8 @@ NULL
   minimize = .autoiml_measure_minimize(metric_id)
 
   estimate = NA_real_
-  ci_low = NA_real_
-  ci_high = NA_real_
+  fold_q10 = NA_real_
+  fold_q90 = NA_real_
   baseline = NA_real_
   better_than_baseline = NA
   performance_text = "Primary predictive metric unavailable."
@@ -102,8 +102,8 @@ NULL
     row = uncertainty[measure_id == metric_id][1L]
     if (nrow(row) > 0L) {
       estimate = as.numeric(row$mean)
-      ci_low = as.numeric(row$ci_low)
-      ci_high = as.numeric(row$ci_high)
+      fold_q10 = as.numeric(.autoiml_dt_scalar(row, "q10", NA_real_))
+      fold_q90 = as.numeric(.autoiml_dt_scalar(row, "q90", NA_real_))
     }
   }
 
@@ -121,15 +121,28 @@ NULL
   }
 
   if (is.finite(estimate) && !is.na(metric_id)) {
-    if (is.finite(ci_low) && is.finite(ci_high)) {
-      performance_text = sprintf("%s = %.3f (95%% CI [%.3f, %.3f]).", metric_id, estimate, ci_low, ci_high)
+    if (is.finite(fold_q10) && is.finite(fold_q90)) {
+      performance_text = sprintf(
+        "%s = %.3f (descriptive fold 10th-90th percentiles [%.3f, %.3f]; not a confidence interval).",
+        metric_id,
+        estimate,
+        fold_q10,
+        fold_q90
+      )
     } else {
       performance_text = sprintf("%s = %.3f.", metric_id, estimate)
     }
     if (is.finite(baseline)) {
+      baseline_comparison = if (isTRUE(better_than_baseline)) {
+        "better than baseline"
+      } else if (isFALSE(better_than_baseline)) {
+        "not better than baseline"
+      } else {
+        "baseline comparison uncertain"
+      }
       performance_text = paste0(
         performance_text,
-        sprintf(" Featureless baseline = %.3f (%s).", baseline, if (isTRUE(better_than_baseline)) "better than baseline" else if (isFALSE(better_than_baseline)) "not better than baseline" else "baseline comparison uncertain")
+        sprintf(" Featureless baseline = %.3f (%s).", baseline, baseline_comparison)
       )
     }
   }
@@ -138,27 +151,56 @@ NULL
     primary_metric_id = metric_id,
     minimize = minimize,
     estimate = estimate,
-    ci_low = ci_low,
-    ci_high = ci_high,
+    ci_low = NA_real_,
+    ci_high = NA_real_,
+    fold_q10 = fold_q10,
+    fold_q90 = fold_q90,
     baseline = baseline,
     better_than_baseline = better_than_baseline,
     performance_text = performance_text
   )
 }
 
-.autoiml_scope_support_label = function(iel) {
-  iel = as.character(iel %??% NA_character_)[1L]
-  if (is.na(iel) || !nzchar(iel)) {
-    return("unclear")
+.autoiml_requested_scopes = function(res) {
+  if (inherits(res, "AutoIML")) {
+    res = res$result
   }
-  switch(
-    iel,
-    "IEL-0" = "not yet supported",
-    "IEL-1" = "only weakly supported",
-    "IEL-2" = "supported with explicit guardrails",
-    "IEL-3" = "strongly supported",
-    "unclear"
-  )
+
+  g0a = .autoiml_get_gate_result(res, "G0A")
+  claim = .autoiml_as_list(g0a$artifacts$claim %??% list())
+  claims = .autoiml_as_list(claim$claims)
+
+  requested = character()
+  if (isTRUE(claims$global %??% TRUE)) requested = c(requested, "global")
+  if (isTRUE(claims$local %??% FALSE)) requested = c(requested, "local")
+  if (isTRUE(claims$decision %??% FALSE)) requested = c(requested, "decision")
+
+  if (length(requested) > 0L) requested else "global"
+}
+
+.autoiml_gate_status_text = function(res, gate_ids) {
+  gate_ids = as.character(gate_ids)
+  statuses = vapply(gate_ids, function(gate_id) {
+    gate = .autoiml_get_gate_result(res, gate_id)
+    as.character(gate$status %??% "not_run")[1L]
+  }, character(1L))
+  paste0(gate_ids, "=", statuses, collapse = ", ")
+}
+
+.autoiml_gate_evidence_blocked = function(res, gate_ids) {
+  statuses = vapply(gate_ids, function(gate_id) {
+    gate = .autoiml_get_gate_result(res, gate_id)
+    as.character(gate$status %??% "not_run")[1L]
+  }, character(1L))
+  any(statuses %in% c("not_run", "skip", "fail", "error"))
+}
+
+.autoiml_gate_evidence_restricted = function(res, gate_ids) {
+  statuses = vapply(gate_ids, function(gate_id) {
+    gate = .autoiml_get_gate_result(res, gate_id)
+    as.character(gate$status %??% "not_run")[1L]
+  }, character(1L))
+  any(statuses %in% c("not_run", "skip", "warn", "fail", "error"))
 }
 
 .autoiml_complexity_rank = function(learner_id) {
@@ -347,49 +389,55 @@ NULL
   g6_status = as.character(statuses[["G6"]] %??% NA_character_)
   g3_status = as.character(statuses[["G3"]] %??% NA_character_)
 
-  iel_global = as.character(res$iel$global %??% NA_character_)
-  iel_local = as.character(res$iel$local %??% NA_character_)
-  iel_decision = as.character(res$iel$decision %??% NA_character_)
-  requested = as.character(res$iel$requested %??% c("global"))
-  scope_label = function(scope, iel) {
-    if (!scope %in% requested) {
-      return("not requested")
-    }
-    .autoiml_scope_support_label(iel)
-  }
+  requested = .autoiml_requested_scopes(res)
+  global_gate_status = .autoiml_gate_status_text(res, c("G1", "G2", "G5", "G6"))
+  local_gate_status = .autoiml_gate_status_text(res, c("G4", "G5", "G6"))
+  decision_gate_status = .autoiml_gate_status_text(res, c("G3", "G7A"))
 
   answer = "Performance alone is never enough to trust interpretations."
   if (identical(g1_status, "fail")) {
-    answer = "No. Gate 1 did not establish predictive adequacy, so interpretation should stop until the model and/or data are improved."
+    answer = paste(
+      "No. Gate 1 did not establish predictive adequacy, so interpretation should stop",
+      "until the model and/or data are improved."
+    )
   } else if (identical(g1_status, "warn")) {
-    answer = "Not yet. Predictive adequacy is only partially established, so interpretation should stay exploratory and conservative."
+    answer = paste(
+      "Not yet. Predictive adequacy remains unresolved, so interpretation",
+      "should stay exploratory and conservative."
+    )
   } else if (identical(g1_status, "pass")) {
     answer = paste0(
-      "Not from performance alone. Predictive adequacy is in place, but the usable interpretation scope is still constrained by the later gates: global = ",
-      scope_label("global", iel_global),
-      ", local = ",
-      scope_label("local", iel_local),
-      ", decision = ",
-      scope_label("decision", iel_decision),
-      "."
+      "Not from performance alone. Predictive adequacy is in place, but every interpretation remains constrained by ",
+      "the relevant diagnostic gates. Global checks: ", global_gate_status, "."
     )
   }
 
   next_step = "Use the gate pattern, not the score alone, to decide what claims to make."
   if (identical(g0b_status, "warn") || identical(g0b_status, "fail")) {
-    next_step = "Strengthen measurement/scoring documentation first, because psychological interpretation depends on construct quality as well as prediction."
+    next_step = paste(
+      "Strengthen measurement/scoring documentation first, because psychological",
+      "interpretation depends on construct quality as well as prediction."
+    )
   } else if (identical(g4_status, "warn") || identical(g5_status, "warn") || identical(g6_status, "warn")) {
     next_step = "Keep global claims ahead of local case narratives, and report robustness limits explicitly."
   }
-  if ("decision" %in% requested && (identical(iel_decision, "IEL-0") || identical(g3_status, "warn") || identical(g3_status, "fail"))) {
-    next_step = paste0(next_step, " Do not convert the score into thresholded decisions until calibration and utility evidence are in place.")
+  if ("decision" %in% requested && .autoiml_gate_evidence_restricted(res, c("G3", "G7A"))) {
+    next_step = paste0(
+      next_step,
+      paste(
+        " Do not convert the score into thresholded decisions until calibration,",
+        "utility, and subgroup evidence are in place."
+      )
+    )
   }
 
   data.table::data.table(
     primary_metric_id = as.character(.autoiml_dt_scalar(perf, "primary_metric_id", NA_character_)),
     primary_estimate = as.numeric(.autoiml_dt_scalar(perf, "estimate", NA_real_)),
-    primary_ci_low = as.numeric(.autoiml_dt_scalar(perf, "ci_low", NA_real_)),
-    primary_ci_high = as.numeric(.autoiml_dt_scalar(perf, "ci_high", NA_real_)),
+    primary_ci_low = NA_real_,
+    primary_ci_high = NA_real_,
+    primary_fold_q10 = as.numeric(.autoiml_dt_scalar(perf, "fold_q10", NA_real_)),
+    primary_fold_q90 = as.numeric(.autoiml_dt_scalar(perf, "fold_q90", NA_real_)),
     baseline = as.numeric(.autoiml_dt_scalar(perf, "baseline", NA_real_)),
     better_than_baseline = .autoiml_dt_scalar(perf, "better_than_baseline", NA),
     g0b_status = g0b_status,
@@ -398,10 +446,15 @@ NULL
     g5_status = g5_status,
     g6_status = g6_status,
     g3_status = g3_status,
-    iel_global = iel_global,
-    iel_local = iel_local,
-    iel_decision = iel_decision,
-    performance_text = as.character(.autoiml_dt_scalar(perf, "performance_text", "Primary predictive metric unavailable.")),
+    requested_scopes = paste(requested, collapse = ","),
+    global_gate_status = global_gate_status,
+    local_gate_status = local_gate_status,
+    decision_gate_status = decision_gate_status,
+    performance_text = as.character(.autoiml_dt_scalar(
+      perf,
+      "performance_text",
+      "Primary predictive metric unavailable."
+    )),
     answer = answer,
     next_step = next_step
   )
@@ -412,7 +465,7 @@ NULL
   model_story = .autoiml_model_story(res)
   claim = (.autoiml_get_gate_result(res, "G0A")$artifacts$claim %??% list())
   semantics = as.character(claim$semantics %??% NA_character_)[1L]
-  requested = as.character(res$iel$requested %??% c("global"))
+  requested = .autoiml_requested_scopes(res)
   g0b = .autoiml_get_gate_result(res, "G0B")
   g2 = .autoiml_get_gate_result(res, "G2")
   g4 = .autoiml_get_gate_result(res, "G4")
@@ -442,7 +495,7 @@ NULL
       short_answer = as.character(.autoiml_dt_scalar(trust, "answer", "Performance alone is not enough.")),
       why = as.character(.autoiml_dt_scalar(trust, "performance_text", "Primary predictive metric unavailable.")),
       what_to_do_now = as.character(.autoiml_dt_scalar(trust, "next_step", action_text)),
-      evidence = "G1 + G4-G6 + IEL"
+      evidence = "G1 + G4-G6"
     ),
     data.table::data.table(
       question_id = "simple_vs_complex",
@@ -470,28 +523,57 @@ NULL
       reader_question = "Can I make case-level claims from the local explanations?",
       short_answer = if (!"local" %in% requested) {
         "Not part of the current Claim and Semantics Card: no case-level claim is being made."
-      } else if (identical(res$iel$local %??% "IEL-0", "IEL-0")) {
+      } else if (.autoiml_gate_evidence_blocked(res, c("G4", "G5", "G6"))) {
         "No. Local case-level claims are not yet supported by the current evidence pattern."
+      } else if (.autoiml_gate_evidence_restricted(res, c("G4", "G5", "G6"))) {
+        paste(
+          "Only with guardrails: at least one local faithfulness, stability, or",
+          "multiplicity check raised a warning."
+        )
       } else {
-        paste0("Only with guardrails. Local claims are ", .autoiml_scope_support_label(res$iel$local), ".")
+        "Yes, as an audited summary of model behavior within the declared semantics, not as a causal fact."
       },
-      why = paste0("Gate 4 = ", as.character(g4$status %??% NA_character_), "; Gate 5 = ", as.character(g5$status %??% NA_character_), "; Gate 6 = ", as.character(g6$status %??% NA_character_), "."),
-      what_to_do_now = "Treat local explanations as audited model behavior summaries, not as causal facts about the person.",
-      evidence = "G4 + G5 + G6 + IEL-local"
+      why = paste0(
+        "Gate 4 = ", as.character(g4$status %??% NA_character_),
+        "; Gate 5 = ", as.character(g5$status %??% NA_character_),
+        "; Gate 6 = ", as.character(g6$status %??% NA_character_), "."
+      ),
+      what_to_do_now = paste(
+        "Treat local explanations as audited model behavior summaries, not as",
+        "causal facts about the person."
+      ),
+      evidence = "G4 + G5 + G6"
     ),
     data.table::data.table(
       question_id = "decision_use",
       reader_question = "Can I turn the model into thresholded decisions or interventions?",
       short_answer = if (!"decision" %in% requested) {
-        "Not part of the current Claim and Semantics Card: the workflow is not currently supporting thresholded decisions or interventions."
-      } else if (identical(res$iel$decision %??% "IEL-0", "IEL-0")) {
-        "No. Decision use is blocked until calibration, thresholds, utility assumptions, and subgroup consequences are justified."
+        paste(
+          "Not part of the current Claim and Semantics Card: the workflow is not",
+          "currently supporting thresholded decisions or interventions."
+        )
+      } else if (.autoiml_gate_evidence_blocked(res, c("G3", "G7A"))) {
+        paste(
+          "No. Decision use is blocked until calibration, thresholds, utility",
+          "assumptions, and subgroup consequences are justified."
+        )
+      } else if (.autoiml_gate_evidence_restricted(res, c("G3", "G7A"))) {
+        paste(
+          "Only within the evaluated decision range and with every warning from",
+          "the calibration and subgroup audits reported."
+        )
       } else {
-        paste0("Only within the explicitly evaluated decision range, because decision evidence is ", .autoiml_scope_support_label(res$iel$decision), ".")
+        "Only within the explicitly evaluated decision range and under the documented utility assumptions."
       },
-      why = paste0("Gate 3 = ", as.character(.autoiml_get_gate_result(res, "G3")$status %??% NA_character_), "; decision IEL = ", as.character(res$iel$decision %??% NA_character_), "."),
-      what_to_do_now = "Specify threshold ranges and utility/cost assumptions, validate calibration, and audit subgroup impacts before acting on scores.",
-      evidence = "G3 + G7A + IEL-decision"
+      why = paste0(
+        "Gate 3 = ", as.character(.autoiml_get_gate_result(res, "G3")$status %??% NA_character_),
+        "; Gate 7A = ", as.character(g7a$status %??% NA_character_), "."
+      ),
+      what_to_do_now = paste(
+        "Specify threshold ranges and utility/cost assumptions, validate calibration,",
+        "and audit subgroup impacts before acting on scores."
+      ),
+      evidence = "G3 + G7A"
     ),
     data.table::data.table(
       question_id = "model_or_world",

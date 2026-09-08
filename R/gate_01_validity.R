@@ -94,13 +94,13 @@ Gate1Validity = R6::R6Class(
       agg_dt = private$agg_to_dt(agg)
       pred = rr$prediction(predict_sets = "test")
 
-      # ---- Plausible-values pooling (Rubin's rules), v0.0.5 ----
+      # ---- Descriptive plausible-value summaries ----
       # If the user passes additional plausible-value targets via
       #   ctx$plausible_values$pv_tasks  : list of mlr3 TaskRegr (one per extra PV)
-      # we train one extra resample per PV and pool per-fold metrics across PVs
-      # using Rubin's rules on the same instantiated resampling splits:
-      #   T = W + (1 + 1/m) * B
-      pv_pool = NULL
+      # we train one extra resample per PV on the same instantiated splits and
+      # summarize the resulting PV-specific metrics descriptively.
+      pv_per_value = NULL
+      pv_summary = NULL
       pv_cfg = .autoiml_as_list(ctx$plausible_values)
       .autoiml_assert_known_names(pv_cfg, c("pv_tasks"), "ctx$plausible_values")
       pv_tasks = pv_cfg$pv_tasks %??% list()
@@ -134,55 +134,40 @@ Gate1Validity = R6::R6Class(
           rrk = mlr3::resample(tk, learner, rsk, store_models = FALSE, store_backends = FALSE)
           per_pv_scores[[k + 1L]] = rrk$score(measures)
         }
-        pool_rows = vector("list", length = length(measures))
-        names(pool_rows) = vapply(measures, function(m) m$id, character(1L))
-        for (mid in vapply(measures, function(m) m$id, character(1L))) {
-          pv_fold_means = vapply(per_pv_scores, function(s) {
-            v = as.numeric(s[[mid]])
-            v = v[is.finite(v)]
-            if (length(v) < 1L) {
-              return(NA_real_)
-            }
-            mean(v)
-          }, numeric(1L))
-          pv_fold_within_var = vapply(per_pv_scores, function(s) {
-            v = as.numeric(s[[mid]])
-            v = v[is.finite(v)]
-            if (length(v) < 2L) {
-              return(NA_real_)
-            }
-            stats::var(v) / length(v)
-          }, numeric(1L))
-
-          pv_fold_means = pv_fold_means[is.finite(pv_fold_means)]
-          pv_fold_within_var = pv_fold_within_var[is.finite(pv_fold_within_var)]
-
-          m_pv = length(pv_fold_means)
-          mean_val = if (m_pv > 0L) mean(pv_fold_means) else NA_real_
-          within_var = if (length(pv_fold_within_var) > 0L) mean(pv_fold_within_var) else NA_real_
-          between_var = if (m_pv > 1L) stats::var(pv_fold_means) else 0
-          total_var = if (is.finite(within_var)) within_var + (1 + 1 / max(m_pv, 1L)) * between_var else NA_real_
-          se_pooled = if (is.finite(total_var) && total_var >= 0) sqrt(total_var) else NA_real_
-          df_pooled = private$rubin_df(within_var = within_var, between_var = between_var, m = m_pv)
-          tcrit = if (is.finite(df_pooled)) stats::qt(0.975, df = df_pooled) else stats::qnorm(0.975)
-          ci_delta = if (is.finite(se_pooled) && is.finite(tcrit)) tcrit * se_pooled else NA_real_
-
-          pool_rows[[mid]] = data.table::data.table(
-            measure_id = mid,
-            n_pv = m_pv,
-            pooled_mean = mean_val,
-            pooled_se = se_pooled,
-            within_var = within_var,
-            between_var = as.numeric(between_var),
-            total_var = total_var,
-            df = df_pooled,
-            ci_low = if (is.finite(ci_delta)) mean_val - ci_delta else NA_real_,
-            ci_high = if (is.finite(ci_delta)) mean_val + ci_delta else NA_real_
+        pv_ids = c(task$id, vapply(pv_tasks, function(x) x$id, character(1L)))
+        measure_ids_pv = vapply(measures, function(m) m$id, character(1L))
+        pv_per_value = data.table::rbindlist(lapply(seq_along(per_pv_scores), function(i) {
+          data.table::rbindlist(lapply(measure_ids_pv, function(mid) {
+            values = as.numeric(per_pv_scores[[i]][[mid]])
+            values = values[is.finite(values)]
+            data.table::data.table(
+              plausible_value = pv_ids[[i]],
+              measure_id = mid,
+              n_folds = length(values),
+              mean = if (length(values)) mean(values) else NA_real_,
+              sd = if (length(values) > 1L) stats::sd(values) else NA_real_,
+              minimum = if (length(values)) min(values) else NA_real_,
+              maximum = if (length(values)) max(values) else NA_real_
+            )
+          }))
+        }))
+        pv_summary = pv_per_value[, {
+          values = mean[is.finite(mean)]
+          .(
+            n_pv = length(values),
+            mean_across_pv = if (length(values)) base::mean(values) else NA_real_,
+            sd_across_pv = if (length(values) > 1L) stats::sd(values) else NA_real_,
+            median_across_pv = if (length(values)) stats::median(values) else NA_real_,
+            minimum_across_pv = if (length(values)) min(values) else NA_real_,
+            maximum_across_pv = if (length(values)) max(values) else NA_real_,
+            uncertainty_label = paste(
+              "descriptive variation across aligned plausible values;",
+              "not a confidence interval or Rubin pooling"
+            )
           )
-        }
-        pv_pool = data.table::rbindlist(pool_rows, fill = TRUE)
+        }, by = measure_id]
       }
-      # ---- end PV pooling ----
+      # ---- end descriptive PV summaries ----
 
       measure_ids = vapply(measures, function(m) m$id, character(1L))
       metric_cols = intersect(measure_ids, names(scores))
@@ -193,28 +178,34 @@ Gate1Validity = R6::R6Class(
           if (length(vals) < 1L) {
             return(data.table::data.table(
               measure_id = mid,
-              n = 0L,
+              n_iterations = 0L,
               mean = NA_real_,
               sd = NA_real_,
-              se = NA_real_,
-              ci_low = NA_real_,
-              ci_high = NA_real_
+              median = NA_real_,
+              q10 = NA_real_,
+              q90 = NA_real_,
+              minimum = NA_real_,
+              maximum = NA_real_,
+              uncertainty_label = paste(
+                "descriptive variation across resampling iterations;",
+                "not independent-sample inference or a confidence interval"
+              )
             ))
           }
-          n = length(vals)
-          m = mean(vals)
-          s = if (n > 1L) stats::sd(vals) else NA_real_
-          se = if (n > 1L) s / sqrt(n) else NA_real_
-          tcrit = if (n > 1L) stats::qt(0.975, df = n - 1L) else NA_real_
-          ci = if (n > 1L && is.finite(se) && is.finite(tcrit)) tcrit * se else NA_real_
           data.table::data.table(
             measure_id = mid,
-            n = n,
-            mean = m,
-            sd = s,
-            se = se,
-            ci_low = if (is.finite(ci)) m - ci else NA_real_,
-            ci_high = if (is.finite(ci)) m + ci else NA_real_
+            n_iterations = length(vals),
+            mean = mean(vals),
+            sd = if (length(vals) > 1L) stats::sd(vals) else NA_real_,
+            median = stats::median(vals),
+            q10 = stats::quantile(vals, 0.10, names = FALSE),
+            q90 = stats::quantile(vals, 0.90, names = FALSE),
+            minimum = min(vals),
+            maximum = max(vals),
+            uncertainty_label = paste(
+              "descriptive variation across resampling iterations;",
+              "not independent-sample inference or a confidence interval"
+            )
           )
         }), fill = TRUE)
       } else {
@@ -317,7 +308,8 @@ Gate1Validity = R6::R6Class(
             split_policy = split_policy,
             n_splits = rr$iters
           ),
-          pv_pool = pv_pool # NULL unless ctx$plausible_values$pv_tasks supplied
+          pv_per_value = pv_per_value,
+          pv_summary = pv_summary
         ),
         messages = c(baseline_msg, preflight_msgs)
       )
@@ -341,23 +333,6 @@ Gate1Validity = R6::R6Class(
 
       # fallback
       tryCatch(data.table::as.data.table(x), error = function(e) NULL)
-    },
-
-    rubin_df = function(within_var, between_var, m) {
-      if (!is.numeric(m) || length(m) != 1L || m < 1L) {
-        return(NA_real_)
-      }
-      if (!is.finite(between_var) || between_var <= 0 || m <= 1L) {
-        return(Inf)
-      }
-      if (is.finite(within_var) && within_var > 0) {
-        rel_increase = ((1 + 1 / m) * between_var) / within_var
-        if (is.finite(rel_increase) && rel_increase > 0) {
-          return((m - 1) * (1 + 1 / rel_increase)^2)
-        }
-        return(Inf)
-      }
-      m - 1
     },
 
     default_measures = function(task) {

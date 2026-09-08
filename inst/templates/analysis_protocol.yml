@@ -1,0 +1,54 @@
+protocol_version: "1.0"
+analysis_id: null
+paper_version: null
+claim:
+  id: null
+  statement: null
+  claim_type: []
+  target: null
+  unit: null
+  population: null
+  analytic_distribution: null
+  model_scope: selected_model
+  setting_scope: analytic_sample
+measurement:
+  outcome: null
+  predictors: []
+  audit_only_variables: []
+  setting_variables: []
+  sample_definition: null
+  missingness: null
+  preprocessing: null
+  verification:
+    status: not_checked
+    artifact: null
+    reviewer: null
+resampling:
+  seed: 20260201
+  cluster: null
+  strata: null
+  folds: 5
+  repeats: 5
+performance:
+  primary_measure: null
+  additional_measures: []
+explanations:
+  method_ids: []
+  target_scale: null
+  perturbation_distribution: null
+  feature_groups: {}
+  local_case_selection: prespecified
+generalization:
+  candidate_models: []
+  rashomon_tolerance_absolute: 0
+  rashomon_tolerance_relative: 0.02
+  setting_shift: null
+  minimum_transport_score: null
+  maximum_transport_score: null
+subgroups:
+  variables: []
+  minimum_n: 50
+outputs:
+  directory: null
+  include_predictions: false
+  include_models: false

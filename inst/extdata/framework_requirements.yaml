@@ -160,20 +160,11 @@ requirements:
     metric_fields: [required, provided]
     tests_required: [T-G7B-001]
 
-  - id: IEL-CLAIM-SCOPED-001
-    gate: IEL
-    requirement_text: IEL must be claim-scoped (G/L/D) and conservative overall.
-    evidence_type: computed
-    severity_if_missing: fail
-    applicability: {}
-    artifact_fields: [overall, global, local, decision, requested]
-    tests_required: [T-IEL-001]
-
   - id: REPORT-CARD-001
     gate: REPORT
-    requirement_text: Report card must expose gate status and claim-scoped IEL fields.
+    requirement_text: Report card must expose gate status and the requested claim scopes.
     evidence_type: computed
     severity_if_missing: fail
     applicability: {}
-    artifact_fields: [gate_id, gate_name, pdr, status, summary, iel_overall, iel_global, iel_local, iel_decision, requested_scopes]
+    artifact_fields: [gate_id, gate_name, pdr, status, summary, requested_scopes]
     tests_required: [T-REPORT-001]

@@ -17,14 +17,66 @@ NULL
 
 # ---- Shared color palette ---------------------------------------------------
 
-.autoiml_plot_palette = function() {
+.autoiml_plot_styles = c("color", "monochrome")
+
+.autoiml_status_shapes = c(
+  pass = 16L,
+  warn = 17L,
+  skip = 1L,
+  fail = 4L,
+  error = 8L
+)
+
+.autoiml_distinct_shapes = c(16L, 17L, 15L, 18L, 8L, 3L)
+.autoiml_distinct_linetypes = c(1L, 2L, 3L, 4L, 5L, 6L)
+.autoiml_quantile_shapes = c(p50 = 16L, p90 = 17L, p95 = 15L)
+.autoiml_quantile_linetypes = c(p50 = 2L, p90 = 3L, p95 = 4L)
+.autoiml_decision_linetypes = c("Focal model" = 1L, "Treat all" = 2L, "Treat none" = 3L)
+
+.autoiml_named_plot_values = function(levels, values) {
+  setNames(rep(values, length.out = length(levels)), levels)
+}
+
+.autoiml_plot_palette = function(style = .autoiml_plot_styles) {
+  style = match.arg(style)
+  if (identical(style, "monochrome")) {
+    return(list(
+      status = c(
+        pass  = "#F2F2F2",
+        warn  = "#BDBDBD",
+        skip  = "#FFFFFF",
+        fail  = "#595959",
+        error = "#111111"
+      ),
+      metric = c(
+        primary = "#4D4D4D",
+        secondary = "#111111",
+        tertiary = "#737373",
+        quaternary = "#A6A6A6"
+      ),
+      gradient = c(
+        low  = "#F7F7F7",
+        mid  = "#D9D9D9",
+        high = "#1A1A1A"
+      ),
+      surface = c(
+        panel     = "#F2F2F2",
+        threshold = "#E0E0E0"
+      ),
+      reference = c(
+        neutral = "#666666",
+        alert   = "#111111"
+      )
+    ))
+  }
+
   list(
     status = c(
-      pass  = "#4FA467",
-      warn  = "#E0A24F",
+      pass  = "#4C72B0",
+      warn  = "#D98C8F",
       skip  = "#9B9B9B",
       fail  = "#C44E52",
-      error = "#C44E52"
+      error = "#8F2D31"
     ),
     metric = c(
       primary = "#4C72B0",
@@ -54,11 +106,15 @@ NULL
 #' Returns the shared color palette used by all mlr3autoiml plotting functions.
 #' Useful for creating custom figures that match the package's visual style.
 #'
+#' @param style Either `"color"` for the default blue-red palette or `"monochrome"` for an achromatic
+#'   print-oriented palette.
 #' @return A named list with sublists `status`, `metric`, `gradient`,
 #'   `surface`, and `reference`, each a named character vector of hex colors.
 #' @export
-autoiml_palette = function() {
-  .autoiml_plot_palette()
+autoiml_palette = function(style = c("color", "monochrome")) {
+  style = match.arg(style)
+  assert_choice(style, .autoiml_plot_styles, .var.name = "style")
+  .autoiml_plot_palette(style)
 }
 
 #' @title Standard model color palette for mlr3autoiml analyses
@@ -68,20 +124,45 @@ autoiml_palette = function() {
 #' used in mlr3autoiml paper analyses. Covers GBM/XGBoost, logistic
 #' regression, ridge, random forest, decision tree, and baseline comparators.
 #'
+#' @param style Either `"color"` for the default learner colors or `"monochrome"` for achromatic learner colors.
 #' @return Named character vector of hex colors.
 #' @export
-autoiml_model_colors = function() {
+autoiml_model_colors = function(style = c("color", "monochrome")) {
+  style = match.arg(style)
+  assert_choice(style, .autoiml_plot_styles, .var.name = "style")
+  if (identical(style, "monochrome")) {
+    return(c(
+      "GBM"                 = "#111111",
+      "Gradient Boosting"   = "#111111",
+      "Logistic Regression" = "#4D4D4D",
+      "Ridge"               = "#737373",
+      "Random Forest"       = "#333333",
+      "Decision Tree"       = "#8C8C8C",
+      "Treat all"           = "#4D4D4D",
+      "Treat none"          = "#8C8C8C",
+      "featureless"         = "#A6A6A6"
+    ))
+  }
+
   c(
     "GBM"                 = "#4C72B0",
     "Gradient Boosting"   = "#4C72B0",
     "Logistic Regression" = "#C44E52",
-    "Ridge"               = "#C44E52",
-    "Random Forest"       = "#55A868",
-    "Decision Tree"       = "#8172B2",
+    "Ridge"               = "#9A6675",
+    "Random Forest"       = "#6E90C9",
+    "Decision Tree"       = "#2F5D9B",
     "Treat all"           = "grey50",
     "Treat none"          = "grey80",
     "featureless"         = "grey70"
   )
+}
+
+.autoiml_model_shapes = function(levels) {
+  .autoiml_named_plot_values(levels, .autoiml_distinct_shapes)
+}
+
+.autoiml_model_linetypes = function(levels) {
+  .autoiml_named_plot_values(levels, .autoiml_distinct_linetypes)
 }
 
 # ---- Gate status strip ------------------------------------------------------

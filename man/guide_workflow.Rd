@@ -20,6 +20,6 @@ Named list with \code{summary}, \code{actions}, \code{recommended_plots},
 \description{
 Produces a compact, machine-readable guide with actionable next steps,
 recommended visualizations, current claim constraints, and reader-facing
-answers to common interpretation questions derived from gate outcomes, IEL,
-and claim semantics.
+answers to common interpretation questions derived from gate outcomes and
+claim semantics.
 }

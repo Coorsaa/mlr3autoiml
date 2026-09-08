@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mlr3autoiml/csdg-card.schema.json",
+  "title": "CSDG cards",
+  "type": "object",
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "statement",
+        "claim_type",
+        "target",
+        "semantics",
+        "population",
+        "analytic_distribution",
+        "model_scope",
+        "setting_scope",
+        "scientific_use",
+        "explanation_design",
+        "claim_level",
+        "claim_version",
+        "revision_relation"
+      ],
+      "additionalProperties": true
+    },
+    "measurement": {
+      "type": "object",
+      "required": [
+        "verification"
+      ],
+      "additionalProperties": true
+    },
+    "explanation": {
+      "type": "object",
+      "required": [
+        "method_ids",
+        "scope",
+        "target"
+      ],
+      "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "seed",
+        "resampling",
+        "stability",
+        "generalization"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "properties": {
+    "claim": {
+      "$ref": "#/$defs/claim"
+    },
+    "measurement": {
+      "$ref": "#/$defs/measurement"
+    },
+    "explanation": {
+      "$ref": "#/$defs/explanation"
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    }
+  },
+  "required": [
+    "claim",
+    "measurement",
+    "explanation",
+    "config"
+  ],
+  "additionalProperties": true
+}

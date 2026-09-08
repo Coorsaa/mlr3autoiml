@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mlr3autoiml/csdg-report-card.schema.json",
+  "title": "CSDG report card row",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "gate_id",
+      "required",
+      "status",
+      "summary"
+    ],
+    "properties": {
+      "gate_id": {
+        "enum": [
+          "G0a",
+          "G0b",
+          "G1",
+          "G2",
+          "G3a",
+          "G3b",
+          "G4",
+          "G5",
+          "G6a",
+          "G6b",
+          "G7a",
+          "G7b"
+        ]
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "status": {
+        "enum": [
+          "met",
+          "unresolved",
+          "not_met",
+          "not_applicable",
+          "error"
+        ]
+      },
+      "summary": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": true
+  }
+}

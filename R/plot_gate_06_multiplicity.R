@@ -7,7 +7,7 @@
 #'
 #' These functions visualize:
 #' \itemize{
-#'   \item Alternative learner performance comparisons with confidence intervals
+#'   \item Alternative learner performance comparisons with descriptive fold ranges
 #'   \item Rashomon set membership
 #'   \item Explanation dispersion across Rashomon models (permutation importance)
 #'   \item Group performance heterogeneity
@@ -48,7 +48,7 @@ NULL
 
   ggplot2::ggplot(perf_dt, ggplot2::aes(x = mean, y = learner_id)) +
     ggplot2::geom_errorbar(
-      ggplot2::aes(xmin = ci_low, xmax = ci_high),
+      ggplot2::aes(xmin = q10, xmax = q90),
       orientation = "y", width = 0.2
     ) +
     ggplot2::geom_point(
@@ -60,8 +60,9 @@ NULL
     ) +
     ggplot2::labs(
       title = "G6: Alternative learner performance",
-      x = sprintf("%s (mean +/- ~95%% CI)", measure_id),
-      y = NULL
+      x = sprintf("%s (mean and descriptive fold 10th-90th percentiles)", measure_id),
+      y = NULL,
+      caption = "Fold ranges are descriptive; they are not confidence intervals or independent-sample inference."
     ) +
     .autoiml_theme_iml()
 }

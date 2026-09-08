@@ -4,7 +4,7 @@
 #' Implements multiplicity (Rashomon effect) and transportability diagnostics.
 #'
 #' \strong{Multiplicity:} Evaluates performance across alternative model classes and
-#' applies a conservative Rashomon set selection using the 1-SE rule by default.
+#' applies a conservative Rashomon set selection using a descriptive spread rule by default.
 #' When multiple models achieve near-tie performance, computes explanation dispersion
 #' via permutation importance rank correlations.
 #'
@@ -66,11 +66,22 @@ Gate6Multiplicity = R6::R6Class(
 
       multiplicity_flag = NA
       primary_id = NA_character_
-      rashomon_rule = cfg$rashomon_rule %??% "1se"
+      rashomon_rule_requested = cfg$rashomon_rule %??% "descriptive_sd"
+      if (identical(rashomon_rule_requested, "1se")) {
+        cli::cli_warn(c(
+          "The {.val 1se} Rashomon rule is deprecated because fold scores are not independent observations.",
+          "i" = "Using {.val descriptive_sd}, a heuristic based on descriptive fold-score spread."
+        ))
+      }
+      rashomon_rule = if (identical(rashomon_rule_requested, "1se")) {
+        "descriptive_sd"
+      } else {
+        rashomon_rule_requested
+      }
       rashomon_threshold = NA_real_
       rashomon_epsilon = suppressWarnings(as.numeric(cfg$epsilon %??% NA_real_))
-      if (!rashomon_rule %in% c("1se", "epsilon")) {
-        stop("ctx$multiplicity$rashomon_rule must be one of {'1se','epsilon'}.", call. = FALSE)
+      if (!rashomon_rule %in% c("descriptive_sd", "epsilon")) {
+        stop("ctx$multiplicity$rashomon_rule must be one of {'1se','descriptive_sd','epsilon'}.", call. = FALSE)
       }
       if (identical(rashomon_rule, "epsilon") && !is.finite(rashomon_epsilon)) {
         stop("ctx$multiplicity$epsilon must be a finite numeric value when rashomon_rule='epsilon'.", call. = FALSE)
@@ -109,42 +120,50 @@ Gate6Multiplicity = R6::R6Class(
             perf_tbl = scores_dt[, {
               v = get(primary_id)
               v = v[is.finite(v)]
-              if (length(v) < 2L) {
+              if (length(v) < 1L) {
                 NULL
               } else {
-                m = mean(v, na.rm = TRUE)
-                s = stats::sd(v, na.rm = TRUE)
-                se = s / sqrt(length(v))
-                ci = 1.96 * se
                 data.table::data.table(
-                  # learner_id = learner_id[1L],
                   measure_id = primary_id,
                   n_folds = length(v),
-                  mean = as.numeric(m),
-                  sd = as.numeric(s),
-                  se = as.numeric(se),
-                  ci_low = as.numeric(m - ci),
-                  ci_high = as.numeric(m + ci)
+                  mean = mean(v),
+                  sd = if (length(v) > 1L) stats::sd(v) else NA_real_,
+                  median = stats::median(v),
+                  q10 = stats::quantile(v, 0.10, names = FALSE),
+                  q90 = stats::quantile(v, 0.90, names = FALSE),
+                  minimum = min(v),
+                  maximum = max(v),
+                  uncertainty_label = paste(
+                    "descriptive variation across resampling iterations;",
+                    "not independent-sample inference or a confidence interval"
+                  )
                 )
               }
-            }, by = learner_id] # [, !"learner_id"]
+            }, by = learner_id]
             perf_tbl = as.data.table(perf_tbl)
           }
           if (!is.null(perf_tbl) && nrow(perf_tbl) >= 2L) {
             minimize = isTRUE(msr$minimize)
 
             best_mean = if (minimize) min(perf_tbl$mean, na.rm = TRUE) else max(perf_tbl$mean, na.rm = TRUE)
-            best_se = perf_tbl[mean == best_mean, min(se, na.rm = TRUE)]
-            if (!is.finite(best_se)) best_se = stats::median(perf_tbl$se, na.rm = TRUE)
+            best_spread = perf_tbl[mean == best_mean, min(sd, na.rm = TRUE)]
+            if (!is.finite(best_spread)) best_spread = stats::median(perf_tbl$sd, na.rm = TRUE)
+            if (!is.finite(best_spread)) best_spread = 0
 
             threshold = if (identical(rashomon_rule, "epsilon")) {
               if (minimize) (best_mean + rashomon_epsilon) else (best_mean - rashomon_epsilon)
             } else {
-              if (minimize) (best_mean + best_se) else (best_mean - best_se)
+              if (minimize) (best_mean + best_spread) else (best_mean - best_spread)
             }
             rashomon_threshold = as.numeric(threshold)
             perf_tbl[, rashomon_threshold := threshold]
             perf_tbl[, rashomon_rule := rashomon_rule]
+            perf_tbl[, rashomon_rule_requested := rashomon_rule_requested]
+            perf_tbl[, descriptive_tolerance := if (identical(rashomon_rule, "descriptive_sd")) {
+              best_spread
+            } else {
+              NA_real_
+            }]
             perf_tbl[, epsilon := if (is.finite(rashomon_epsilon)) rashomon_epsilon else NA_real_]
 
             perf_tbl[, in_rashomon := if (minimize) mean <= threshold else mean >= threshold]
@@ -337,7 +356,7 @@ Gate6Multiplicity = R6::R6Class(
         if (multiplicity_assessed) assessed = c(assessed, "multiplicity") else not_assessed = c(not_assessed, "multiplicity")
         if (transport_assessed) assessed = c(assessed, "transport") else not_assessed = c(not_assessed, "transport")
         summary = paste0(
-          "Partial Gate 6 coverage: assessed ", paste(assessed, collapse = " + "),
+          "Incomplete Gate 6 coverage: assessed ", paste(assessed, collapse = " + "),
           "; not assessed ", paste(not_assessed, collapse = " + "),
           "."
         )
@@ -357,6 +376,7 @@ Gate6Multiplicity = R6::R6Class(
         transport_mode = transport_mode,
         transport_measure_id = transport_measure_id,
         rashomon_rule = rashomon_rule,
+        rashomon_rule_requested = rashomon_rule_requested,
         high_stakes = high_stakes,
         require_transport_for_high_stakes = require_transport_for_high_stakes
       )
@@ -364,6 +384,7 @@ Gate6Multiplicity = R6::R6Class(
       rashomon_provenance = data.table::data.table(
         enabled = enabled,
         rashomon_rule = as.character(rashomon_rule),
+        rashomon_rule_requested = as.character(rashomon_rule_requested),
         epsilon = if (is.finite(rashomon_epsilon)) rashomon_epsilon else NA_real_,
         rashomon_threshold = rashomon_threshold,
         primary_measure_id = as.character(primary_id),

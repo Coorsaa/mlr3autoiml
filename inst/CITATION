@@ -1,0 +1,15 @@
+citHeader("To cite mlr3autoiml in publications, use:")
+
+bibentry(
+  bibtype = "Manual",
+  title = "mlr3autoiml: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning",
+  author = c(
+    person("Stefan", "Coors"),
+    person("Clara", "Vetter"),
+    person("Jonas", "Hauck"),
+    person("Bernd", "Bischl"),
+    person("Sven", "Hilbert")
+  ),
+  year = "2026",
+  note = sprintf("R package version %s", meta$Version)
+)

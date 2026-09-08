@@ -6,8 +6,8 @@
 #' Create a compact, audit-ready report card (one row per gate) from an
 #' [AutoIMLResult].
 #'
-#' The report card includes the gate status, a short summary, and the achieved
-#' **claim-scoped Interpretation Evidence Levels (IEL)**.
+#' The report card includes the gate status, a short summary, and the claim
+#' scopes requested in the Claim and Semantics Card.
 #'
 #' @param x ([AutoIMLResult] | [AutoIML])
 #'   A completed result or an AutoIML runner.
@@ -38,23 +38,9 @@ report_card = function(x) {
     fill = TRUE
   )
 
-  # Attach IEL fields (repeat across rows for convenience)
-  iel = res$iel
-  if (is.list(iel)) {
-    dt[, iel_overall := iel$overall %??% NA_character_]
-    dt[, iel_global := iel$global %??% NA_character_]
-    dt[, iel_local := iel$local %??% NA_character_]
-    dt[, iel_decision := iel$decision %??% NA_character_]
-  } else {
-    dt[, iel_overall := as.character(iel)]
-    dt[, iel_global := NA_character_]
-    dt[, iel_local := NA_character_]
-    dt[, iel_decision := NA_character_]
-  }
-
   dt[, purpose := res$purpose %??% NA_character_]
   dt[, quick_start := isTRUE(res$quick_start)]
-  data.table::set(dt, j = "requested_scopes", value = paste(as.character(res$iel$requested %??% c("global")), collapse = ","))
+  data.table::set(dt, j = "requested_scopes", value = paste(.autoiml_requested_scopes(res), collapse = ","))
 
   # If Gate 0 exists, attach claim semantics / stakes as convenience columns.
   g0a = gates[["G0A"]]
@@ -98,20 +84,11 @@ report_card_extended = function(x) {
   reqs = reqs_yaml$requirements
   rows = lapply(reqs, function(r) {
     gate = as.character(r$gate)
-    gr = if (gate %in% c("IEL", "REPORT")) NULL else .autoiml_get_gate_result(res, gate)
+    gr = if (identical(gate, "REPORT")) NULL else .autoiml_get_gate_result(res, gate)
     app = .autoiml_requirement_applicable(r, res)
 
     field_chk = if (isTRUE(app$applicable)) {
-      if (identical(gate, "IEL")) {
-        vals = .autoiml_as_list(res$iel)
-        missing = character(0)
-        for (k in as.character(unlist(r$artifact_fields %??% character(), use.names = FALSE))) {
-          if (!k %in% names(vals) || !.autoiml_has_evidence_value(vals[[k]])) {
-            missing = c(missing, paste0("iel:", k))
-          }
-        }
-        list(ok = length(missing) == 0L, missing = missing)
-      } else if (identical(gate, "REPORT")) {
+      if (identical(gate, "REPORT")) {
         rc = report_card(res)
         missing = character(0)
         for (k in as.character(unlist(r$artifact_fields %??% character(), use.names = FALSE))) {
@@ -129,7 +106,7 @@ report_card_extended = function(x) {
 
     evidence_status = if (!isTRUE(app$applicable)) {
       "not_applicable"
-    } else if (is.null(gr) && !gate %in% c("IEL", "REPORT")) {
+    } else if (is.null(gr) && !identical(gate, "REPORT")) {
       "gate_missing"
     } else if (isTRUE(field_chk$ok)) {
       "evidence_present"
@@ -144,10 +121,20 @@ report_card_extended = function(x) {
       severity_if_missing = as.character(r$severity_if_missing),
       applicable = isTRUE(app$applicable),
       applicability_reason = as.character(app$reason %??% ""),
-      gate_present = if (!gate %in% c("IEL", "REPORT")) !is.null(gr) else TRUE,
-      gate_status = if (!is.null(gr)) as.character(gr$status %??% NA_character_) else if (gate %in% c("IEL", "REPORT")) "computed" else NA_character_,
+      gate_present = if (!identical(gate, "REPORT")) !is.null(gr) else TRUE,
+      gate_status = if (!is.null(gr)) {
+        as.character(gr$status %??% NA_character_)
+      } else if (identical(gate, "REPORT")) {
+        "computed"
+      } else {
+        NA_character_
+      },
       artifact_keys_ok = if (isTRUE(app$applicable)) isTRUE(field_chk$ok) else NA,
-      missing_artifact_keys = if (isTRUE(app$applicable) && !isTRUE(field_chk$ok)) paste(field_chk$missing, collapse = ",") else "",
+      missing_artifact_keys = if (isTRUE(app$applicable) && !isTRUE(field_chk$ok)) {
+        paste(field_chk$missing, collapse = ",")
+      } else {
+        ""
+      },
       evidence_status = evidence_status,
       requirement_text = as.character(r$requirement_text)
     )
@@ -162,8 +149,8 @@ report_card_extended = function(x) {
 #'
 #' @description
 #' Exports compact and extended report cards plus core reproducibility artifacts
-#' (gate results, IEL, claim scope, session info, traceability status, and the
-#' reader-facing guide outputs).
+#' (gate results, session info, traceability status, and the reader-facing guide
+#' outputs).
 #'
 #' @param x ([AutoIMLResult] | [AutoIML])
 #'   A completed result or an AutoIML runner.
@@ -199,8 +186,6 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
   p_reader_questions = file.path(dir, paste0(prefix, "_reader_questions.csv"))
   p_recommended_plots = file.path(dir, paste0(prefix, "_recommended_plots.txt"))
   p_gate_results = file.path(dir, paste0(prefix, "_gate_results.rds"))
-  p_iel = file.path(dir, paste0(prefix, "_iel.rds"))
-  p_claim_scope = file.path(dir, paste0(prefix, "_claim_scope.rds"))
   p_trace = file.path(dir, paste0(prefix, "_traceability_status.rds"))
   p_session = file.path(dir, paste0(prefix, "_sessionInfo.txt"))
 
@@ -214,8 +199,6 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
   writeLines(unique(as.character(guide$recommended_plots)), p_recommended_plots)
 
   saveRDS(res$gate_results, p_gate_results)
-  saveRDS(res$iel, p_iel)
-  saveRDS(res$claim_scope, p_claim_scope)
   saveRDS(tr, p_trace)
 
   si = utils::capture.output(utils::sessionInfo())
@@ -231,8 +214,6 @@ export_audit_bundle = function(x, dir = "autoiml_audit_bundle", prefix = "autoim
     reader_questions = p_reader_questions,
     recommended_plots = p_recommended_plots,
     gate_results = p_gate_results,
-    iel = p_iel,
-    claim_scope = p_claim_scope,
     traceability_status = p_trace,
     session_info = p_session
   )

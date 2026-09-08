@@ -1,0 +1,17 @@
+{
+  "method_ids": [
+    "ale",
+    "coefficients",
+    "counterfactual",
+    "decision_curve",
+    "ice",
+    "local_surrogate",
+    "marginal_shap",
+    "other",
+    "path_attribution",
+    "pdp",
+    "pfi",
+    "shapley"
+  ],
+  "note": "Controlled identifiers accepted by csdg_explanation()."
+}

@@ -4,7 +4,10 @@
 \alias{autoiml_model_colors}
 \title{Standard model color palette for mlr3autoiml analyses}
 \usage{
-autoiml_model_colors()
+autoiml_model_colors(style = c("color", "monochrome"))
+}
+\arguments{
+\item{style}{Either \code{"color"} for the default learner colors or \code{"monochrome"} for achromatic learner colors.}
 }
 \value{
 Named character vector of hex colors.

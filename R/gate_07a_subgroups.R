@@ -345,11 +345,10 @@ Gate7aSubgroups = R6::R6Class(
         }, .fill = TRUE)
 
         status = "pass"
-
-        # Flag large subgroup calibration dispersion heuristically
-        if (any(is.finite(subgroup$ece) & subgroup$ece > 0.10, na.rm = TRUE)) status = "warn"
-
-        summary = "Subgroup audit computed (binary classification performance + calibration; utility if specified)."
+        summary = paste(
+          "Subgroup audit computed (binary classification performance and calibration; utility if specified).",
+          "Calibration estimates are descriptive unless claim-specific adequacy criteria are supplied elsewhere."
+        )
 
         subgroup_expl_stability = NULL
         if (!is.null(ctx$final_model)) {

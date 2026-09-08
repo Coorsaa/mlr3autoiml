@@ -91,7 +91,7 @@ save_analysis_plot = function(p, base_path, width = 7, height = 4.5, title = NUL
   for (ext in c(".pdf", ".png")) {
     tryCatch(
       {
-        ggplot2::ggsave(paste0(base_path, ext), p, width = width, height = height)
+        ggplot2::ggsave(paste0(base_path, ext), p, width = width, height = height, bg = "white")
         ok = TRUE
       },
       error = function(e) {
@@ -156,7 +156,7 @@ export_analysis_bundle = function(auto, dir = "analysis_bundle", prefix = "run",
 
   paths = list()
 
-  # ---- Audit bundle (report card, guide, RDS, IEL) -------------------------
+  # ---- Audit bundle (report card, guide, and reproducibility metadata) ------
   bundle_paths = export_audit_bundle(res, dir = bundle_dir, prefix = prefix)
   paths = c(paths, bundle_paths)
 

@@ -1,0 +1,167 @@
+---
+title: "Claim-Scoped Diagnostic Gates"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Claim-Scoped Diagnostic Gates}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Why claims come first
+
+An explanation method does not determine what its output can support. A global
+importance ranking for one fitted model, for example, does not by itself show
+that the ranking survives across resamples, near-equivalent models, cohorts,
+or plausible setting shifts. CSDG therefore starts from an explicit claim and
+assigns diagnostic gates to that claim.
+
+```{r cards}
+library(mlr3)
+library(mlr3autoiml)
+
+claim = csdg_claim(
+  id = "example_global_pattern",
+  statement = paste(
+    "The selected pipeline predicts the observed binary outcome adequately",
+    "and supports a stable global importance description in the analytic sample."
+  ),
+  claim_type = c(
+    "predictive_performance", "calibration", "global_explanation"
+  ),
+  target = "binary outcome at the observed assessment",
+  unit = "participant",
+  population = "the worked-example population",
+  analytic_distribution = "the generated analytic sample",
+  model_scope = "selected_model",
+  setting_scope = "analytic_sample"
+)
+
+measurement = csdg_measurement(
+  outcome = "y",
+  predictors = c("x1", "x2", "group"),
+  data_source = "generated worked example",
+  sample_definition = "all generated rows",
+  unit = "participant",
+  outcome_scale = "binary factor, positive class 1",
+  missingness = "no missing values",
+  preprocessing = "rpart pipeline refitted within each training split",
+  verification = list(
+    status = "author_reviewed",
+    artifact = "vignette source"
+  )
+)
+
+explanation = csdg_explanation(
+  method_ids = "pfi",
+  scope = "global",
+  target = "positive-class predicted probability",
+  perturbation = list(
+    type = "marginal",
+    distribution = "held-out analytic-sample folds"
+  )
+)
+
+csdg_gate_plan(claim, measurement, explanation)
+```
+
+## Fit and diagnose a complete pipeline
+
+Every learned preprocessing operation should be embedded in the learner so
+that it is refitted inside each training split. The small example below has no
+missingness or learned preprocessing, but the same rule applies to a graph
+learner containing imputation, encoding, selection, and tuning.
+
+```{r audit}
+set.seed(42)
+n = 180
+dat = data.frame(
+  x1 = rnorm(n),
+  x2 = rnorm(n),
+  group = factor(sample(letters[1:3], n, replace = TRUE))
+)
+eta = 0.8 * dat$x1 - 0.5 * dat$x2 + 0.3 * (dat$group == "b")
+dat$y = factor(rbinom(n, 1, plogis(eta)), levels = c(0, 1))
+
+task = as_task_classif(dat, target = "y", positive = "1")
+learner = lrn("classif.rpart", predict_type = "prob")
+
+config = csdg_config(
+  seed = 42L,
+  resampling = list(folds = 3L, repeats = 1L),
+  stability = list(
+    pfi_repetitions = 2L,
+    top_k = 2L,
+    min_top_k_overlap = 0.25
+  )
+)
+
+result = csdg_audit(
+  task = task,
+  learner = learner,
+  claim = claim,
+  measurement = measurement,
+  explanation = explanation,
+  config = config
+)
+
+csdg_report_card(result)
+csdg_claim_report(result)
+```
+
+## Adding model-refit uncertainty to ALE curves
+
+A one-dimensional ALE curve from a final full-sample fit describes one fitted model.
+When the claim also requires evidence that the curve persists across resampled analytic data, use
+`csdg_ale_bootstrap()` with the independent sampling unit and the complete learner pipeline.
+The returned percentile intervals are pointwise, not simultaneous, and remain conditional on the fixed learner
+specification and analysis design.
+
+```{r ale-bootstrap, eval=FALSE}
+fitted_learner = learner$clone(deep = TRUE)
+fitted_learner$train(task)
+
+ale_intervals = csdg_ale_bootstrap(
+  task = task,
+  learner = fitted_learner,
+  features = c("x1", "x2"),
+  sample_n = 180L,
+  ale_bins = 10L,
+  replicates = 200L,
+  resampling_unit = "row",
+  min_interval_n = 10L,
+  seed = 42L
+)
+
+csdg_plot_data(ale_intervals$ale_1d, type = "ale", style = "monochrome")
+```
+
+For clustered observations, set `resampling_unit = "cluster"`, supply one cluster label per task row, and use
+`strata` when clusters must be sampled independently within prespecified strata.
+
+## Reading status labels
+
+`not_applicable` means that the prespecified claim does not invoke a gate.
+`unresolved` means that a required component, criterion, or scope check is missing or cannot yet be adjudicated.
+`not_met` records a prespecified diagnostic failure. `error` preserves a computational failure rather than silently
+converting it into support. `met` means only that the evidence required by the declared gate was available and met
+the declared criterion.
+
+None of these labels converts a predictive association into a causal effect.
+Nor do they establish population transport, fairness, user comprehension, or
+real-world utility unless those components were explicitly designed and
+supplied.
+
+## Exporting the audit trail
+
+```{r export, eval=FALSE}
+bundle = csdg_export(result, path = "results")
+bundle
+```
+
+The bundle contains machine-readable cards, the gate plan, report and claim
+cards, diagnostic tables, a serialized result, session information, an
+uncertainty-scope note, and file checksums.

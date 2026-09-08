@@ -8,7 +8,7 @@ Internal ggplot2-based plotting helpers for Gate 6 (Multiplicity and Transport).
 
 These functions visualize:
 \itemize{
-\item Alternative learner performance comparisons with confidence intervals
+\item Alternative learner performance comparisons with descriptive fold ranges
 \item Rashomon set membership
 \item Explanation dispersion across Rashomon models (permutation importance)
 \item Group performance heterogeneity

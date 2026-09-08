@@ -78,7 +78,7 @@ AutoIML = R6::R6Class(
     #' @param resampling (`mlr3::Resampling`)
     #'   Resampling strategy used for Gate 1 and related diagnostics.
     #' @param purpose (`character(1)`)
-    #'   Intended use. Influences default thresholds and which gates are executed.
+    #'   Intended use. Influences the default analysis scope and which gates are executed.
     #' @param profile (`character(1)`)
     #'   Configuration profile: `"high_resolution"` (default) or `"fast"`.
     #' @param quick_start (`logical(1)`)
@@ -248,16 +248,11 @@ AutoIML = R6::R6Class(
 
       ctx$run_log = run_log
 
-      iel = iel_from_gates(gate_results)
-      claim_scope = claim_scope_from_iel(iel = iel, purpose = self$purpose)
-
       res = AutoIMLResult$new(
         task_id = self$task$id,
         learner_id = self$learner$id,
         purpose = self$purpose,
         quick_start = self$quick_start,
-        iel = iel,
-        claim_scope = claim_scope,
         gate_results = gate_results,
         report = data.table::data.table(),
         timings = timings,
@@ -377,10 +372,7 @@ AutoIML = R6::R6Class(
         " | seed: ", self$seed, "\n",
         sep = ""
       )
-      iel_txt = .autoiml_format_iel(res$iel)
-      scope_txt = .autoiml_format_claim_scope(res$claim_scope)
-      cat("IEL: ", iel_txt, "\n", sep = "")
-      cat("Claim scope: ", scope_txt, "\n\n", sep = "")
+      cat("Requested scopes: ", paste(.autoiml_requested_scopes(res), collapse = ", "), "\n\n", sep = "")
 
       print(res$report)
 
@@ -504,14 +496,15 @@ AutoIML = R6::R6Class(
       if (is.null(model)) stop("No trained final model found. Run $run() first.", call. = FALSE)
 
       feats = task$feature_names
+      seed_use = seed %??% (ctx$seed %??% 1L)
 
       x_interest = task$data(rows = row_id, cols = feats)
       bg_n = min(as.integer(background_n), task$nrow)
+      set.seed(as.integer(seed_use))
       bg_rows = sample(task$row_ids, size = bg_n)
       background = task$data(rows = bg_rows, cols = feats)
 
       cls = if (!is.null(class_label)) as.character(class_label) else NULL
-      seed_use = seed %??% (ctx$seed %??% 1L)
 
       # Semantics: default SHAP mode depends on the declared semantics (Gate 0A),
       # but can be overridden via ctx$shap$mode.
@@ -663,15 +656,6 @@ AutoIML = R6::R6Class(
       }
 
       list(result = out, elapsed = proc.time()[3] - gstart)
-    },
-
-    derive_iel = function(gate_results) {
-      iel_from_gates(gate_results)
-    },
-
-    # Translate achieved IEL into conservative claim-scope statements.
-    claim_scope = function(iel, purpose) {
-      claim_scope_from_iel(iel = iel, purpose = purpose)
     }
   )
 )

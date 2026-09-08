@@ -222,7 +222,7 @@ Gate0BMeasurement = R6::R6Class(
         m$scoring_pipeline = if (identical(level, "plausible_values") || isTRUE(has_pv_tasks)) {
           paste(
             "Outcome uncertainty is represented through the supplied plausible-value tasks,",
-            "and Gate 1 pools predictive metrics across those tasks."
+            "and Gate 1 summarizes predictive metrics descriptively across those tasks."
           )
         } else if (inherits(task, "TaskClassif")) {
           "Use the observed task target and feature representation supplied to the fitted learner pipeline in Gate 1."

@@ -31,14 +31,32 @@ NULL
   NULL
 }
 
+.autoiml_plot_font_family = function() {
+  if (!"Arial" %in% names(grDevices::pdfFonts()) && "ArialMT" %in% names(grDevices::pdfFonts())) {
+    font = grDevices::pdfFonts("ArialMT")[[1L]]
+    font$family = "Arial"
+    try(do.call(grDevices::pdfFonts, setNames(list(font), "Arial")), silent = TRUE)
+  }
+  if (!"Arial" %in% names(grDevices::postscriptFonts()) &&
+      "ArialMT" %in% names(grDevices::postscriptFonts())) {
+    font = grDevices::postscriptFonts("ArialMT")[[1L]]
+    font$family = "Arial"
+    try(do.call(grDevices::postscriptFonts, setNames(list(font), "Arial")), silent = TRUE)
+  }
+  if ("Arial" %in% names(grDevices::pdfFonts())) "Arial" else "sans"
+}
+
 .autoiml_theme_iml = function(base_size = 11) {
-  ggplot2::theme_minimal(base_size = base_size) +
+  font_family = .autoiml_plot_font_family()
+  ggplot2::theme_minimal(base_size = base_size, base_family = font_family) +
     ggplot2::theme(
+      text = ggplot2::element_text(family = font_family),
       panel.grid.minor = ggplot2::element_blank(),
       legend.position = "right",
       plot.title.position = "plot",
       plot.title = ggplot2::element_text(face = "plain"),
-      axis.title = ggplot2::element_text(face = "plain")
+      axis.title = ggplot2::element_text(face = "plain"),
+      plot.margin = ggplot2::margin(10, 18, 12, 18)
     )
 }
 

@@ -3,8 +3,8 @@
 #' @description
 #' Produces a compact, machine-readable guide with actionable next steps,
 #' recommended visualizations, current claim constraints, and reader-facing
-#' answers to common interpretation questions derived from gate outcomes, IEL,
-#' and claim semantics.
+#' answers to common interpretation questions derived from gate outcomes and
+#' claim semantics.
 #'
 #' @param x ([AutoIMLResult] | [AutoIML])
 #'   A completed result or an AutoIML runner.
@@ -37,7 +37,7 @@ guide_workflow = function(x, max_actions = 6L) {
 
   g2 = .autoiml_get_gate_result(res, "G2")
   g2_metrics = g2$metrics %??% data.table::data.table()
-  requested_scopes = as.character(res$iel$requested %??% c("global"))
+  requested_scopes = .autoiml_requested_scopes(res)
 
   trust_summary = .autoiml_trust_summary(res)
   model_story = .autoiml_model_story(res)
@@ -168,17 +168,17 @@ guide_workflow = function(x, max_actions = 6L) {
     )
   }
 
-  if ("local" %in% requested_scopes && isTRUE((res$iel$local %??% "IEL-0") == "IEL-0")) {
+  if ("local" %in% requested_scopes && .autoiml_gate_evidence_blocked(res, c("G4", "G5", "G6"))) {
     actions = add_action(
       actions,
       7L,
       "Avoid case-level claims for now",
-      "Local evidence is currently IEL-0.",
+      "At least one required local faithfulness, stability, or multiplicity check is unavailable or did not pass.",
       "Do not report individual-level explanations as if they were actionable or definitive; improve local diagnostics first."
     )
   }
 
-  if ("decision" %in% requested_scopes && isTRUE((res$iel$decision %??% "IEL-0") == "IEL-0")) {
+  if ("decision" %in% requested_scopes && .autoiml_gate_evidence_blocked(res, c("G3", "G7A"))) {
     actions = add_action(
       actions,
       7L,
@@ -193,7 +193,7 @@ guide_workflow = function(x, max_actions = 6L) {
       actions,
       9L,
       "Proceed with the current claim scope",
-      "No immediate blocker was detected beyond the current IEL restrictions.",
+      "No immediate blocker was detected in the gate evidence for the requested claims.",
       "Export the audit bundle, include the trust/model-story outputs in the paper, and keep the declared semantics visible wherever interpretations are reported."
     )
   }
@@ -225,11 +225,9 @@ guide_workflow = function(x, max_actions = 6L) {
     stakes = stakes,
     semantics = semantics,
     requested_scopes = paste(requested_scopes, collapse = ","),
-    iel_overall = as.character(res$iel$overall %??% NA_character_),
-    iel_global = as.character(res$iel$global %??% NA_character_),
-    iel_local = as.character(res$iel$local %??% NA_character_),
-    iel_decision = as.character(res$iel$decision %??% NA_character_),
-    claim_scope_overall = as.character(res$claim_scope$overall %??% NA_character_),
+    global_gate_status = .autoiml_gate_status_text(res, c("G1", "G2", "G5", "G6")),
+    local_gate_status = .autoiml_gate_status_text(res, c("G4", "G5", "G6")),
+    decision_gate_status = .autoiml_gate_status_text(res, c("G3", "G7A")),
     gate0b_status = as.character(statuses[["G0B"]] %??% NA_character_),
     gate1_status = as.character(statuses[["G1"]] %??% NA_character_),
     gate4_status = as.character(statuses[["G4"]] %??% NA_character_),

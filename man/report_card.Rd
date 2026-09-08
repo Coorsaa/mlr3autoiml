@@ -17,6 +17,6 @@ A \link[data.table:data.table]{data.table::data.table} with one row per gate.
 Create a compact, audit-ready report card (one row per gate) from an
 \link{AutoIMLResult}.
 
-The report card includes the gate status, a short summary, and the achieved
-\strong{claim-scoped Interpretation Evidence Levels (IEL)}.
+The report card includes the gate status, a short summary, and the claim
+scopes requested in the Claim and Semantics Card.
 }

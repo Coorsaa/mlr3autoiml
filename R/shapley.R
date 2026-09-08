@@ -57,6 +57,29 @@ NULL
   stop("Unsupported task type for Shapley: ", class(task)[1L], call. = FALSE)
 }
 
+.autoiml_conditional_distance = function(background, x_interest, features, sd_scale) {
+  distance = rep(0, nrow(background))
+  for (feature in features) {
+    value = x_interest[[feature]][1L]
+    if (is.null(value)) next
+    column = background[[feature]]
+    if (is.na(value)) {
+      distance = distance + as.numeric(!is.na(column))
+    } else if (is.numeric(column) || is.integer(column)) {
+      scale = sd_scale[[feature]]
+      if (!is.finite(scale) || scale <= 0) scale = 1
+      component = abs(as.numeric(column) - as.numeric(value)) / scale
+      component[is.na(component)] = 1
+      distance = distance + component
+    } else {
+      component = as.numeric(column != value)
+      component[is.na(component)] = 1
+      distance = distance + component
+    }
+  }
+  distance
+}
+
 #' Internal Shapley computation
 #'
 #' * `mode = "marginal"` matches iml's interventional design.
@@ -172,25 +195,7 @@ NULL
     }
 
     n_bg = nrow(background)
-    d = rep(0, n_bg)
-
-    for (f in cond_features) {
-      xv = xi[[f]][1L]
-      if (is.null(xv) || is.na(xv)) next
-
-      col = background[[f]]
-      if (is.numeric(col) || is.integer(col)) {
-        s = sd_scale[[f]]
-        if (!is.finite(s) || s <= 0) s = 1
-        dv = abs(as.numeric(col) - as.numeric(xv)) / s
-        dv[is.na(dv)] = 0
-        d = d + dv
-      } else {
-        dv = as.numeric(col != xv)
-        dv[is.na(dv)] = 0
-        d = d + dv
-      }
-    }
+    d = .autoiml_conditional_distance(background, xi, cond_features, sd_scale)
 
     k = min(conditional_k, n_bg)
     idx = order(d)[seq_len(k)]
@@ -360,6 +365,9 @@ NULL
   out = merge(out, feat_vals, by = "feature", all.x = TRUE)
   out[, sample_size := B]
   out[, shap_mode := mode]
-  data.table::setcolorder(out, c("class_label", "feature", "feature_value", "phi", "phi_var", "sample_size", "shap_mode"))
+  data.table::setcolorder(
+    out,
+    c("class_label", "feature", "feature_value", "phi", "phi_var", "sample_size", "shap_mode")
+  )
   out[]
 }

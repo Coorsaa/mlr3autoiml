@@ -416,7 +416,7 @@ NULL
   data.table::rbindlist(out)
 }
 
-# ---- bootstrap CIs for calibration/DCA (Gate 3, IEL-2D requirement) ---------
+# ---- bootstrap CIs for calibration/DCA (Gate 3) -----------------------------
 
 .autoiml_reliability_curve_boot = function(truth01, p_hat, bins = 10L, B = 200L,
                                             level = 0.95) {
@@ -594,7 +594,9 @@ NULL
     "pint_max_features", "pint_grid_n", "pint_grid_type"
   )
 
-  allowed_calibration = c("thresholds", "bins")
+  allowed_calibration = c(
+    "thresholds", "bins", "maximum_ece", "calibration_slope_range", "maximum_abs_intercept"
+  )
   allowed_validation = c("split_policy", "cluster_var", "time_var", "site_var")
   allowed_plausible_values = c("pv_tasks")
 
@@ -652,16 +654,6 @@ NULL
 #' @keywords internal
 .autoiml_framework_requirements = function() {
   path = .autoiml_extdata_path("framework_requirements.yaml")
-  x = .autoiml_read_yaml_file(path)
-  x$`_path` = path
-  x
-}
-
-
-#' Load IEL rules from inst/extdata.
-#' @keywords internal
-.autoiml_iel_rules = function() {
-  path = .autoiml_extdata_path("iel_rules.yaml")
   x = .autoiml_read_yaml_file(path)
   x$`_path` = path
   x
@@ -856,7 +848,7 @@ NULL
     "severity_if_missing", "applicability", "tests_required"
   )
 
-  allowed_gate = c("G0A", "G0B", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B", "IEL", "REPORT")
+  allowed_gate = c("G0A", "G0B", "G1", "G2", "G3", "G4", "G5", "G6", "G7A", "G7B", "REPORT")
   allowed_evidence = c("computed", "user_provided", "external_study")
   allowed_severity = c("fail", "warn", "skip")
 
@@ -925,129 +917,21 @@ NULL
 }
 
 
-#' Validate shape of IEL rules YAML.
-#' @keywords internal
-.autoiml_validate_iel_rules = function(x) {
-  out = list(ok = TRUE, errors = character())
-
-  if (!is.list(x)) {
-    return(list(ok = FALSE, errors = "iel_rules: root must be a list"))
-  }
-
-  rules = x$rules
-  if (!is.list(rules) || length(rules) < 1L) {
-    return(list(ok = FALSE, errors = "iel_rules: 'rules' must be a non-empty list"))
-  }
-
-  allowed_scope = c("global", "local", "decision")
-  allowed_level = c("IEL-0", "IEL-1", "IEL-2", "IEL-3")
-  allowed_status = c("pass", "warn")
-  ids = character(0)
-
-  for (i in seq_along(rules)) {
-    r = rules[[i]]
-    tag = paste0("rules[[", i, "]]")
-
-    if (!is.list(r)) {
-      out$errors = c(out$errors, paste0(tag, " must be a list"))
-      next
-    }
-
-    rid = as.character(r$id %??% "")
-    if (!nzchar(rid)) {
-      out$errors = c(out$errors, paste0(tag, " has empty id"))
-    } else {
-      ids = c(ids, rid)
-    }
-
-    scope = as.character(r$scope %??% "")
-    if (!scope %in% allowed_scope) {
-      out$errors = c(out$errors, paste0(tag, " has invalid scope: ", scope))
-    }
-
-    level = as.character(r$level %??% "")
-    if (!level %in% allowed_level) {
-      out$errors = c(out$errors, paste0(tag, " has invalid level: ", level))
-    }
-
-    rg = as.character(unlist(r$required_gates %??% character(), use.names = FALSE))
-    if (length(rg) < 1L || any(!nzchar(rg))) {
-      out$errors = c(out$errors, paste0(tag, " must provide non-empty required_gates"))
-    }
-
-    st = as.character(unlist(r$requires_any_status_in %??% c("pass", "warn"), use.names = FALSE))
-    if (length(st) < 1L || any(!st %in% allowed_status)) {
-      out$errors = c(out$errors, paste0(tag, " requires_any_status_in must be subset of {pass,warn}"))
-    }
-
-    gate_status_req = r$gate_status_requirements %??% NULL
-    if (!is.null(gate_status_req)) {
-      if (!is.list(gate_status_req) || length(gate_status_req) < 1L || is.null(names(gate_status_req)) || any(!nzchar(names(gate_status_req)))) {
-        out$errors = c(out$errors, paste0(tag, " gate_status_requirements must be a named list of gate ids -> allowed statuses"))
-      } else {
-        bad_gate_refs = setdiff(names(gate_status_req), rg)
-        if (length(bad_gate_refs) > 0L) {
-          out$errors = c(out$errors, paste0(tag, " gate_status_requirements references gates not listed in required_gates: ", paste(bad_gate_refs, collapse = ", ")))
-        }
-        for (gid in names(gate_status_req)) {
-          vals = as.character(unlist(gate_status_req[[gid]], use.names = FALSE))
-          if (length(vals) < 1L || any(!vals %in% allowed_status)) {
-            out$errors = c(out$errors, paste0(tag, " gate_status_requirements$", gid, " must be subset of {pass,warn}"))
-          }
-        }
-      }
-    }
-
-    cond = .autoiml_as_list(r$conditions)
-    if (length(cond) > 0L && !is.null(cond$user_facing) && !is.logical(cond$user_facing)) {
-      out$errors = c(out$errors, paste0(tag, " conditions$user_facing must be TRUE/FALSE when provided"))
-    }
-
-    req_keys = r$requires_artifact_keys %??% NULL
-    if (!is.null(req_keys)) {
-      if (!is.list(req_keys) || length(req_keys) < 1L || is.null(names(req_keys)) || any(!nzchar(names(req_keys)))) {
-        out$errors = c(out$errors, paste0(tag, " requires_artifact_keys must be a named list of gate ids -> artifact keys"))
-      } else {
-        bad_gate_refs = setdiff(names(req_keys), rg)
-        if (length(bad_gate_refs) > 0L) {
-          out$errors = c(out$errors, paste0(tag, " requires_artifact_keys references gates not listed in required_gates: ", paste(bad_gate_refs, collapse = ", ")))
-        }
-
-        for (gid in names(req_keys)) {
-          keys = as.character(unlist(req_keys[[gid]], use.names = FALSE))
-          if (length(keys) < 1L || any(!nzchar(keys))) {
-            out$errors = c(out$errors, paste0(tag, " requires_artifact_keys$", gid, " must contain non-empty artifact key names"))
-          }
-        }
-      }
-    }
-  }
-
-  dup = unique(ids[duplicated(ids)])
-  if (length(dup) > 0L) {
-    out$errors = c(out$errors, paste0("Duplicate IEL rule IDs: ", paste(dup, collapse = ", ")))
-  }
-
-  out$ok = length(out$errors) == 0L
-  out
-}
-
-
 #' Run traceability scaffold checks without mutating runtime behavior.
 #' @keywords internal
 .autoiml_traceability_status = function() {
   fr = tryCatch(.autoiml_framework_requirements(), error = function(e) e)
-  ir = tryCatch(.autoiml_iel_rules(), error = function(e) e)
 
   out = list(
     framework_loaded = !inherits(fr, "error"),
-    iel_rules_loaded = !inherits(ir, "error"),
     framework_path = if (!inherits(fr, "error")) fr$`_path` %??% NA_character_ else NA_character_,
-    iel_rules_path = if (!inherits(ir, "error")) ir$`_path` %??% NA_character_ else NA_character_,
-    framework_validation = if (!inherits(fr, "error")) .autoiml_validate_framework_requirements(fr) else list(ok = FALSE, errors = conditionMessage(fr)),
-    iel_rules_validation = if (!inherits(ir, "error")) .autoiml_validate_iel_rules(ir) else list(ok = FALSE, errors = conditionMessage(ir))
+    framework_validation = if (!inherits(fr, "error")) {
+      .autoiml_validate_framework_requirements(fr)
+    } else {
+      list(ok = FALSE, errors = conditionMessage(fr))
+    }
   )
 
-  out$ok = isTRUE(out$framework_validation$ok) && isTRUE(out$iel_rules_validation$ok)
+  out$ok = isTRUE(out$framework_validation$ok)
   out
 }

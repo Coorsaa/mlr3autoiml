@@ -7,7 +7,7 @@
 Implements multiplicity (Rashomon effect) and transportability diagnostics.
 
 \strong{Multiplicity:} Evaluates performance across alternative model classes and
-applies a conservative Rashomon set selection using the 1-SE rule by default.
+applies a conservative Rashomon set selection using a descriptive spread rule by default.
 When multiple models achieve near-tie performance, computes explanation dispersion
 via permutation importance rank correlations.
 

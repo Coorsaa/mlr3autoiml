@@ -3,11 +3,20 @@
 
 # mlr3autoiml
 
-`mlr3autoiml` is an **auditing and automation layer** for interpretable
-machine learning (IML) on top of the **mlr3 ecosystem**. It implements a
-**gate-based workflow** (G0A/G0B → G1 → G2 → G3 → G4 → G5 → G6 →
-G7A/G7B) and assigns **claim-scoped Interpretation Evidence Levels
-(IEL-0…3)** that scope the strength of permissible interpretive claims.
+`mlr3autoiml` 0.1.0 primarily implements **claim-scoped diagnostic gates
+(CSDG)** for interpretable machine-learning analyses in the **mlr3
+ecosystem**. A CSDG audit records the intended claim, measurement and
+preprocessing choices, explanation semantics, gate-specific evidence,
+and the limits of the resulting interpretation. Its `met`, `not_met`,
+and `unresolved` status labels summarize the supplied diagnostic
+evidence; they do not certify causal validity, fairness, or deployment
+readiness.
+
+The claim-scoped interface distinguishes calibration from utility
+(G3a/G3b), model multiplicity from setting transport (G6a/G6b), and
+technical subgroup behavior from audience and workflow evidence
+(G7a/G7b). The earlier combined gate names below belong only to the
+retained `AutoIML` compatibility interface.
 
 Core dependencies: `mlr3`, `mlr3measures`, `mlr3misc`, `data.table`,
 `checkmate`, `R6`. Optional integrations (pipelines, SHAP, iml,
@@ -20,13 +29,90 @@ plotting) activate when the corresponding packages are available.
 remotes::install_github("coorsaa/mlr3autoiml")
 ```
 
+## CSDG quick start
+
+Declare the claim and its scope before running the audit. This example
+requests held-out performance, calibration, and global permutation
+importance evidence for one selected model in the analytic sample.
+
+``` r
+library(mlr3)
+library(mlr3autoiml)
+library(mlr3learners)
+
+task = tsk("german_credit")
+learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
+
+claim = csdg_claim(
+  id = "credit_risk_description",
+  statement = paste(
+    "Held-out predictive performance, calibration, and global permutation",
+    "importance are adequate in the analytic sample."
+  ),
+  claim_type = c("predictive_performance", "calibration", "global_explanation"),
+  target = "credit risk",
+  unit = "credit application",
+  population = "applications represented by the analytic sample",
+  analytic_distribution = "the observed German credit example data",
+  model_scope = "selected_model",
+  setting_scope = "analytic_sample"
+)
+
+measurement = csdg_measurement(
+  outcome = task$target_names,
+  predictors = task$feature_names,
+  data_source = "mlr3 German credit example task",
+  sample_definition = "all rows in the example task",
+  unit = "credit application",
+  missingness = "no missing values in the supplied task",
+  preprocessing = "the complete learner is refitted within every training split",
+  verification = list(status = "not_checked")
+)
+
+explanation = csdg_explanation(
+  method_ids = "pfi",
+  scope = "global",
+  target = "positive-class probability"
+)
+
+audit = csdg_audit(
+  task = task,
+  learner = learner,
+  claim = claim,
+  measurement = measurement,
+  explanation = explanation,
+  config = csdg_config(
+    seed = 42L,
+    resampling = list(folds = 3L, repeats = 1L),
+    stability = list(pfi_repetitions = 3L)
+  )
+)
+
+csdg_report_card(audit)
+csdg_claim_report(audit)
+bundle = csdg_export(audit, path = "csdg-output")
+```
+
+Keep `output_dir = NULL` while inspecting an audit, and export to a
+dedicated directory when it is ready. By default, `csdg_export()` omits
+fitted models and observation-level predictions. This is not a privacy
+or licensing clearance: review the generated bundle before sharing it,
+and set `include_models = TRUE` or `include_predictions = TRUE` only
+when its release is explicitly approved.
+
 ------------------------------------------------------------------------
 
-## Example 1 — Classification · decision support
+## AutoIML compatibility examples
+
+The earlier `AutoIML` interface remains available for compatibility. The
+examples below demonstrate that workflow; new analyses should start from
+the CSDG claim-card and audit interface shown above.
+
+### Example 1 — Classification · decision support
 
 **Task:** `german_credit` (1 000 rows, 20 mixed-type features, binary
-`credit_risk`). Full gate path including G3 calibration + decision
-utility and G7A subgroup audit.
+`credit_risk`). Full compatibility-gate path including combined G3
+calibration and decision utility and G7A subgroup audit.
 
 ``` r
 library(mlr3)
@@ -84,7 +170,7 @@ only asks for comparability or reliability evidence when the measurement
 type makes those claims material.
 
 ``` r
-res = auto$run()
+auto$run()
 ```
 
 ``` r
@@ -96,13 +182,11 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=TRUE) with semantics=within_support. |
 | G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
 | G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
-| G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
-| G3 | Calibration and decision utility | warn | Binary calibration/utility checks computed (intercept/slope, ECE, reliability, net benefit, cost-/utility sweep). |
+| G2 | What is being summarized? (dependence & interactions) | pass | Claim semantics=“within_support”: dependence and/or heterogeneity detected; Gate 2 passes with claim restrictions: prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
+| G3 | Calibration and decision utility | warn | Binary calibration and decision-utility diagnostics were computed. Calibration adequacy remains unadjudicated because no claim-specific criteria were declared. |
 | G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
 | G6 | Multiplicity and transport | pass | Multiplicity and transport checks did not raise major concerns (given available evidence). |
-| G7A | Subgroups / measurement audit | warn | Subgroup audit computed (binary classification performance + calibration; utility if specified). |
-
-**IEL (overall):** IEL-1
+| G7A | Subgroups / measurement audit | pass | Subgroup audit computed (binary classification performance and calibration; utility if specified). Calibration estimates are descriptive unless claim-specific adequacy criteria are supplied elsewhere. |
 
 With the operative claim card, analysis-derived measurement notes, and
 subgroup audit in place, the remaining warnings are substantive rather
@@ -153,7 +237,7 @@ export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_cred
 
 ------------------------------------------------------------------------
 
-## Example 2 — Regression · global insight
+### Example 2 — Regression · global insight
 
 **Task:** `california_housing` (20 433 complete cases from the 20
 640-row benchmark, 8 numeric + 1 factor feature, continuous
@@ -220,7 +304,7 @@ auto$ctx$structure$max_features = 8L
 ```
 
 ``` r
-res = auto$run()
+auto$run()
 ```
 
 ``` r
@@ -232,12 +316,10 @@ knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 | G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=FALSE) with semantics=within_support. |
 | G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
 | G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
-| G2 | What is being summarized? (dependence & interactions) | warn | Claim semantics=“within_support”: dependence and/or heterogeneity detected; prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
+| G2 | What is being summarized? (dependence & interactions) | pass | Claim semantics=“within_support”: dependence and/or heterogeneity detected; Gate 2 passes with claim restrictions: prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
 | G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
 | G6 | Multiplicity and transport | warn | Evidence of multiplicity (Rashomon set contains multiple near-tie models) and/or limited transportability across groups; scope interpretive claims accordingly. |
 | G7A | Subgroups / measurement audit | pass | Subgroup audit computed (regression RMSE, R², mean_y by group). |
-
-**IEL (overall):** IEL-1
 
 The effect plots focus on the housing variables that dominate the model
 story: income and coastal location. `ranger` keeps the global effects
@@ -267,7 +349,10 @@ export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
 
 ------------------------------------------------------------------------
 
-## Gate overview
+## AutoIML gate overview
+
+This table documents the legacy compatibility interface; it is not the
+CSDG applicability map returned by `csdg_gate_plan()`.
 
 | Gate | Triggered when | Evidence checks |
 |----|----|----|
@@ -282,16 +367,14 @@ export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
 | G7A | `sensitive_features` set | Subgroup performance + calibration audit |
 | G7B | user-facing + high-stakes | Human-factors (task-based evaluation) evidence |
 
-IELs (0–3) are assigned per claim scope (global / local / decision). The
-overall IEL is the minimum across all requested scopes.
+## AutoIML compatibility status
 
-## Status
-
-The package follows a claim-first, gate-based architecture with explicit
-semantics, claim-scoped IELs, and evidence-driven gate planning. Default
-runs use the `high_resolution` profile; `quick_start = TRUE` is
-available for rapid prototyping. IEL-3 requires G6 evidence across all
-scopes and, for decision claims, a passed G7A subgroup audit.
+The compatibility workflow uses a claim-first, gate-based architecture
+with explicit semantics, direct gate evidence, and claim-dependent gate
+planning. Default compatibility runs use the `high_resolution` profile;
+`quick_start = TRUE` is available for rapid prototyping. Report cards
+and guides retain the individual gate results and their claim-specific
+restrictions instead of reducing them to a summary evidence score.
 
 ## License
 
