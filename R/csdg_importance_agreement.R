@@ -39,6 +39,8 @@
 #' @param comparison Data frame with the same columns for the comparison model.
 #' @param top_k Positive integer used for set overlap.
 #' @param practical_tolerances Nonnegative absolute importance differences treated as practical ties.
+#'   The default of zero reports strict pair ordering only; every positive practical-tie tolerance must be supplied
+#'   for the specific analysis and interpreted on its importance scale.
 #' @param exclude_groups Optional feature groups excluded from rank-based summaries.
 #'
 #' @return A list containing aligned direct differences, pair-level comparisons, tolerance-sensitivity summaries,
@@ -48,7 +50,7 @@ csdg_importance_agreement = function(
     reference,
     comparison,
     top_k = 5L,
-    practical_tolerances = c(0, 0.01, 0.05),
+    practical_tolerances = 0,
     exclude_groups = NULL) {
   assert_int(top_k, lower = 1L)
   assert_numeric(

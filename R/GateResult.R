@@ -13,6 +13,11 @@
 #' optional artifacts (tables and intermediate objects) used for reproducibility
 #' and plotting.
 #'
+#' @section Compatibility status:
+#' `GateResult` is retained only for the legacy `AutoIML` compatibility workflow.
+#' Its heuristic `pass`, `warn`, `fail`, and `skip` labels are not CSDG evidence roles or claim decisions.
+#' New analyses should use [csdg_audit()], [csdg_evidence_record()], and [csdg_adjudicate_claim()].
+#'
 #' @section Fields:
 #' * `gate_id` :: `character(1)`\cr
 #'   Short gate identifier, e.g. `"G2"`.
@@ -104,6 +109,14 @@ GateResult = R6::R6Class(
     #' @param ... Additional arguments, ignored.
     #' @return Invisibly returns `self`.
     print = function(...) {
+      .Deprecated(
+        "csdg_audit",
+        package = "mlr3autoiml",
+        msg = paste(
+          "GateResult is a compatibility-only class.",
+          "Its pass/warn/fail/skip labels are not CSDG claim decisions."
+        )
+      )
       cat(sprintf("<GateResult %s: %s>\n", self$gate_id, self$status))
       cat(sprintf("  %s\n", self$gate_name))
       if (!is.null(self$summary)) cat(sprintf("  Summary: %s\n", self$summary))

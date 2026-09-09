@@ -1,5 +1,6 @@
 version: 0.2.0
 updated: 2026-04-21
+interface: "AutoIML legacy compatibility traceability; not the CSDG evidence-role or claim-decision schema."
 requirements:
   - id: G0A-CLAIM-SCOPE-001
     gate: G0A

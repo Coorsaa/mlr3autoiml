@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mlr3autoiml/csdg-claim-relation.schema.json",
+  "title": "CSDG claim relation",
+  "type": "object",
+  "required": ["parent_claim_id", "claim_id", "relation", "coordinates", "rationale"],
+  "properties": {
+    "parent_claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "relation": {
+      "type": "string",
+      "enum": ["same", "narrower", "broader", "alternative_or_incomparable"]
+    },
+    "coordinates": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "target"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "model_scope"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "semantics"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "analytic_distribution"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "scientific_use"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"coordinate": {"const": "explanation_design"}},
+            "required": ["coordinate"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "type": "object",
+        "required": ["coordinate", "parent_value", "claim_value", "relation"],
+        "properties": {
+          "coordinate": {
+            "enum": [
+              "target",
+              "model_scope",
+              "semantics",
+              "analytic_distribution",
+              "scientific_use",
+              "explanation_design"
+            ]
+          },
+          "parent_value": {
+            "type": ["string", "null"],
+            "minLength": 1
+          },
+          "claim_value": {
+            "type": ["string", "null"],
+            "minLength": 1
+          },
+          "relation": {
+            "type": "string",
+            "enum": ["same", "narrower", "broader", "alternative_or_incomparable"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"relation": {"const": "same"}},
+        "required": ["relation"]
+      },
+      "then": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "properties": {"relation": {"const": "same"}},
+              "required": ["relation"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"relation": {"const": "narrower"}},
+        "required": ["relation"]
+      },
+      "then": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "properties": {"relation": {"enum": ["same", "narrower"]}},
+              "required": ["relation"]
+            },
+            "contains": {
+              "properties": {"relation": {"const": "narrower"}},
+              "required": ["relation"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"relation": {"const": "broader"}},
+        "required": ["relation"]
+      },
+      "then": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "properties": {"relation": {"enum": ["same", "broader"]}},
+              "required": ["relation"]
+            },
+            "contains": {
+              "properties": {"relation": {"const": "broader"}},
+              "required": ["relation"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"relation": {"const": "alternative_or_incomparable"}},
+        "required": ["relation"]
+      },
+      "then": {
+        "properties": {
+          "coordinates": {
+            "anyOf": [
+              {
+                "contains": {
+                  "properties": {"relation": {"const": "alternative_or_incomparable"}},
+                  "required": ["relation"]
+                },
+                "minContains": 1
+              },
+              {
+                "allOf": [
+                  {
+                    "contains": {
+                      "properties": {"relation": {"const": "narrower"}},
+                      "required": ["relation"]
+                    },
+                    "minContains": 1
+                  },
+                  {
+                    "contains": {
+                      "properties": {"relation": {"const": "broader"}},
+                      "required": ["relation"]
+                    },
+                    "minContains": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

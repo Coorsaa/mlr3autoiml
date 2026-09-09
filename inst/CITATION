@@ -11,5 +11,6 @@ bibentry(
     person("Sven", "Hilbert")
   ),
   year = "2026",
-  note = sprintf("R package version %s", meta$Version)
+  note = sprintf("R package version %s", meta$Version),
+  url = "https://github.com/coorsaa/mlr3autoiml"
 )

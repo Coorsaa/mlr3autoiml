@@ -7,12 +7,72 @@ new_gate_result = function(
     limitations = character(),
     thresholds = list(),
     diagnostics = list(),
+    availability = NULL,
+    result_direction = NULL,
+    criterion = NULL,
+    criterion_source = NULL,
+    criterion_rationale = NULL,
+    materiality = "not_applicable",
+    adjudication_basis = NULL,
+    claim_consequence = "none",
+    rationale = NULL,
     error = NULL,
     started_at = NULL,
     completed_at = .now_utc()) {
   .assert_choice(gate_id, .csdg_gate_ids, "gate_id")
   .assert_choice(status, .csdg_statuses, "status")
   .assert_scalar_string(summary, "summary")
+  availability = availability %||% switch(
+    status,
+    error = "unavailable",
+    not_applicable = "not_applicable",
+    "complete"
+  )
+  result_direction = result_direction %||% switch(
+    status,
+    met = "supports",
+    not_met = "challenges",
+    "not_evaluated"
+  )
+  criteria_table = if (is.list(evidence)) evidence$criteria %||% NULL else NULL
+  if (is.null(criterion) && is.data.frame(criteria_table) && nrow(criteria_table)) {
+    criterion_columns = intersect(
+      c("criterion", "operator", "threshold", "criterion_complete", "passed"),
+      names(criteria_table)
+    )
+    criterion = as.data.frame(criteria_table)[, criterion_columns, drop = FALSE]
+  }
+  if (is.null(criterion_source) && is.data.frame(criteria_table) && "criterion_source" %in% names(criteria_table)) {
+    sources = unique(na.omit(as.character(criteria_table$criterion_source)))
+    if (length(sources)) criterion_source = paste(sources, collapse = " | ")
+  }
+  if (is.null(criterion_rationale) &&
+      is.data.frame(criteria_table) &&
+      "criterion_rationale" %in% names(criteria_table)) {
+    rationales = unique(na.omit(as.character(criteria_table$criterion_rationale)))
+    if (length(rationales)) criterion_rationale = paste(rationales, collapse = " | ")
+  }
+  .assert_choice(availability, .csdg_evidence_availability, "availability")
+  .assert_choice(result_direction, .csdg_result_directions, "result_direction")
+  .assert_choice(materiality, .csdg_materiality, "materiality")
+  .assert_choice(claim_consequence, .csdg_claim_consequences, "claim_consequence")
+  if (!is.null(adjudication_basis)) {
+    .assert_choice(adjudication_basis, .csdg_adjudication_bases, "adjudication_basis")
+  }
+  .assert_scalar_string(criterion_source, "criterion_source", allow_null = TRUE)
+  .assert_scalar_string(criterion_rationale, "criterion_rationale", allow_null = TRUE)
+  .assert_scalar_string(rationale, "rationale", allow_null = TRUE)
+  if (is.null(criterion) && (!is.null(criterion_source) || !is.null(criterion_rationale))) {
+    .csdg_stop("`criterion_source` and `criterion_rationale` require a non-NULL `criterion`.")
+  }
+  if (xor(is.null(criterion_source), is.null(criterion_rationale))) {
+    .csdg_stop("Criterion provenance requires both `criterion_source` and `criterion_rationale`.")
+  }
+  if (!is.null(criterion) &&
+      status %in% c("met", "not_met") &&
+      (is.null(criterion_source) || is.null(criterion_rationale))) {
+    .csdg_stop("A criterion used to adjudicate a gate requires a recorded source and rationale.")
+  }
   structure(
     list(
       gate_id = gate_id,
@@ -22,6 +82,15 @@ new_gate_result = function(
       limitations = as.character(limitations),
       thresholds = thresholds,
       diagnostics = diagnostics,
+      availability = availability,
+      result_direction = result_direction,
+      criterion = criterion,
+      criterion_source = criterion_source,
+      criterion_rationale = criterion_rationale,
+      materiality = materiality,
+      adjudication_basis = adjudication_basis,
+      claim_consequence = claim_consequence,
+      rationale = rationale %||% summary,
       error = error,
       started_at = started_at,
       completed_at = completed_at
@@ -83,6 +152,33 @@ print.CSDGClaim = function(x, ...) {
   cat("  Statement:", x$statement, "\n")
   cat("  Types:", paste(x$claim_type, collapse = ", "), "\n")
   cat("  Model scope:", x$model_scope, "\n")
+  invisible(x)
+}
+
+#' @export
+#' @noRd
+print.CSDGClaimRelation = function(x, ...) {
+  cat("<CSDGClaimRelation>", x$parent_claim_id, "->", x$claim_id, "\n")
+  cat("  Relation:", x$relation, "\n")
+  print(x$coordinates, ...)
+  invisible(x)
+}
+
+#' @export
+#' @noRd
+print.CSDGEvidenceRecord = function(x, ...) {
+  cat("<CSDGEvidenceRecord>", x$gate_id, "\n")
+  cat("  Role:", x$role, "\n")
+  cat("  Availability:", x$availability, "\n")
+  cat("  Result direction:", x$result_direction, "\n")
+  invisible(x)
+}
+
+#' @export
+#' @noRd
+print.CSDGClaimAdjudication = function(x, ...) {
+  cat("<CSDGClaimAdjudication>", x$decision, "\n")
+  cat("\n ", x$rationale, "\n")
   invisible(x)
 }
 
@@ -156,7 +252,12 @@ print.CSDGResample = function(x, ...) {
 print.CSDGRashomon = function(x, ...) {
   cat("<CSDGRashomon>\n")
   cat("  Candidates:", nrow(x$candidates), "\n")
-  cat("  Near-equivalent:", sum(x$candidates$accepted), "\n")
+  accepted = x$candidates$accepted
+  cat(
+    "  Near-equivalent:",
+    if (all(is.na(accepted))) "not defined" else sum(accepted, na.rm = TRUE),
+    "\n"
+  )
   cat("  Primary measure:", x$primary_measure, "\n")
   invisible(x)
 }

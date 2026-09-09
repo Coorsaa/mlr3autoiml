@@ -8,7 +8,7 @@ csdg_importance_agreement(
   reference,
   comparison,
   top_k = 5L,
-  practical_tolerances = c(0, 0.01, 0.05),
+  practical_tolerances = 0,
   exclude_groups = NULL
 )
 }
@@ -19,7 +19,9 @@ csdg_importance_agreement(
 
 \item{top_k}{Positive integer used for set overlap.}
 
-\item{practical_tolerances}{Nonnegative absolute importance differences treated as practical ties.}
+\item{practical_tolerances}{Nonnegative absolute importance differences treated as practical ties.
+The default of zero reports strict pair ordering only; every positive practical-tie tolerance must be supplied
+for the specific analysis and interpreted on its importance scale.}
 
 \item{exclude_groups}{Optional feature groups excluded from rank-based summaries.}
 }

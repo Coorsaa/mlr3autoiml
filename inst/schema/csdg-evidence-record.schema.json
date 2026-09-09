@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mlr3autoiml/csdg-evidence-record.schema.json",
+  "title": "CSDG evidence record",
+  "type": "object",
+  "required": [
+    "gate_id",
+    "applicable",
+    "role",
+    "availability",
+    "result_direction",
+    "criterion",
+    "criterion_source",
+    "criterion_rationale",
+    "materiality",
+    "adjudication_basis",
+    "claim_consequence",
+    "rationale"
+  ],
+  "properties": {
+    "gate_id": {
+      "enum": ["G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b"]
+    },
+    "applicable": {
+      "type": "boolean"
+    },
+    "role": {
+      "enum": [
+        "necessary_requirement",
+        "potential_defeater",
+        "graded_support",
+        "descriptive_context"
+      ]
+    },
+    "availability": {
+      "enum": ["complete", "incomplete", "unavailable", "not_applicable"]
+    },
+    "result_direction": {
+      "enum": ["supports", "challenges", "mixed", "descriptive", "not_evaluated"]
+    },
+    "criterion": {
+      "type": ["object", "null"],
+      "properties": {
+        "direction": {
+          "enum": ["minimum", "maximum", "range", "qualitative"]
+        }
+      },
+      "required": ["value", "direction"],
+      "additionalProperties": true
+    },
+    "criterion_source": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "criterion_rationale": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "materiality": {
+      "enum": ["not_materialized", "materialized", "not_applicable"]
+    },
+    "adjudication_basis": {
+      "enum": [
+        "prespecified_claim_specific_criterion",
+        "substantive_adjudication",
+        "claim_relevant_sensitivity",
+        "other_transparent_rule",
+        null
+      ]
+    },
+    "claim_consequence": {
+      "enum": ["none", "retain_exact_claim", "revise_claim", "exact_claim_not_retained", "unresolved"]
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"criterion": {"type": "object"}}
+      },
+      "then": {
+        "properties": {
+          "criterion_source": {"type": "string", "minLength": 1},
+          "criterion_rationale": {"type": "string", "minLength": 1}
+        }
+      },
+      "else": {
+        "properties": {
+          "criterion_source": {"type": "null"},
+          "criterion_rationale": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"applicable": {"const": false}}
+      },
+      "then": {
+        "properties": {
+          "availability": {"const": "not_applicable"},
+          "result_direction": {"const": "not_evaluated"},
+          "materiality": {"const": "not_applicable"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"applicable": {"const": true}},
+        "required": ["applicable"]
+      },
+      "then": {
+        "properties": {"availability": {"not": {"const": "not_applicable"}}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"role": {"not": {"const": "potential_defeater"}}},
+        "required": ["role"]
+      },
+      "then": {
+        "properties": {"materiality": {"const": "not_applicable"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "applicable": {"const": true},
+          "role": {"const": "potential_defeater"}
+        },
+        "required": ["applicable", "role"]
+      },
+      "then": {
+        "properties": {"materiality": {"enum": ["not_materialized", "materialized"]}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"adjudication_basis": {"const": "prespecified_claim_specific_criterion"}},
+        "required": ["adjudication_basis"]
+      },
+      "then": {
+        "properties": {"criterion": {"type": "object"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"materiality": {"const": "materialized"}}
+      },
+      "then": {
+        "properties": {
+          "role": {"const": "potential_defeater"},
+          "availability": {"const": "complete"},
+          "result_direction": {"enum": ["challenges", "mixed"]},
+          "adjudication_basis": {"type": "string"},
+          "claim_consequence": {"enum": ["revise_claim", "exact_claim_not_retained"]}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"role": {"const": "descriptive_context"}},
+        "required": ["role"]
+      },
+      "then": {
+        "properties": {"claim_consequence": {"const": "none"}}
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {"const": "potential_defeater"},
+          "materiality": {"const": "not_materialized"}
+        },
+        "required": ["role", "materiality"]
+      },
+      "then": {
+        "properties": {"claim_consequence": {"enum": ["none", "unresolved"]}}
+      }
+    },
+    {
+      "if": {
+        "properties": {"claim_consequence": {"const": "retain_exact_claim"}},
+        "required": ["claim_consequence"]
+      },
+      "then": {
+        "properties": {
+          "applicable": {"const": true},
+          "role": {"enum": ["necessary_requirement", "graded_support"]},
+          "availability": {"const": "complete"},
+          "result_direction": {"const": "supports"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"claim_consequence": {"const": "exact_claim_not_retained"}},
+        "required": ["claim_consequence"]
+      },
+      "then": {
+        "properties": {
+          "applicable": {"const": true},
+          "availability": {"const": "complete"}
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "role": {"const": "necessary_requirement"},
+              "result_direction": {"const": "challenges"}
+            },
+            "required": ["role", "result_direction"]
+          },
+          {
+            "properties": {
+              "role": {"const": "potential_defeater"},
+              "materiality": {"const": "materialized"},
+              "result_direction": {"enum": ["challenges", "mixed"]}
+            },
+            "required": ["role", "materiality", "result_direction"]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {"claim_consequence": {"const": "revise_claim"}},
+        "required": ["claim_consequence"]
+      },
+      "then": {
+        "properties": {
+          "applicable": {"const": true},
+          "availability": {"const": "complete"}
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "role": {"const": "necessary_requirement"},
+              "result_direction": {"enum": ["challenges", "mixed"]}
+            },
+            "required": ["role", "result_direction"]
+          },
+          {
+            "properties": {
+              "role": {"const": "potential_defeater"},
+              "materiality": {"const": "materialized"},
+              "result_direction": {"enum": ["challenges", "mixed"]}
+            },
+            "required": ["role", "materiality", "result_direction"]
+          }
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

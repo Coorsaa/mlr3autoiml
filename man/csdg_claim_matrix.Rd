@@ -12,7 +12,7 @@ csdg_claim_matrix(
   claim_id = NULL,
   claim_version = "C0",
   parent_claim_id = NA_character_,
-  revision_relation = "independent",
+  revision_relation = "original",
   derivation_scope =
     "User-supplied claim boundary; not an independently executed gate plan"
 )
@@ -25,8 +25,7 @@ csdg_claim_matrix(
 \item{conclusion}{Character vector containing the conclusion permitted by the available evidence for each claim.}
 
 \item{status}{Character vector containing one status per claim.
-Supported values are \code{"supported_scoped"}, \code{"unresolved"}, \code{"not_supported"},
-\code{"not_established"}, and \code{"not_evaluated"}.}
+Supported values are \code{"met"}, \code{"not_met"}, \code{"unresolved"}, and \code{"not_applicable"}.}
 
 \item{claim_id}{Optional unique character identifiers.
 Deterministic identifiers are generated when this is \code{NULL}.}
@@ -57,7 +56,7 @@ claims = csdg_claim_matrix(
   ),
   evidence_needed = c("Repeated out-of-fold evaluation", "Prospective external validation"),
   conclusion = c("Supported only for the analytic sample", "Not evaluated"),
-  status = c("supported_scoped", "not_evaluated")
+  status = c("met", "not_applicable")
 )
 claims
 }

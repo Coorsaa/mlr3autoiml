@@ -19,9 +19,44 @@
         "scientific_use",
         "explanation_design",
         "claim_level",
+        "use_claim",
         "claim_version",
-        "revision_relation"
+        "revision_relation",
+        "coordinates"
       ],
+      "properties": {
+        "claim_level": {
+          "enum": [
+            "functional",
+            "predictive",
+            "substantive"
+          ]
+        },
+        "use_claim": {
+          "type": "boolean"
+        },
+        "revision_relation": {
+          "enum": [
+            "original",
+            "same",
+            "narrower",
+            "broader",
+            "alternative_or_incomparable"
+          ]
+        },
+        "coordinates": {
+          "type": "object",
+          "required": [
+            "target",
+            "model_scope",
+            "semantics",
+            "analytic_distribution",
+            "scientific_use",
+            "explanation_design"
+          ],
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": true
     },
     "measurement": {
@@ -46,7 +81,8 @@
         "seed",
         "resampling",
         "stability",
-        "generalization"
+        "generalization",
+        "criteria"
       ],
       "additionalProperties": true
     }

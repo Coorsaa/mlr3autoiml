@@ -3,20 +3,36 @@
 
 # mlr3autoiml
 
-`mlr3autoiml` 0.1.0 primarily implements **claim-scoped diagnostic gates
+`mlr3autoiml` 0.1.1 primarily implements **claim-scoped diagnostic gates
 (CSDG)** for interpretable machine-learning analyses in the **mlr3
 ecosystem**. A CSDG audit records the intended claim, measurement and
 preprocessing choices, explanation semantics, gate-specific evidence,
-and the limits of the resulting interpretation. Its `met`, `not_met`,
-and `unresolved` status labels summarize the supplied diagnostic
-evidence; they do not certify causal validity, fairness, or deployment
-readiness.
+and the limits of the resulting interpretation. Module availability,
+evidence role, result direction, criterion provenance, materiality, and
+claim consequence are separate fields. CSDG does not calculate an
+aggregate score, readiness grade, or Interpretation Evidence Level, and
+it does not certify causal validity, fairness, or deployment readiness.
+Claims use exactly three inference levels (`functional`, `predictive`,
+and `substantive`). A separate `use_claim` flag records whether the
+proposition additionally asserts adequacy for an audience, workflow,
+implementation, or use.
 
 The claim-scoped interface distinguishes calibration from utility
 (G3a/G3b), model multiplicity from setting transport (G6a/G6b), and
 technical subgroup behavior from audience and workflow evidence
 (G7a/G7b). The earlier combined gate names below belong only to the
 retained `AutoIML` compatibility interface.
+
+The claim object is `C = (T, M, S, D, U, Q)`: target, model scope,
+explanation semantics, analytic distribution and measurement context,
+intended use, and explanation design. `csdg_claim_relation()` records
+`same`, `narrower`, `broader`, or `alternative_or_incomparable` for
+every coordinate; no relation is inferred from text. Evidence roles are
+exactly `necessary_requirement`, `potential_defeater`, `graded_support`,
+and `descriptive_context`. `csdg_evidence_record()` keeps those roles
+distinct from completion and results, and `csdg_adjudicate_claim()`
+applies conditional non-compensation without adding evidence into a
+score.
 
 Core dependencies: `mlr3`, `mlr3measures`, `mlr3misc`, `data.table`,
 `checkmate`, `R6`. Optional integrations (pipelines, SHAP, iml,
@@ -32,8 +48,10 @@ remotes::install_github("coorsaa/mlr3autoiml")
 ## CSDG quick start
 
 Declare the claim and its scope before running the audit. This example
-requests held-out performance, calibration, and global permutation
-importance evidence for one selected model in the analytic sample.
+requests descriptive held-out performance, calibration, and global
+permutation-importance evidence for one selected model in the analytic
+sample. Because it supplies no use-linked adequacy criterion, the
+corresponding adequacy questions remain unresolved.
 
 ``` r
 library(mlr3)
@@ -46,8 +64,8 @@ learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
 claim = csdg_claim(
   id = "credit_risk_description",
   statement = paste(
-    "Held-out predictive performance, calibration, and global permutation",
-    "importance are adequate in the analytic sample."
+    "Held-out predictive performance, calibration, and global permutation importance",
+    "are described for the selected model in the analytic sample."
   ),
   claim_type = c("predictive_performance", "calibration", "global_explanation"),
   target = "credit risk",
@@ -55,7 +73,9 @@ claim = csdg_claim(
   population = "applications represented by the analytic sample",
   analytic_distribution = "the observed German credit example data",
   model_scope = "selected_model",
-  setting_scope = "analytic_sample"
+  setting_scope = "analytic_sample",
+  scientific_use = "descriptive model audit",
+  explanation_design = "held-out marginal permutation importance"
 )
 
 measurement = csdg_measurement(
@@ -93,6 +113,29 @@ csdg_claim_report(audit)
 bundle = csdg_export(audit, path = "csdg-output")
 ```
 
+When a numerical criterion is appropriate, supply both the value and its
+provenance. For example,
+`performance = list(maximum_primary_score = value)` must be accompanied
+by
+`criteria = list(performance.maximum_primary_score = list(source = source, rationale = rationale))`.
+Without both strings, the diagnostic remains descriptive and the module
+decision is `unresolved`.
+
+`csdg_rashomon()` is likewise descriptive by default. It returns
+candidate performance without an accepted set unless an absolute or
+relative tolerance and its source and rationale are supplied explicitly.
+
+## Package and study-script boundary
+
+The package owns reusable claim and evidence records, gate planning,
+resampling, permutation importance, calibration, ALE bootstrap,
+local-fidelity audits, importance agreement, matched-setting utilities,
+plotting, reporting, and provenance. Study-specific equal-country
+sampling, plausible-value loops, SHILD and PISA orchestration, country
+exclusion schedules, matched-control scheduling, and manuscript
+synthesis remain in the analysis scripts. No single package call
+reproduces either complete empirical study.
+
 Keep `output_dir = NULL` while inspecting an audit, and export to a
 dedicated directory when it is ready. By default, `csdg_export()` omits
 fitted models and observation-level predictions. This is not a privacy
@@ -104,9 +147,12 @@ when its release is explicitly approved.
 
 ## AutoIML compatibility examples
 
-The earlier `AutoIML` interface remains available for compatibility. The
-examples below demonstrate that workflow; new analyses should start from
-the CSDG claim-card and audit interface shown above.
+The earlier `AutoIML` interface remains available for compatibility. Its
+`GateResult` pass/warn/fail/skip labels are heuristic workflow
+diagnostics, not CSDG evidence roles or claim decisions. Printing a
+legacy `GateResult` emits a targeted deprecation warning. The examples
+below demonstrate that workflow; new analyses should start from the CSDG
+claim-card and audit interface shown above.
 
 ### Example 1 — Classification · decision support
 

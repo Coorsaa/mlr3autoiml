@@ -15,6 +15,7 @@ csdg_claim = function(
     scientific_use = NULL,
     explanation_design = NULL,
     claim_level = "substantive",
+    use_claim = FALSE,
     claim_version = "C0",
     parent_claim_id = NULL,
     revision_relation = "original",
@@ -63,10 +64,11 @@ csdg_claim = function(
     c("fitted_model_description", "hypothetical_model_query", "causal", "recourse"),
     "semantics"
   )
-  .assert_choice(claim_level, c("functional", "predictive", "substantive", "use"), "claim_level")
+  .assert_choice(claim_level, c("functional", "predictive", "substantive"), "claim_level")
+  assert_flag(use_claim, .var.name = "use_claim")
   .assert_choice(
     revision_relation,
-    c("original", "narrower", "stronger_excluded", "alternative"),
+    c("original", .csdg_claim_relations),
     "revision_relation"
   )
   .assert_scalar_string(claim_version, "claim_version")
@@ -121,6 +123,7 @@ csdg_claim = function(
       scientific_use = scientific_use,
       explanation_design = explanation_design,
       claim_level = claim_level,
+      use_claim = use_claim,
       claim_version = claim_version,
       parent_claim_id = parent_claim_id,
       revision_relation = revision_relation,
@@ -131,6 +134,14 @@ csdg_claim = function(
       subgroup_variables = subgroup_variables,
       confirmatory = isTRUE(confirmatory),
       notes = notes,
+      coordinates = list(
+        target = target,
+        model_scope = model_scope,
+        semantics = semantics,
+        analytic_distribution = analytic_distribution,
+        scientific_use = scientific_use,
+        explanation_design = explanation_design
+      ),
       completeness = list(
         decision_fields_missing = names(missing_decision)[missing_decision]
       ),
@@ -153,7 +164,8 @@ csdg_claim = function(
 #' @param id Unique identifier for the revised claim.
 #' @param statement Complete revised claim statement.
 #' @param claim_version Version label for the revised claim.
-#' @param revision_relation One of `"narrower"`, `"stronger_excluded"`, or `"alternative"`.
+#' @param revision_relation One of `"same"`, `"narrower"`, `"broader"`, or
+#'   `"alternative_or_incomparable"`.
 #' @param ... Named claim-card fields that replace fields inherited from `claim`.
 #'
 #' @return A `CSDGClaim` linked to `claim` through `parent_claim_id`.
@@ -169,6 +181,7 @@ csdg_claim = function(
 #'   original,
 #'   id = "claim_revised",
 #'   claim_version = "C1",
+#'   revision_relation = "narrower",
 #'   statement = "The explanation describes the selected model in the analytic sample."
 #' )
 #' revised
@@ -178,7 +191,7 @@ csdg_claim_revision = function(
     id,
     statement,
     claim_version,
-    revision_relation = "narrower",
+    revision_relation,
     ...) {
   assert_class(claim, "CSDGClaim", .var.name = "claim")
   assert_string(id, min.chars = 1L, .var.name = "id")
@@ -186,13 +199,14 @@ csdg_claim_revision = function(
   assert_string(claim_version, min.chars = 1L, .var.name = "claim_version")
   assert_choice(
     revision_relation,
-    c("narrower", "stronger_excluded", "alternative"),
+    .csdg_claim_relations,
     .var.name = "revision_relation"
   )
   replacements = list(...)
   .assert_named_dots(replacements)
   inherited = unclass(claim)
   inherited$completeness = NULL
+  inherited$coordinates = NULL
   inherited$additional = NULL
   inherited$id = id
   inherited$statement = statement
@@ -220,10 +234,21 @@ csdg_claim_revision = function(
   )
   .assert_choice(
     verification$status,
-    c("not_checked", "author_reviewed", "independently_reviewed"),
+    c(
+      "not_checked",
+      "author_reviewed",
+      "author_confirmed_verified",
+      "verified_by_responsible_coauthors",
+      "independently_reviewed"
+    ),
     "verification$status"
   )
-  if (verification$status %in% c("author_reviewed", "independently_reviewed") &&
+  if (verification$status %in% c(
+      "author_reviewed",
+      "author_confirmed_verified",
+      "verified_by_responsible_coauthors",
+      "independently_reviewed"
+    ) &&
       is.null(verification$artifact)) {
     .csdg_stop(
       "`verification$artifact` is required when preprocessing is reported as reviewed."

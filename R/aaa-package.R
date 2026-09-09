@@ -5,14 +5,27 @@
 #' learners.
 #'
 #' The CSDG workflow prespecifies claims, measurement and preprocessing semantics, explanation semantics, and
-#' adequacy criteria before coordinating out-of-fold diagnostic evidence.
+#' claim-specific criteria before coordinating out-of-fold diagnostic evidence.
+#' A CSDG evidence record separates module applicability, one of four evidence roles, availability, result direction,
+#' criterion provenance, materiality, adjudication basis, and claim consequence.
+#' Claim cards distinguish exactly three inference levels, functional, predictive, and substantive, from the separate
+#' question of whether a proposition asserts adequacy for an audience, workflow, implementation, or use.
+#' CSDG does not produce an Interpretation Evidence Level, readiness grade, or aggregate score.
 #'
 #' The package also retains the established [AutoIML] workflow for compatibility with earlier analyses.
+#' Its `GateResult` pass/warn/fail/skip labels are legacy heuristic diagnostics and are not CSDG claim decisions.
+#'
+#' Reusable package components implement claim records, evidence planning, resampling diagnostics, permutation
+#' importance, calibration, ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities,
+#' reporting, and provenance.
+#' Study-specific sampling, outcome loops, exclusion schedules, and manuscript synthesis remain analysis scripts.
 #'
 #' @seealso
 #' \itemize{
 #'   \item [csdg_audit()] for the claim-scoped diagnostic workflow.
 #'   \item [csdg_claim()] for claim, measurement, explanation, and configuration cards.
+#'   \item [csdg_claim_relation()] for six-coordinate claim comparison.
+#'   \item [csdg_evidence_record()] for orthogonal evidence records and non-compensatory adjudication.
 #'   \item [AutoIML] for the established AutoIML orchestrator.
 #'   \item [autoiml()] for a convenience wrapper.
 #'   \item [report_card()] for audit trail summary.
@@ -32,11 +45,12 @@
 #'   scale_x_continuous scale_x_discrete scale_y_continuous scale_y_discrete
 #'   guides guide_legend position_nudge theme theme_void
 #' @importFrom grid unit
-#' @importFrom stats cor quantile qnorm sd var coef glm predict lm median model.matrix setNames reorder
+#' @importFrom stats cor quantile qnorm sd var coef glm predict lm median model.matrix na.omit setNames reorder
 #' @importFrom R6 R6Class
 #' @importFrom checkmate assert_atomic assert_character assert_choice assert_class assert_data_frame assert_flag
 #'   assert_int assert_integerish assert_list assert_logical assert_multi_class assert_number assert_numeric
-#'   assert_string assert_subset assert_true
+#'   assert_string assert_subset assert_true test_string
+#' @importFrom jsonlite toJSON
 #' @importFrom cli cli_abort cli_warn cli_inform
 #' @importFrom checkmate %??%
 #' @importFrom mlr3misc map_dtr

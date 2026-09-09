@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -13,11 +13,13 @@ Description: Implements Claim-Scoped Diagnostic Gates (CSDG) for planning,
     executing, documenting, and exporting diagnostics for interpretable
     machine-learning analyses. The package integrates with the 'mlr3'
     ecosystem and separates predictive performance, measurement and
-    preprocessing review, dependence and support, calibration, local
-    faithfulness, explanation stability, model and setting generalization,
-    and subgroup auditing. The existing AutoIML workflow remains available
-    for compatibility. Diagnostic status labels describe the available
-    evidence and do not certify causal validity or deployment readiness.
+    preprocessing review, six-coordinate claim comparison, orthogonal evidence
+    roles, non-compensatory claim adjudication, dependence and support,
+    calibration, local faithfulness, explanation stability, model and setting
+    generalization, and subgroup auditing. The existing AutoIML workflow
+    remains available for compatibility. Legacy pass/warn/fail labels are
+    quarantined from CSDG claim decisions. CSDG applies no aggregate score,
+    readiness grade, or universal substantive threshold.
 License: LGPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -31,12 +33,11 @@ Suggests: callr, FNN, future, future.apply, ggforce, glmnet, iml,
         withr, xgboost
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-URL: https://coorsaa.github.io/mlr3autoiml/,
-        https://github.com/coorsaa/mlr3autoiml,
+URL: https://github.com/coorsaa/mlr3autoiml,
         https://github.com/mlr-org/mlr3, https://mlr3.mlr-org.com
 BugReports: https://github.com/coorsaa/mlr3autoiml/issues
 NeedsCompilation: no
-Packaged: 2026-09-08 22:32:17 UTC; 35955
+Packaged: 2026-09-09 20:15:23 UTC; 35955
 Author: Stefan Coors [aut, cre],
   Clara Vetter [aut],
   Jonas Hauck [aut],

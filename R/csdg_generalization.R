@@ -6,8 +6,10 @@ csdg_rashomon = function(
     learners,
     resampling,
     primary_measure = NULL,
-    tolerance_absolute = 0,
-    tolerance_relative = 0.02,
+    tolerance_absolute = NULL,
+    tolerance_relative = NULL,
+    tolerance_source = NULL,
+    tolerance_rationale = NULL,
     reference_learner = NULL,
     seed = 20260201L,
     store_models = TRUE) {
@@ -41,10 +43,21 @@ csdg_rashomon = function(
   if (!inherits(primary_measure, "Measure")) {
     .csdg_stop("`primary_measure` must be a measure key or mlr3 Measure.")
   }
-  checkmate::assert_number(tolerance_absolute, lower = 0, finite = TRUE)
-  checkmate::assert_number(tolerance_relative, lower = 0, finite = TRUE)
+  if (!is.null(tolerance_absolute)) {
+    assert_number(tolerance_absolute, lower = 0, finite = TRUE)
+  }
+  if (!is.null(tolerance_relative)) {
+    assert_number(tolerance_relative, lower = 0, finite = TRUE)
+  }
+  has_tolerance = !is.null(tolerance_absolute) || !is.null(tolerance_relative)
+  if (has_tolerance) {
+    assert_string(tolerance_source, min.chars = 1L, .var.name = "tolerance_source")
+    assert_string(tolerance_rationale, min.chars = 1L, .var.name = "tolerance_rationale")
+  } else if (!is.null(tolerance_source) || !is.null(tolerance_rationale)) {
+    .csdg_stop("Tolerance metadata requires `tolerance_absolute` or `tolerance_relative`.")
+  }
   if (!is.null(reference_learner)) {
-    checkmate::assert_choice(reference_learner, names(learners))
+    assert_choice(reference_learner, names(learners))
   }
 
   resamples = vector("list", length(learners))
@@ -79,17 +92,33 @@ csdg_rashomon = function(
   } else {
     candidates[learner_name == reference_learner, mean_score][[1L]]
   }
-  acceptance_basis = if (is.null(reference_learner)) "best candidate" else "declared reference learner"
+  acceptance_basis = if (!has_tolerance) {
+    "descriptive comparison; no acceptance rule"
+  } else if (is.null(reference_learner)) {
+    "best candidate"
+  } else {
+    "declared reference learner"
+  }
+  best = if (identical(direction, "minimize")) {
+    min(candidates$mean_score, na.rm = TRUE)
+  } else {
+    max(candidates$mean_score, na.rm = TRUE)
+  }
+  tolerance_absolute_value = tolerance_absolute %||% 0
+  tolerance_relative_value = tolerance_relative %||% 0
+  limit = if (!has_tolerance) {
+    NA_real_
+  } else if (identical(direction, "minimize")) {
+    reference_score + tolerance_absolute_value + abs(reference_score) * tolerance_relative_value
+  } else {
+    reference_score - tolerance_absolute_value - abs(reference_score) * tolerance_relative_value
+  }
   if (identical(direction, "minimize")) {
-    best = min(candidates$mean_score, na.rm = TRUE)
-    limit = reference_score + tolerance_absolute + abs(reference_score) * tolerance_relative
-    candidates[, accepted := mean_score <= limit]
+    candidates[, accepted := if (has_tolerance) mean_score <= limit else NA]
     candidates[, distance_from_best := mean_score - best]
     candidates[, distance_from_reference := mean_score - reference_score]
   } else {
-    best = max(candidates$mean_score, na.rm = TRUE)
-    limit = reference_score - tolerance_absolute - abs(reference_score) * tolerance_relative
-    candidates[, accepted := mean_score >= limit]
+    candidates[, accepted := if (has_tolerance) mean_score >= limit else NA]
     candidates[, distance_from_best := best - mean_score]
     candidates[, distance_from_reference := reference_score - mean_score]
   }
@@ -100,8 +129,10 @@ csdg_rashomon = function(
     acceptance_reference_score = reference_score,
     acceptance_basis = acceptance_basis,
     acceptance_limit = limit,
-    tolerance_absolute = tolerance_absolute,
-    tolerance_relative = tolerance_relative
+    tolerance_absolute = if (has_tolerance) tolerance_absolute_value else NA_real_,
+    tolerance_relative = if (has_tolerance) tolerance_relative_value else NA_real_,
+    tolerance_source = tolerance_source %||% NA_character_,
+    tolerance_rationale = tolerance_rationale %||% NA_character_
   )]
   data.table::setorder(candidates, distance_from_best, learner_name)
 
@@ -117,8 +148,14 @@ csdg_rashomon = function(
       acceptance_reference_score = reference_score,
       acceptance_basis = acceptance_basis,
       acceptance_limit = limit,
+      tolerance_source = tolerance_source,
+      tolerance_rationale = tolerance_rationale,
       uncertainty_scope = paste(
-        "Near-equivalence is defined by a prespecified performance tolerance.",
+        if (has_tolerance) {
+          "Near-equivalence is defined by the supplied, documented performance tolerance."
+        } else {
+          "Candidate performance is descriptive because no near-equivalence tolerance was supplied."
+        },
         "Fold scores are not treated as independent observations."
       )
     ),
@@ -138,12 +175,19 @@ csdg_rashomon = function(
 #' @export
 csdg_near_equivalence_sensitivity = function(
     x,
-    tolerance_absolute = 0,
-    tolerance_relative = 0,
+    tolerance_absolute = NULL,
+    tolerance_relative = NULL,
+    tolerance_source = NULL,
+    tolerance_rationale = NULL,
     reference_learner = NULL,
     direction = c("auto", "minimize", "maximize"),
     scenario_id = NULL) {
   direction = match.arg(direction)
+  if (is.null(tolerance_absolute) && is.null(tolerance_relative)) {
+    .csdg_stop("Supply at least one explicit tolerance scenario.")
+  }
+  assert_string(tolerance_source, min.chars = 1L, .var.name = "tolerance_source")
+  assert_string(tolerance_rationale, min.chars = 1L, .var.name = "tolerance_rationale")
   is_rashomon = inherits(x, "CSDGRashomon")
   candidates = if (is_rashomon) data.table::copy(x$candidates) else .as_dt(x)
   checkmate::assert_data_frame(candidates, min.rows = 1L, .var.name = "x")
@@ -180,7 +224,13 @@ csdg_near_equivalence_sensitivity = function(
   checkmate::assert_choice(resolved_reference, candidates$learner_name, .var.name = "reference_learner")
   reference_score = candidates[learner_name == resolved_reference, mean_score][[1L]]
 
-  n_scenarios = max(length(tolerance_absolute), length(tolerance_relative), length(scenario_id %||% character()))
+  n_scenarios = max(
+    length(tolerance_absolute %||% 0),
+    length(tolerance_relative %||% 0),
+    length(scenario_id %||% character())
+  )
+  tolerance_absolute = tolerance_absolute %||% 0
+  tolerance_relative = tolerance_relative %||% 0
   tolerance_absolute = .csdg_recycle_tolerance(tolerance_absolute, n_scenarios, "tolerance_absolute")
   tolerance_relative = .csdg_recycle_tolerance(tolerance_relative, n_scenarios, "tolerance_relative")
   scenario_id = scenario_id %||% sprintf("scenario_%02d", seq_len(n_scenarios))
@@ -227,7 +277,9 @@ csdg_near_equivalence_sensitivity = function(
       tolerance_allowance = allowance,
       distance_from_reference = distance,
       fraction_of_tolerance_consumed = fraction,
-      accepted = accepted
+      accepted = accepted,
+      tolerance_source = tolerance_source,
+      tolerance_rationale = tolerance_rationale
     )
   }, by = .(scenario_order, scenario_id, tolerance_absolute, tolerance_relative)]
   data.table::setorder(result, scenario_order, mean_score, learner_name)
@@ -246,6 +298,9 @@ csdg_rashomon_agreement = function(
     top_k = 10L) {
   checkmate::assert_class(rashomon, "CSDGRashomon")
   checkmate::assert_int(top_k, lower = 1)
+  if (all(is.na(rashomon$candidates$accepted))) {
+    .csdg_stop("`rashomon` has no accepted set because no near-equivalence tolerance was supplied.")
+  }
   accepted = rashomon$candidates[accepted == TRUE, learner_name]
   checkmate::assert_list(pfi)
   if (is.null(names(pfi))) {
@@ -374,7 +429,9 @@ csdg_transport_status = function(
     measure,
     direction = c("maximize", "minimize"),
     minimum_transport_score = NULL,
-    maximum_transport_score = NULL) {
+    maximum_transport_score = NULL,
+    criterion_source = NULL,
+    criterion_rationale = NULL) {
   checkmate::assert_character(direction, any.missing = FALSE, min.len = 1L)
   direction = match.arg(direction)
   checkmate::assert_string(measure, min.chars = 1L)
@@ -394,33 +451,69 @@ csdg_transport_status = function(
   if (!is.null(threshold)) {
     checkmate::assert_number(threshold, finite = TRUE)
   }
+  criterion_complete = is.null(threshold) ||
+    (.is_scalar_string(criterion_source) && .is_scalar_string(criterion_rationale))
   if (!any(finite)) {
     return(list(
       status = "unresolved",
       passed = NA,
       threshold = threshold,
+      criterion_source = criterion_source,
+      criterion_rationale = criterion_rationale,
+      criterion_complete = criterion_complete,
       reason = "No finite transport scores were available."
+    ))
+  }
+  if (!is.null(threshold) && !criterion_complete) {
+    return(list(
+      status = "unresolved",
+      passed = NA,
+      threshold = threshold,
+      criterion_source = criterion_source,
+      criterion_rationale = criterion_rationale,
+      criterion_complete = FALSE,
+      reason = "The supplied transport threshold lacks a recorded source or rationale."
     ))
   }
   if (identical(direction, "maximize")) {
     if (is.null(minimum_transport_score)) {
-      return(list(status = "unresolved", passed = NA, threshold = NULL))
+      return(list(
+        status = "unresolved",
+        passed = NA,
+        threshold = NULL,
+        criterion_source = NULL,
+        criterion_rationale = NULL,
+        criterion_complete = FALSE
+      ))
     }
     passed = all(values[finite] >= minimum_transport_score)
     list(
       status = if (passed) "met" else "not_met",
       passed = passed,
-      threshold = minimum_transport_score
+      threshold = minimum_transport_score,
+      criterion_source = criterion_source,
+      criterion_rationale = criterion_rationale,
+      criterion_complete = TRUE
     )
   } else {
     if (is.null(maximum_transport_score)) {
-      return(list(status = "unresolved", passed = NA, threshold = NULL))
+      return(list(
+        status = "unresolved",
+        passed = NA,
+        threshold = NULL,
+        criterion_source = NULL,
+        criterion_rationale = NULL,
+        criterion_complete = FALSE
+      ))
     }
     passed = all(values[finite] <= maximum_transport_score)
     list(
       status = if (passed) "met" else "not_met",
       passed = passed,
-      threshold = maximum_transport_score
+      threshold = maximum_transport_score,
+      criterion_source = criterion_source,
+      criterion_rationale = criterion_rationale,
+      criterion_complete = TRUE
     )
   }
 }

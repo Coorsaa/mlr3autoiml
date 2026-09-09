@@ -7,6 +7,26 @@
   "met", "not_met", "unresolved", "not_applicable", "error"
 )
 
+.csdg_claim_decisions = c("met", "not_met", "unresolved", "not_applicable")
+
+.csdg_claim_coordinates = c(
+  "target",
+  "model_scope",
+  "semantics",
+  "analytic_distribution",
+  "scientific_use",
+  "explanation_design"
+)
+
+.csdg_claim_relations = c("same", "narrower", "broader", "alternative_or_incomparable")
+
+.csdg_evidence_roles = c(
+  "necessary_requirement",
+  "potential_defeater",
+  "graded_support",
+  "descriptive_context"
+)
+
 .csdg_gate_ids = c("G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b")
 
 .csdg_stop = function(..., call. = FALSE) {

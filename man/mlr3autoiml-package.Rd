@@ -10,14 +10,27 @@
 learners.
 
 The CSDG workflow prespecifies claims, measurement and preprocessing semantics, explanation semantics, and
-adequacy criteria before coordinating out-of-fold diagnostic evidence.
+claim-specific criteria before coordinating out-of-fold diagnostic evidence.
+A CSDG evidence record separates module applicability, one of four evidence roles, availability, result direction,
+criterion provenance, materiality, adjudication basis, and claim consequence.
+Claim cards distinguish exactly three inference levels, functional, predictive, and substantive, from the separate
+question of whether a proposition asserts adequacy for an audience, workflow, implementation, or use.
+CSDG does not produce an Interpretation Evidence Level, readiness grade, or aggregate score.
 
 The package also retains the established \link{AutoIML} workflow for compatibility with earlier analyses.
+Its \code{GateResult} pass/warn/fail/skip labels are legacy heuristic diagnostics and are not CSDG claim decisions.
+
+Reusable package components implement claim records, evidence planning, resampling diagnostics, permutation
+importance, calibration, ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities,
+reporting, and provenance.
+Study-specific sampling, outcome loops, exclusion schedules, and manuscript synthesis remain analysis scripts.
 }
 \seealso{
 \itemize{
 \item \code{\link[=csdg_audit]{csdg_audit()}} for the claim-scoped diagnostic workflow.
 \item \code{\link[=csdg_claim]{csdg_claim()}} for claim, measurement, explanation, and configuration cards.
+\item \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} for six-coordinate claim comparison.
+\item \code{\link[=csdg_evidence_record]{csdg_evidence_record()}} for orthogonal evidence records and non-compensatory adjudication.
 \item \link{AutoIML} for the established AutoIML orchestrator.
 \item \code{\link[=autoiml]{autoiml()}} for a convenience wrapper.
 \item \code{\link[=report_card]{report_card()}} for audit trail summary.

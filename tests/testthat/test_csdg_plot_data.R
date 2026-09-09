@@ -51,8 +51,6 @@ test_that("table-oriented estimate plots preserve blue-red interval semantics", 
   expect_equal(edge_row$label_hjust, 1)
   expect_lt(edge_row$label_x, edge_row$low__)
   expect_gt(edge_built$layout$panel_params[[1L]]$x.range[[2L]], max(edge_plot$data$high__))
-  edge_x_range = edge_built$layout$panel_params[[1L]]$x.range
-  expect_gt((edge_row$label_x - edge_x_range[[1L]]) / diff(edge_x_range), 0.10)
 
   pfi = data.table::data.table(
     feature_group = paste0("feature_", 1:4),

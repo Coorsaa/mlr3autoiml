@@ -1,3 +1,16 @@
+# mlr3autoiml 0.1.1
+
+- CSDG claim records now represent all six coordinates, use exactly three inference levels and four evidence roles, separate use claims from inference level, separate applicability, availability, result direction, criterion provenance, materiality, adjudication basis, and claim consequence, and apply conditional non-compensation without a score (no issue).
+- Legacy `GateResult` pass/warn/fail/skip labels are explicitly compatibility-only and cannot serve as CSDG claim decisions (no issue).
+- `csdg_adjudicate_claim()` evaluates explicit evidence records without compensation, universal thresholds, or a primitive partial-support state (no issue).
+- `csdg_claim_matrix()` now uses only `met`, `not_met`, `unresolved`, and `not_applicable` as claim decisions (no issue).
+- `csdg_claim_relation()` records declared coordinate-specific and overall relations as `same`, `narrower`, `broader`, or `alternative_or_incomparable` (no issue).
+- `csdg_config()` now uses a neutral one-row subgroup reporting minimum rather than silently applying a universal sample-size criterion; analysts can supply a larger design-specific minimum explicitly (no issue).
+- `csdg_evidence_record()` now rejects cross-field combinations in which the evidence role, observed direction, materiality, and recorded claim consequence contradict one another (no issue).
+- `csdg_export()` now recursively removes fitted models, model-bearing attributes, direct identifiers, PII fields, individual prediction records, and split membership under its privacy-safe defaults while keeping identifier-free predictions available only through the explicit prediction opt-in (no issue).
+- `csdg_importance_agreement()` now defaults to strict pair ordering; positive practical-tie tolerances must be supplied for the analysis-specific importance scale (no issue).
+- `csdg_rashomon()` now defaults to a descriptive candidate comparison and constructs an accepted set only when the analyst supplies a tolerance, source, and rationale (no issue).
+
 # mlr3autoiml 0.1.0
 
 - Claim-Scoped Diagnostic Gates add prospective claim, measurement, explanation, and configuration cards while retaining the existing AutoIML workflow (no issue).
@@ -13,7 +26,7 @@
 - `csdg_ale_bootstrap()` adds row- or stratified cluster-resampled pointwise percentile intervals that refit the complete learner pipeline and recompute one-dimensional ALE on common grids, while reporting point-curve and bootstrap-interval support separately (no issue).
 - `csdg_audit()` plans and executes claim-dependent Gates G0a through G7, preserves per-gate errors, records start and completion times, requires explicit adequacy criteria before claim-support gates are marked sufficient, and can compute explicitly selected descriptive diagnostics without changing their claim-derived applicability or evidence role (no issue).
 - `csdg_calibration()` distinguishes calibration-in-the-large from free-intercept calibration models for classification and regression and labels the returned components consistently (no issue).
-- `csdg_calibration_bootstrap()` adds natural regression-spline calibration curves, preindexes nested clusters, and can evaluate predetermined bootstrap draws in parallel, preserving deterministic results while making large stratified cluster bootstraps practical (no issue).
+- `csdg_calibration_bootstrap()` exports the canonical `uniform_grid_mean_absolute_calibration_error`, retains `integrated_absolute_calibration_error` only as an explicitly marked deprecated output alias, adds natural regression-spline calibration curves, preindexes nested clusters, and can evaluate predetermined bootstrap draws in parallel, preserving deterministic results while making large stratified cluster bootstraps practical (no issue).
 - `csdg_claim_matrix()` and `csdg_plot_claim_matrix()` add validated categorical claim-by-evidence reporting with explicit status labels, optional monochrome rendering, and no inferred judgment, gate count, or aggregate score (no issue).
 - `csdg_dependence()` drops unused categorical levels before computing bias-corrected Cramér's V, avoiding spurious missing associations (no issue).
 - `csdg_effect_diagnostics()`, `csdg_interaction_diagnostics()`, `csdg_shapley_diagnostics()`, and `csdg_prediction_multiplicity()` add package-owned full-fit ALE, PDP, ICE, interaction, Shapley, and prediction-dispersion diagnostics with explicit estimands, limitations, privacy scopes, and support masking (no issue).

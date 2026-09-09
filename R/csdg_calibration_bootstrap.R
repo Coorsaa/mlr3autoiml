@@ -54,6 +54,14 @@
   .calibration_bootstrap_index_sampler(n, cluster, strata)()
 }
 
+.calibration_metric_aliases = function() {
+  data.table(
+    alias = "integrated_absolute_calibration_error",
+    canonical_estimand = "uniform_grid_mean_absolute_calibration_error",
+    alias_status = "deprecated_alias"
+  )
+}
+
 .calibration_flexible_curve = function(
     data,
     task_type,
@@ -140,7 +148,7 @@
   finite_error = absolute_error[is.finite(absolute_error)]
   summary = copy(result$summary)
   summary[, `:=`(
-    integrated_absolute_calibration_error = if (length(finite_error)) mean(finite_error) else NA_real_,
+    uniform_grid_mean_absolute_calibration_error = if (length(finite_error)) mean(finite_error) else NA_real_,
     maximum_absolute_calibration_error = if (length(finite_error)) max(finite_error) else NA_real_
   )]
   list(summary = summary, curve = curve)
@@ -153,6 +161,15 @@
 #' Percentile intervals can use a respondent bootstrap or a cluster bootstrap, optionally sampling clusters
 #' independently within strata.
 #' The bootstrap conditions on the supplied predictions unless the complete fitting pipeline is rerun by the caller.
+#' The `uniform_grid_mean_absolute_calibration_error` is the arithmetic mean of the absolute difference between the
+#' flexible calibration curve and the identity line at equally spaced prediction-grid points.
+#' \deqn{|\mathcal{G}_{f}|^{-1}\sum_{p_g\in\mathcal{G}_{f}} |\widehat{m}(p_g)-p_g|}
+#' Here, `G_f` contains the declared grid points for which the flexible-curve estimate is finite.
+#' The grid spans the empirical 0.01 and 0.99 prediction quantiles for classification and the empirical 0.005 and
+#' 0.995 prediction quantiles for regression, using quantile type 8.
+#' Each grid point with a finite curve estimate receives equal weight, so the statistic is a discrete grid mean and
+#' not a numerical approximation to an integral under an empirical or continuous prediction distribution.
+#' The former name `integrated_absolute_calibration_error` remains in returned tables only as a deprecated alias.
 #'
 #' @param predictions A `CSDGResample` or prediction data frame accepted by [csdg_calibration()].
 #' @param task_type Optional task type, either `"classif"` or `"regr"`.
@@ -174,8 +191,9 @@
 #' @param collapse_repeats Whether repeated predictions for the same row are averaged before calibration.
 #'
 #' @return A list with point estimates and percentile intervals in `summary`, a flexible calibration curve with
-#'   pointwise intervals in `curve`, descriptive bins in `bins`, bootstrap replicates, estimand definitions,
-#'   resampling metadata, and limitations.
+#'   pointwise intervals in `curve`, descriptive bins in `bins`, bootstrap replicates, estimand definitions, an
+#'   explicit deprecated-alias mapping in `metric_aliases`, a `grid_specification`, resampling metadata, and
+#'   limitations.
 #' @export
 csdg_calibration_bootstrap = function(
     predictions,
@@ -306,6 +324,22 @@ csdg_calibration_bootstrap = function(
       upper = as.numeric(stats::quantile(values, 1 - alpha, na.rm = TRUE, names = FALSE, type = 8))
     )
   }))
+  summary[, `:=`(
+    canonical_estimand = get("estimand"),
+    estimand_status = "canonical"
+  )]
+  metric_aliases = .calibration_metric_aliases()
+  alias_summary = summary[
+    get("estimand") == metric_aliases$canonical_estimand[[1L]]
+  ]
+  alias_summary[, `:=`(
+    estimand = metric_aliases$alias[[1L]],
+    estimand_status = metric_aliases$alias_status[[1L]]
+  )]
+  summary = rbindlist(list(summary, alias_summary), use.names = TRUE)
+  bootstrap_summary[
+    , (metric_aliases$alias[[1L]]) := get(metric_aliases$canonical_estimand[[1L]])
+  ]
   curve = data.table(
     prediction = grid,
     estimate = point$curve,
@@ -324,7 +358,7 @@ csdg_calibration_bootstrap = function(
         "calibration_in_the_large",
         "calibration_intercept",
         "calibration_slope",
-        "integrated_absolute_calibration_error",
+        "uniform_grid_mean_absolute_calibration_error",
         "maximum_absolute_calibration_error"
       ),
       definition = c(
@@ -335,9 +369,23 @@ csdg_calibration_bootstrap = function(
         },
         "Free intercept in the calibration model",
         "Free slope in the calibration model",
-        "Mean absolute flexible-curve deviation from the identity line over the displayed prediction grid",
+        paste(
+          "Uniformly weighted mean absolute flexible-curve deviation from the identity line",
+          "over equally spaced points on the declared prediction grid"
+        ),
         "Maximum absolute flexible-curve deviation from the identity line over the displayed prediction grid"
       )
+    ),
+    metric_aliases = metric_aliases,
+    grid_specification = list(
+      points = grid_points,
+      lower_prediction = limits[[1L]],
+      upper_prediction = limits[[2L]],
+      lower_quantile_probability = probabilities[[1L]],
+      upper_quantile_probability = probabilities[[2L]],
+      quantile_type = 8L,
+      weighting = "uniform_discrete",
+      finite_curve_estimates_only = TRUE
     ),
     resampling = list(
       unit = if (is.null(cluster)) "respondent" else "cluster",

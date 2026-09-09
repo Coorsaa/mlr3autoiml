@@ -1,23 +1,19 @@
-.csdg_claim_matrix_statuses = c(
-  "supported_scoped", "unresolved", "not_supported", "not_established", "not_evaluated"
-)
+.csdg_claim_matrix_statuses = c("met", "not_met", "unresolved", "not_applicable")
 
 .csdg_claim_matrix_status_labels = c(
-  supported_scoped = "Supported (scoped)",
+  met = "Met",
+  not_met = "Not met",
   unresolved = "Unresolved",
-  not_supported = "Not supported",
-  not_established = "Not established",
-  not_evaluated = "Not evaluated"
+  not_applicable = "Not applicable"
 )
 
 .csdg_claim_matrix_palette = function(style = .autoiml_plot_styles) {
   palette = .autoiml_plot_palette(style)
   c(
-    supported_scoped = palette$status[["pass"]],
+    met = palette$status[["pass"]],
+    not_met = palette$status[["fail"]],
     unresolved = palette$status[["warn"]],
-    not_supported = palette$status[["fail"]],
-    not_established = palette$status[["error"]],
-    not_evaluated = palette$status[["skip"]]
+    not_applicable = palette$status[["skip"]]
   )
 }
 
@@ -40,8 +36,7 @@
 #' @param evidence_needed Character vector describing the evidence required for each claim.
 #' @param conclusion Character vector containing the conclusion permitted by the available evidence for each claim.
 #' @param status Character vector containing one status per claim.
-#'   Supported values are `"supported_scoped"`, `"unresolved"`, `"not_supported"`,
-#'   `"not_established"`, and `"not_evaluated"`.
+#'   Supported values are `"met"`, `"not_met"`, `"unresolved"`, and `"not_applicable"`.
 #' @param claim_id Optional unique character identifiers.
 #'   Deterministic identifiers are generated when this is `NULL`.
 #' @param claim_version A scalar character string or one string per claim, such as `"C0"` or `"C1"`.
@@ -60,7 +55,7 @@
 #'   ),
 #'   evidence_needed = c("Repeated out-of-fold evaluation", "Prospective external validation"),
 #'   conclusion = c("Supported only for the analytic sample", "Not evaluated"),
-#'   status = c("supported_scoped", "not_evaluated")
+#'   status = c("met", "not_applicable")
 #' )
 #' claims
 #' @export
@@ -72,7 +67,7 @@ csdg_claim_matrix = function(
     claim_id = NULL,
     claim_version = "C0",
     parent_claim_id = NA_character_,
-    revision_relation = "independent",
+    revision_relation = "original",
     derivation_scope = "User-supplied claim boundary; not an independently executed gate plan") {
   assert_character(claim, any.missing = FALSE, min.len = 1L, min.chars = 1L, .var.name = "claim")
   assert_character(
@@ -140,6 +135,12 @@ csdg_claim_matrix = function(
     any.missing = FALSE,
     len = n_claims,
     min.chars = 1L,
+    .var.name = "revision_relation"
+  )
+  assert_subset(
+    revision_relation,
+    c("original", .csdg_claim_relations),
+    empty.ok = FALSE,
     .var.name = "revision_relation"
   )
 
@@ -265,19 +266,17 @@ csdg_plot_claim_matrix = function(
   fill_palette = c(status_palette, row_white = "#FFFFFF", row_gray = "#F7F7F7")
   status_text = if (monochrome) {
     c(
-      supported_scoped = "#1A1A1A",
+      met = "#1A1A1A",
+      not_met = "#FFFFFF",
       unresolved = "#1A1A1A",
-      not_supported = "#FFFFFF",
-      not_established = "#FFFFFF",
-      not_evaluated = "#1A1A1A"
+      not_applicable = "#1A1A1A"
     )
   } else {
     c(
-      supported_scoped = "#FFFFFF",
+      met = "#FFFFFF",
+      not_met = "#FFFFFF",
       unresolved = "#1A1A1A",
-      not_supported = "#FFFFFF",
-      not_established = "#FFFFFF",
-      not_evaluated = "#1A1A1A"
+      not_applicable = "#1A1A1A"
     )
   }
   tile_border = if (monochrome) "grey55" else "#FFFFFF"

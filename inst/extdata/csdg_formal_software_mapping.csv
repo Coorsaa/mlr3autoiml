@@ -1,0 +1,18 @@
+formal_concept,package_function_or_class,software_field,allowed_values_or_scope
+Claim target,csdg_claim,target,Free-text target or interpreted quantity
+Claim model scope,csdg_claim,model_scope,selected_model|cross_fitted_pipeline|near_equivalent_models|model_class|unspecified
+Claim explanation semantics,csdg_claim,semantics,fitted_model_description|hypothetical_model_query|causal|recourse
+Claim analytic context,csdg_claim,analytic_distribution,Free-text distribution population measurement and sampling context
+Claim intended use,csdg_claim,scientific_use,Free-text intended and excluded use
+Claim explanation design,csdg_claim,explanation_design,Free-text perturbation reference neighborhood and support design
+Inference level,csdg_claim,claim_level,functional|predictive|substantive
+Use adequacy assertion,csdg_claim,use_claim,TRUE|FALSE; separate from inference level
+Claim relation,csdg_claim_relation,relation,same|narrower|broader|alternative_or_incomparable
+Module applicability,csdg_gate_plan;csdg_evidence_record,applicable,TRUE|FALSE
+Evidence role,csdg_gate_plan;csdg_evidence_record,role,necessary_requirement|potential_defeater|graded_support|descriptive_context
+Evidence availability,csdg_evidence_record,availability,complete|incomplete|unavailable|not_applicable
+Observed result,csdg_evidence_record,result_direction,supports|challenges|mixed|descriptive|not_evaluated
+Claim-specific criterion,csdg_evidence_record,criterion;criterion_source;criterion_rationale,No universal substantive default
+Defeater materiality,csdg_evidence_record,materiality;adjudication_basis,Explicit transparent materialization only
+Claim consequence,csdg_evidence_record,claim_consequence,none|retain_exact_claim|revise_claim|exact_claim_not_retained|unresolved
+Claim decision,csdg_adjudicate_claim,decision,met|not_met|unresolved|not_applicable

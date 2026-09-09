@@ -29,13 +29,24 @@
     "Externally supplied evidence was recorded; its provenance must be reviewed."
   evidence = override$evidence %||%
     override[setdiff(names(override), c(
-      "status", "summary", "limitations", "thresholds", "diagnostics", "error"
+      "status", "summary", "limitations", "thresholds", "diagnostics", "availability",
+      "result_direction", "criterion", "criterion_source", "criterion_rationale", "materiality",
+      "adjudication_basis", "claim_consequence", "rationale", "error"
     ))]
   new_gate_result(
     gate_id = gate_id,
     status = status,
     summary = summary,
     evidence = evidence,
+    availability = override$availability %||% NULL,
+    result_direction = override$result_direction %||% NULL,
+    criterion = override$criterion %||% NULL,
+    criterion_source = override$criterion_source %||% NULL,
+    criterion_rationale = override$criterion_rationale %||% NULL,
+    materiality = override$materiality %||% "not_applicable",
+    adjudication_basis = override$adjudication_basis %||% NULL,
+    claim_consequence = override$claim_consequence %||% "none",
+    rationale = override$rationale %||% NULL,
     limitations = c(
       override$limitations %||% character(),
       "Externally supplied evidence was not independently recomputed by this call."
@@ -46,13 +57,23 @@
   )
 }
 
-.run_gate = function(gate_id, required, override, code) {
+.run_gate = function(gate_id, applicable, evidence_role, execute, override, code) {
   started = .now_utc()
-  if (!required) {
+  if (!execute) {
     return(new_gate_result(
       gate_id,
-      status = "not_applicable",
-      summary = "The prespecified claim does not require this gate.",
+      status = if (applicable) "unresolved" else "not_applicable",
+      summary = if (applicable) {
+        "The gate applies to the prespecified claim but was not executed in this call."
+      } else {
+        "The prespecified claim does not require this gate."
+      },
+      availability = if (applicable) "unavailable" else "not_applicable",
+      materiality = if (applicable && identical(evidence_role, "potential_defeater")) {
+        "not_materialized"
+      } else {
+        "not_applicable"
+      },
       started_at = started
     ))
   }
@@ -64,6 +85,11 @@
   )
   if (is.null(result$started_at)) {
     result$started_at = started
+  }
+  if (applicable &&
+      identical(evidence_role, "potential_defeater") &&
+      identical(result$materiality, "not_applicable")) {
+    result$materiality = "not_materialized"
   }
   result
 }
@@ -80,6 +106,7 @@
     scientific_use = !is.null(claim$scientific_use),
     explanation_design = !is.null(claim$explanation_design),
     claim_level = !is.null(claim$claim_level),
+    use_claim = is.logical(claim$use_claim) && length(claim$use_claim) == 1L && !is.na(claim$use_claim),
     claim_version = !is.null(claim$claim_version),
     revision_relation = !is.null(claim$revision_relation)
   )
@@ -236,8 +263,15 @@
   mlr3::msr(key)
 }
 
-.criterion_row = function(criterion, observed, operator, threshold) {
-  passed = if (!is.finite(observed) || !is.finite(threshold)) {
+.criterion_metadata = function(config, name) {
+  config$criteria[[name]] %||% NULL
+}
+
+.criterion_row = function(criterion, observed, operator, threshold, metadata = NULL) {
+  complete = !is.null(metadata) &&
+    .is_scalar_string(metadata$source %||% NULL) &&
+    .is_scalar_string(metadata$rationale %||% NULL)
+  passed = if (!complete || !is.finite(observed) || !is.finite(threshold)) {
     NA
   } else {
     switch(
@@ -252,6 +286,9 @@
     observed = as.numeric(observed),
     operator = operator,
     threshold = as.numeric(threshold),
+    criterion_source = if (complete) metadata$source else NA_character_,
+    criterion_rationale = if (complete) metadata$rationale else NA_character_,
+    criterion_complete = complete,
     passed = passed
   )
 }
@@ -283,7 +320,7 @@
     pfi_cluster_level_groups,
     evidence,
     run_gates) {
-  plan = data.table::copy(csdg_gate_plan(claim, measurement, explanation))
+  plan = copy(csdg_gate_plan(claim, measurement, explanation))
   plan[, execute := required]
   if (!is.null(run_gates)) {
     unknown = setdiff(run_gates, .csdg_gate_ids)
@@ -292,8 +329,9 @@
     }
     plan[, execute := gate_id %in% run_gates]
   }
-  required = stats::setNames(plan$required, plan$gate_id)
-  execute = stats::setNames(plan$execute, plan$gate_id)
+  required = setNames(plan$required, plan$gate_id)
+  evidence_role = setNames(plan$evidence_role, plan$gate_id)
+  execute = setNames(plan$execute, plan$gate_id)
   evidence = evidence %||% list()
   if (!is.list(evidence)) {
     .csdg_stop("`evidence` must be a list.")
@@ -306,14 +344,20 @@
   gates = list()
   artifacts = new.env(parent = emptyenv())
 
-  gates$G0a = .run_gate("G0a", execute[["G0a"]], evidence$G0a, function() {
+  gates$G0a = .run_gate(
+    "G0a", required[["G0a"]], evidence_role[["G0a"]], execute[["G0a"]], evidence$G0a,
+    function() {
     .evaluate_g0a(claim)
   })
-  gates$G0b = .run_gate("G0b", execute[["G0b"]], evidence$G0b, function() {
+  gates$G0b = .run_gate(
+    "G0b", required[["G0b"]], evidence_role[["G0b"]], execute[["G0b"]], evidence$G0b,
+    function() {
     .evaluate_g0b(measurement)
   })
 
-  gates$G1 = .run_gate("G1", execute[["G1"]], evidence$G1, function() {
+  gates$G1 = .run_gate(
+    "G1", required[["G1"]], evidence_role[["G1"]], execute[["G1"]], evidence$G1,
+    function() {
     .require_task(task)
     .require_learner(learner)
     if (identical(task$task_type, "classif") &&
@@ -350,12 +394,20 @@
     criteria = list()
     if (!is.null(config$performance$minimum_primary_score)) {
       criteria[[length(criteria) + 1L]] = .criterion_row(
-        "minimum_primary_score", primary_score, ">=", config$performance$minimum_primary_score
+        "minimum_primary_score",
+        primary_score,
+        ">=",
+        config$performance$minimum_primary_score,
+        .criterion_metadata(config, "performance.minimum_primary_score")
       )
     }
     if (!is.null(config$performance$maximum_primary_score)) {
       criteria[[length(criteria) + 1L]] = .criterion_row(
-        "maximum_primary_score", primary_score, "<=", config$performance$maximum_primary_score
+        "maximum_primary_score",
+        primary_score,
+        "<=",
+        config$performance$maximum_primary_score,
+        .criterion_metadata(config, "performance.maximum_primary_score")
       )
     }
     if (!is.null(config$performance$minimum_baseline_improvement)) {
@@ -370,7 +422,8 @@
         "minimum_baseline_improvement",
         improvement,
         ">=",
-        config$performance$minimum_baseline_improvement
+        config$performance$minimum_baseline_improvement,
+        .criterion_metadata(config, "performance.minimum_baseline_improvement")
       )
     }
     criteria = data.table::rbindlist(criteria, fill = TRUE)
@@ -408,7 +461,9 @@
     )
   })
 
-  gates$G2 = .run_gate("G2", execute[["G2"]], evidence$G2, function() {
+  gates$G2 = .run_gate(
+    "G2", required[["G2"]], evidence_role[["G2"]], execute[["G2"]], evidence$G2,
+    function() {
     .require_task(task)
     dep = csdg_dependence(
       task$data(cols = task$feature_names),
@@ -421,11 +476,15 @@
       status = "met",
       summary = "Mixed-type dependence and observed feature support were characterized.",
       evidence = dep,
+      result_direction = "descriptive",
+      materiality = "not_materialized",
       limitations = dep$limitations
     )
   })
 
-  gates$G3a = .run_gate("G3a", execute[["G3a"]], evidence$G3a, function() {
+  gates$G3a = .run_gate(
+    "G3a", required[["G3a"]], evidence_role[["G3a"]], execute[["G3a"]], evidence$G3a,
+    function() {
     oof = artifacts$oof
     if (is.null(oof)) {
       .csdg_stop("G3a requires out-of-fold predictions from G1 or supplied evidence.")
@@ -451,17 +510,29 @@
       observed = .table_value(cal$summary, column)
       if (identical(name, "maximum_abs_intercept")) observed = abs(observed)
       criteria[[length(criteria) + 1L]] = .criterion_row(
-        name, observed, calibration_criteria[[name]][[2L]], threshold
+        name,
+        observed,
+        calibration_criteria[[name]][[2L]],
+        threshold,
+        .criterion_metadata(config, paste0("calibration.", name))
       )
     }
     slope_range = config$calibration$calibration_slope_range
     if (!is.null(slope_range)) {
       slope = .table_value(cal$summary, "calibration_slope")
       criteria[[length(criteria) + 1L]] = .criterion_row(
-        "minimum_calibration_slope", slope, ">=", slope_range[[1L]]
+        "minimum_calibration_slope",
+        slope,
+        ">=",
+        slope_range[[1L]],
+        .criterion_metadata(config, "calibration.minimum_slope")
       )
       criteria[[length(criteria) + 1L]] = .criterion_row(
-        "maximum_calibration_slope", slope, "<=", slope_range[[2L]]
+        "maximum_calibration_slope",
+        slope,
+        "<=",
+        slope_range[[2L]],
+        .criterion_metadata(config, "calibration.maximum_slope")
       )
     }
     criteria = data.table::rbindlist(criteria, fill = TRUE)
@@ -488,7 +559,9 @@
     )
   })
 
-  gates$G3b = .run_gate("G3b", execute[["G3b"]], evidence$G3b, function() {
+  gates$G3b = .run_gate(
+    "G3b", required[["G3b"]], evidence_role[["G3b"]], execute[["G3b"]], evidence$G3b,
+    function() {
     oof = artifacts$oof
     if (is.null(oof)) {
       .csdg_stop("G3b requires out-of-fold predictions from G1 or supplied evidence.")
@@ -513,7 +586,8 @@
         "minimum_fraction_beneficial",
         beneficial_fraction,
         ">=",
-        config$decision$minimum_fraction_beneficial
+        config$decision$minimum_fraction_beneficial,
+        .criterion_metadata(config, "decision.minimum_fraction_beneficial")
       )
     }
     criteria = data.table::rbindlist(criteria, fill = TRUE)
@@ -539,7 +613,9 @@
     )
   })
 
-  gates$G4 = .run_gate("G4", execute[["G4"]], evidence$G4, function() {
+  gates$G4 = .run_gate(
+    "G4", required[["G4"]], evidence_role[["G4"]], execute[["G4"]], evidence$G4,
+    function() {
     .require_task(task)
     .require_learner(learner)
     cases = local_cases %||% explanation$local_cases
@@ -593,7 +669,13 @@
       if (!is.null(threshold)) {
         criterion_state$rows = c(
           criterion_state$rows,
-          list(.criterion_row(name, observed, operator, threshold))
+          list(.criterion_row(
+            name,
+            observed,
+            operator,
+            threshold,
+            .criterion_metadata(config, paste0("faithfulness.", name))
+          ))
         )
       }
     }
@@ -660,7 +742,9 @@
     )
   })
 
-  gates$G5 = .run_gate("G5", execute[["G5"]], evidence$G5, function() {
+  gates$G5 = .run_gate(
+    "G5", required[["G5"]], evidence_role[["G5"]], execute[["G5"]], evidence$G5,
+    function() {
     oof = artifacts$oof
     if (is.null(oof)) {
       .csdg_stop("G5 requires stored fold models and splits from G1 or supplied evidence.")
@@ -680,13 +764,18 @@
     artifacts$pfi_stability = stability
     median_j = stability$median_jaccard
     stability_cutoff = config$stability$min_top_k_overlap
-    status = if (!is.finite(median_j) || is.null(stability_cutoff)) {
-      "unresolved"
-    } else if (median_j >= stability_cutoff) {
-      "met"
+    stability_criteria = if (is.null(stability_cutoff)) {
+      data.table()
     } else {
-      "not_met"
+      .criterion_row(
+        "minimum_median_jaccard",
+        median_j,
+        ">=",
+        stability_cutoff,
+        .criterion_metadata(config, "stability.min_top_k_overlap")
+      )
     }
+    status = .criteria_status(stability_criteria)
     new_gate_result(
       "G5",
       status = status,
@@ -706,7 +795,7 @@
           stability$effective_top_k, median_j
         )
       },
-      evidence = list(pfi = pfi, stability = stability),
+      evidence = list(pfi = pfi, stability = stability, criteria = stability_criteria),
       thresholds = list(
         requested_top_k = config$stability$top_k,
         effective_top_k = stability$effective_top_k,
@@ -716,7 +805,9 @@
     )
   })
 
-  gates$G6a = .run_gate("G6a", execute[["G6a"]], evidence$G6a, function() {
+  gates$G6a = .run_gate(
+    "G6a", required[["G6a"]], evidence_role[["G6a"]], execute[["G6a"]], evidence$G6a,
+    function() {
     if (is.null(candidate_learners)) {
       return(new_gate_result(
         "G6a",
@@ -734,6 +825,18 @@
         limitations = "Model-multiplicity evidence requires a substantively justified predictive equivalence rule."
       ))
     }
+    tolerance_metadata = .criterion_metadata(config, "generalization.rashomon_tolerance")
+    if (is.null(tolerance_metadata)) {
+      return(new_gate_result(
+        "G6a",
+        status = "unresolved",
+        summary = paste(
+          "A near-equivalence tolerance was supplied without a recorded source and rationale;",
+          "no accepted model set was constructed."
+        ),
+        limitations = "A numerical tolerance is not a universal or self-justifying model-adequacy criterion."
+      ))
+    }
     learners = candidate_learners
     if (is.null(names(learners)) || !any(vapply(
       learners,
@@ -749,8 +852,10 @@
       learners,
       rs,
       primary_measure = primary,
-      tolerance_absolute = config$generalization$rashomon_tolerance_absolute %||% 0,
-      tolerance_relative = config$generalization$rashomon_tolerance_relative %||% 0,
+      tolerance_absolute = config$generalization$rashomon_tolerance_absolute,
+      tolerance_relative = config$generalization$rashomon_tolerance_relative,
+      tolerance_source = tolerance_metadata$source,
+      tolerance_rationale = tolerance_metadata$rationale,
       reference_learner = config$generalization$rashomon_reference_learner,
       seed = config$seed + 2000000L
     )
@@ -781,19 +886,26 @@
     focal = model_evidence$candidates[learner_id == learner$id]
     focal_present = nrow(focal) > 0L
     focal_accepted = focal_present && any(focal$accepted %in% TRUE)
-    agreement = model_evidence$explanation_agreement$pairwise_top_k %||% data.table::data.table()
-    median_jaccard = if (nrow(agreement)) stats::median(agreement$jaccard, na.rm = TRUE) else NA_real_
+    agreement = model_evidence$explanation_agreement$pairwise_top_k %||% data.table()
+    median_jaccard = if (nrow(agreement)) median(agreement$jaccard, na.rm = TRUE) else NA_real_
     agreement_cutoff = config$stability$min_top_k_overlap
+    agreement_criterion = if (is.null(agreement_cutoff)) {
+      data.table()
+    } else {
+      .criterion_row(
+        "minimum_median_jaccard",
+        median_jaccard,
+        ">=",
+        agreement_cutoff,
+        .criterion_metadata(config, "stability.min_top_k_overlap")
+      )
+    }
     status = if (!focal_present) {
       "unresolved"
     } else if (!focal_accepted) {
       "not_met"
-    } else if (!is.finite(median_jaccard) || is.null(agreement_cutoff)) {
-      "unresolved"
-    } else if (median_jaccard < agreement_cutoff) {
-      "not_met"
     } else {
-      "met"
+      .criteria_status(agreement_criterion)
     }
     new_gate_result(
       "G6a",
@@ -813,7 +925,7 @@
       } else {
         sprintf("Median accepted-model top-%d Jaccard agreement was %.3f.", config$stability$top_k, median_jaccard)
       },
-      evidence = list(model_generalization = model_evidence),
+      evidence = list(model_generalization = model_evidence, criteria = agreement_criterion),
       thresholds = list(
         rashomon_tolerance_absolute = config$generalization$rashomon_tolerance_absolute,
         rashomon_tolerance_relative = config$generalization$rashomon_tolerance_relative,
@@ -832,7 +944,9 @@
     )
   })
 
-  gates$G6b = .run_gate("G6b", execute[["G6b"]], evidence$G6b, function() {
+  gates$G6b = .run_gate(
+    "G6b", required[["G6b"]], evidence_role[["G6b"]], execute[["G6b"]], evidence$G6b,
+    function() {
     if (is.null(setting_group)) {
       return(new_gate_result(
         "G6b",
@@ -850,12 +964,20 @@
     )
     artifacts$setting_transport = setting_evidence
     primary = .resolve_primary_measure(config, task)
+    transport_key = if (isTRUE(primary$minimize)) {
+      "generalization.maximum_transport_score"
+    } else {
+      "generalization.minimum_transport_score"
+    }
+    transport_metadata = .criterion_metadata(config, transport_key)
     threshold_status = csdg_transport_status(
       setting_evidence$scores,
       measure = primary$id,
       direction = if (isTRUE(primary$minimize)) "minimize" else "maximize",
       minimum_transport_score = config$generalization$minimum_transport_score,
-      maximum_transport_score = config$generalization$maximum_transport_score
+      maximum_transport_score = config$generalization$maximum_transport_score,
+      criterion_source = transport_metadata$source %||% NULL,
+      criterion_rationale = transport_metadata$rationale %||% NULL
     )
     new_gate_result(
       "G6b",
@@ -879,7 +1001,9 @@
     )
   })
 
-  gates$G7a = .run_gate("G7a", execute[["G7a"]], evidence$G7a, function() {
+  gates$G7a = .run_gate(
+    "G7a", required[["G7a"]], evidence_role[["G7a"]], execute[["G7a"]], evidence$G7a,
+    function() {
     oof = artifacts$oof
     if (is.null(oof)) {
       .csdg_stop("G7a requires selected-model out-of-fold predictions from G1.")
@@ -911,7 +1035,11 @@
       values = values[is.finite(values)]
       observed_gap = if (length(values)) max(values) - min(values) else NA_real_
       criteria[[1L]] = .criterion_row(
-        "maximum_subgroup_gap", observed_gap, "<=", config$subgroup$maximum_gap
+        "maximum_subgroup_gap",
+        observed_gap,
+        "<=",
+        config$subgroup$maximum_gap,
+        .criterion_metadata(config, "subgroup.maximum_gap")
       )
     }
     criteria = data.table::rbindlist(criteria, fill = TRUE)
@@ -943,7 +1071,9 @@
     )
   })
 
-  gates$G7b = .run_gate("G7b", execute[["G7b"]], evidence$G7b, function() {
+  gates$G7b = .run_gate(
+    "G7b", required[["G7b"]], evidence_role[["G7b"]], execute[["G7b"]], evidence$G7b,
+    function() {
     audience_evidence = evidence$audience_evidence %||% NULL
     if (is.null(audience_evidence)) {
       return(new_gate_result(

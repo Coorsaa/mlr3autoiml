@@ -58,4 +58,8 @@ A report table, claim report, invisibly returned bundle path, or \link[ggplot2:g
 \description{
 Creates manuscript-facing report cards, diagnostic plots, and an atomic audit bundle containing cards, gate
 evidence, provenance, uncertainty boundaries, and an MD5 manifest.
+CSDG report cards keep applicability, evidence role, availability, result direction, criterion provenance,
+including distinct criterion source and rationale fields, materiality, adjudication basis, and claim consequence
+in separate fields.
+They never consume legacy \code{GateResult} statuses as CSDG claim decisions.
 }

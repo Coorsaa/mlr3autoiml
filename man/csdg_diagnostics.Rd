@@ -159,7 +159,8 @@ is never divided when it already exceeds that target.}
 
 \item{threshold}{Classification cutoff.}
 
-\item{min_n}{Minimum descriptive subgroup size.}
+\item{min_n}{Minimum descriptive subgroup size.
+The package-level default of one applies no universal sample-size adequacy criterion.}
 
 \item{bootstrap_strata}{Optional bootstrap-stratum vector aligned with the collapsed prediction table, or a
 two-column data frame containing \code{row_id} and one stratum column.

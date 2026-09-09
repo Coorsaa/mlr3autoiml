@@ -108,7 +108,7 @@
   size_scale = direct_label_size / (2.9 * base_size / 11)
   label_reserve = span * pmin(
     0.42,
-    pmax(0.08, 0.022 * nchar(labels, type = "width") * size_scale)
+    pmax(0.08, 0.014 * nchar(labels, type = "width") * size_scale)
   )
   gap = 0.018 * span
   left_anchor = low - gap
@@ -2234,7 +2234,7 @@
   }
   span = diff(x_limits)
   size_scale = direct_label_size / (2.9 * base_size / 11)
-  label_reserve = span * pmin(0.35, pmax(0.08, 0.022 * nchar(screen$value_label) * size_scale))
+  label_reserve = span * pmin(0.35, pmax(0.08, 0.014 * nchar(screen$value_label) * size_scale))
   screen[, `:=`(
     label_hjust = 0,
     label_x = value__ + 0.04 * span,

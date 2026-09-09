@@ -6,11 +6,15 @@ test_that("directional transport thresholds are not conflated", {
   )
   high = csdg_transport_status(
     scores, "auc", direction = "maximize",
-    minimum_transport_score = .68
+    minimum_transport_score = .68,
+    criterion_source = "Prospective analysis protocol",
+    criterion_rationale = "Minimum discrimination required for the declared comparison."
   )
   low = csdg_transport_status(
     scores, "rmse", direction = "minimize",
-    maximum_transport_score = 1.2
+    maximum_transport_score = 1.2,
+    criterion_source = "Prospective analysis protocol",
+    criterion_rationale = "Maximum prediction error required for the declared comparison."
   )
   expect_equal(high$status, "met")
   expect_equal(low$status, "not_met")
@@ -21,11 +25,26 @@ test_that("all-missing transport scores are incomplete", {
     data.table::data.table(auc = c(NA_real_, NaN)),
     "auc",
     direction = "maximize",
-    minimum_transport_score = 0.7
+    minimum_transport_score = 0.7,
+    criterion_source = "Prospective analysis protocol",
+    criterion_rationale = "Minimum discrimination required for the declared comparison."
   )
   expect_equal(out$status, "unresolved")
   expect_true(is.na(out$passed))
   expect_match(out$reason, "No finite")
+})
+
+test_that("transport thresholds without provenance do not adjudicate", {
+  out = csdg_transport_status(
+    data.table::data.table(auc = c(.72, .69)),
+    "auc",
+    direction = "maximize",
+    minimum_transport_score = .68
+  )
+
+  expect_identical(out$status, "unresolved")
+  expect_false(out$criterion_complete)
+  expect_match(out$reason, "source or rationale")
 })
 
 test_that("Rashomon agreement honors a requested all-feature top-k", {
@@ -69,6 +88,8 @@ test_that("Rashomon candidates share one split definition", {
     fx$task, learners, rs,
     primary_measure = "classif.logloss",
     tolerance_relative = .25,
+    tolerance_source = "Prospective analysis protocol",
+    tolerance_rationale = "Defines the near-equivalent candidate set for this test.",
     seed = 10L
   )
   expect_s3_class(out, "CSDGRashomon")
@@ -95,6 +116,8 @@ test_that("Rashomon tolerance can be anchored to a declared focal learner", {
     rs,
     primary_measure = "classif.logloss",
     tolerance_relative = 0.10,
+    tolerance_source = "Prospective analysis protocol",
+    tolerance_rationale = "Defines the focal-relative candidate set for this test.",
     reference_learner = "focal",
     seed = 11L
   )
@@ -125,6 +148,8 @@ test_that("near-equivalence tolerance grids remain focal-relative and direction-
   out = csdg_near_equivalence_sensitivity(
     candidates,
     tolerance_relative = c(0.05, 0.20),
+    tolerance_source = "Prospective sensitivity grid",
+    tolerance_rationale = "Compares two declared near-equivalence boundaries.",
     reference_learner = "focal",
     scenario_id = c("narrow", "wide")
   )
@@ -141,9 +166,28 @@ test_that("near-equivalence tolerance grids remain focal-relative and direction-
   max_out = csdg_near_equivalence_sensitivity(
     maximizing,
     tolerance_absolute = 0.03,
+    tolerance_source = "Prospective sensitivity grid",
+    tolerance_rationale = "Defines the absolute maximizing-metric boundary.",
     reference_learner = "focal",
     direction = "maximize"
   )
   expect_true(max_out[learner_name == "alternative", accepted])
   expect_equal(max_out[learner_name == "alternative", fraction_of_tolerance_consumed], 2 / 3)
+})
+
+test_that("Rashomon comparisons are descriptive when no tolerance is supplied", {
+  skip_if_not_installed("rpart")
+  fx = make_classif_fixture(n = 60L)
+  learners = list(
+    shallow = mlr3::lrn("classif.rpart", predict_type = "prob", cp = 0.05),
+    deep = mlr3::lrn("classif.rpart", predict_type = "prob", cp = 0.001)
+  )
+  rs = mlr3::rsmp("cv", folds = 2L)
+  rs$instantiate(fx$task)
+
+  out = csdg_rashomon(fx$task, learners, rs, primary_measure = "classif.logloss", seed = 12L)
+
+  expect_true(all(is.na(out$candidates$accepted)))
+  expect_match(out$acceptance_basis, "descriptive")
+  expect_error(csdg_rashomon_agreement(out, list()), "no accepted set")
 })

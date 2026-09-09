@@ -58,8 +58,9 @@ Values greater than one use forked processes where supported and otherwise fall 
 }
 \value{
 A list with point estimates and percentile intervals in \code{summary}, a flexible calibration curve with
-pointwise intervals in \code{curve}, descriptive bins in \code{bins}, bootstrap replicates, estimand definitions,
-resampling metadata, and limitations.
+pointwise intervals in \code{curve}, descriptive bins in \code{bins}, bootstrap replicates, estimand definitions, an
+explicit deprecated-alias mapping in \code{metric_aliases}, a \code{grid_specification}, resampling metadata, and
+limitations.
 }
 \description{
 Estimates calibration-in-the-large, the free calibration intercept and slope, prediction-error summaries,
@@ -67,4 +68,13 @@ and a flexible calibration curve from out-of-fold predictions.
 Percentile intervals can use a respondent bootstrap or a cluster bootstrap, optionally sampling clusters
 independently within strata.
 The bootstrap conditions on the supplied predictions unless the complete fitting pipeline is rerun by the caller.
+The \code{uniform_grid_mean_absolute_calibration_error} is the arithmetic mean of the absolute difference between the
+flexible calibration curve and the identity line at equally spaced prediction-grid points.
+\deqn{|\mathcal{G}_{f}|^{-1}\sum_{p_g\in\mathcal{G}_{f}} |\widehat{m}(p_g)-p_g|}
+Here, \code{G_f} contains the declared grid points for which the flexible-curve estimate is finite.
+The grid spans the empirical 0.01 and 0.99 prediction quantiles for classification and the empirical 0.005 and
+0.995 prediction quantiles for regression, using quantile type 8.
+Each grid point with a finite curve estimate receives equal weight, so the statistic is a discrete grid mean and
+not a numerical approximation to an integral under an empirical or continuous prediction distribution.
+The former name \code{integrated_absolute_calibration_error} remains in returned tables only as a deprecated alias.
 }

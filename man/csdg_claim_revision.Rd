@@ -9,7 +9,7 @@ csdg_claim_revision(
   id,
   statement,
   claim_version,
-  revision_relation = "narrower",
+  revision_relation,
   ...
 )
 }
@@ -22,7 +22,8 @@ csdg_claim_revision(
 
 \item{claim_version}{Version label for the revised claim.}
 
-\item{revision_relation}{One of \code{"narrower"}, \code{"stronger_excluded"}, or \code{"alternative"}.}
+\item{revision_relation}{One of \code{"same"}, \code{"narrower"}, \code{"broader"}, or
+\code{"alternative_or_incomparable"}.}
 
 \item{...}{Named claim-card fields that replace fields inherited from \code{claim}.}
 }
@@ -45,6 +46,7 @@ revised = csdg_claim_revision(
   original,
   id = "claim_revised",
   claim_version = "C1",
+  revision_relation = "narrower",
   statement = "The explanation describes the selected model in the analytic sample."
 )
 revised

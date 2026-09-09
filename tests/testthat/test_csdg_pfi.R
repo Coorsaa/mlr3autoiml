@@ -144,6 +144,9 @@ test_that("importance agreement distinguishes exact ranks from practical ties", 
   expect_equal(agreement$tolerance_sensitivity[practical_tolerance == 0.02, n_practical_reversals], 0L)
   expect_true(agreement$direct_differences[feature_group == "joint", excluded_from_rank_comparison])
   expect_equal(agreement$top_k$jaccard, 1 / 3)
+
+  strict_default = csdg_importance_agreement(reference, comparison, exclude_groups = "joint")
+  expect_identical(strict_default$tolerance_sensitivity$practical_tolerance, 0)
 })
 
 test_that("OOF local surrogate uses held-out fold models", {

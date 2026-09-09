@@ -22,7 +22,8 @@ A \code{CSDGGatePlan} data table with applicability, evidence role, trigger, and
 Maps a prespecified claim to Gates G0a through G7b and records why each gate is required or optional.
 
 Maps a declared claim to applicable evidence modules.
-A required module is a necessary warrant for that claim as declared; optional diagnostics can still provide
-graded support, potential defeaters, or descriptive context.
+Applicability and evidence role are distinct: an applicable module may be a necessary requirement, potential
+defeater, graded support, or descriptive context.
+Nonapplicable diagnostics can still be computed descriptively when requested, without changing their role.
 The mapping is explicit and contains no aggregate score.
 }

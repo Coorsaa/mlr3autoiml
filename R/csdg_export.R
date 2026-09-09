@@ -8,6 +8,19 @@ csdg_report_card = function(x) {
     data.table::data.table(
       gate_id = gate$gate_id,
       status = gate$status,
+      availability = gate$availability,
+      result_direction = gate$result_direction,
+      criterion = if (is.null(gate$criterion)) {
+        ""
+      } else {
+        as.character(toJSON(gate$criterion, auto_unbox = TRUE))
+      },
+      criterion_source = gate$criterion_source %||% NA_character_,
+      criterion_rationale = gate$criterion_rationale %||% NA_character_,
+      materiality = gate$materiality,
+      adjudication_basis = gate$adjudication_basis %||% NA_character_,
+      claim_consequence = gate$claim_consequence,
+      rationale = gate$rationale,
       summary = gate$summary,
       limitations = paste(gate$limitations, collapse = " | "),
       started_at = gate$started_at %||% NA_character_,
@@ -33,7 +46,8 @@ csdg_claim_report = function(x) {
     parent_claim_id = x$claim$parent_claim_id %||% NA_character_,
     revision_relation = x$claim$revision_relation,
     claim_statement = x$claim$statement,
-    support_decision = "requires_substantive_judgment",
+    decision = "unresolved",
+    decision_basis = "requires_explicit_claim_adjudication",
     required_gates = paste(required$gate_id, collapse = ", "),
     met_gates = paste(required[status == "met", gate_id], collapse = ", "),
     not_met_gates = paste(required[status == "not_met", gate_id], collapse = ", "),
@@ -46,8 +60,8 @@ csdg_claim_report = function(x) {
     ),
     interpretation = paste(
       "Gate states are evidence records, not an aggregate claim verdict.",
-      "The analyst must decide whether every necessary warrant is met and record any narrower replacement",
-      "as a new, linked claim version; several non-equivalent revisions may be defensible."
+      "The analyst must decide whether every necessary requirement is met and whether a potential defeater",
+      "has been materialized under a recorded claim-specific rule. A surviving revision is a new claim version."
     )
   )
 }
@@ -88,9 +102,10 @@ csdg_claim_report = function(x) {
       card$summary, collapse = "\n"
     ),
     "\n\n## Interpretation boundary\n\n",
-    "Gate states record whether claim-scoped evidence is available and meets any supplied criteria. ",
-    "They are not combined into an overall score or verdict. Claim support and any maximal defensible ",
-    "revision require substantive judgment and must be recorded as linked claim versions. The records do not ",
+    "The report separates applicability, evidence role, availability, observed direction, criterion provenance, ",
+    "materiality, and claim consequence. These fields are not combined into an overall score or verdict. ",
+    "An unmet necessary requirement or explicitly materialized defeater cannot be compensated by favorable ",
+    "evidence elsewhere. A defensible replacement is recorded as a new, linked claim version. The records do not ",
     "establish causal validity, population representativeness, clinical utility, fairness, or deployment readiness.\n"
   )
 }
@@ -137,23 +152,284 @@ csdg_claim_report = function(x) {
   )
 }
 
-.sanitize_export_object = function(x, include_models, include_predictions) {
+.normalize_export_field_names = function(fields) {
+  snake_case = gsub("(?<=[a-z0-9])(?=[A-Z])", "_", fields, perl = TRUE)
+  gsub("[^a-z0-9]+", "_", tolower(snake_case))
+}
+
+.export_private_field_names = function(fields, generic_identifiers = TRUE) {
+  normalized = .normalize_export_field_names(fields)
+  generic = c("id", "ids", "uuid", "uuids", "identifier", "identifiers")
+  direct_identifiers = c(
+    "student_id", "student_ids", "school_id", "school_ids", "respondent_id", "respondent_ids",
+    "participant_id", "participant_ids", "person_id", "person_ids", "individual_id", "individual_ids",
+    "record_id", "record_ids", "subject_id", "subject_ids", "user_id", "user_ids", "patient_id", "patient_ids"
+  )
+  names = c(
+    "first_name", "first_names", "middle_name", "middle_names", "last_name", "last_names", "full_name", "full_names",
+    "given_name", "given_names", "family_name", "family_names", "surname", "surnames"
+  )
+  contacts = c(
+    "email", "emails", "email_address", "email_addresses", "phone", "phones", "phone_number", "phone_numbers",
+    "telephone", "telephones", "telephone_number", "telephone_numbers", "mobile", "mobiles", "mobile_number",
+    "mobile_numbers", "cell", "cells", "cell_number", "cell_numbers", "e_mail", "e_mails", "e_mail_address",
+    "e_mail_addresses"
+  )
+  addresses = c(
+    "address", "addresses", "street_address", "street_addresses", "mailing_address", "mailing_addresses",
+    "residential_address", "residential_addresses", "home_address", "home_addresses", "work_address",
+    "work_addresses", "address_line_1", "address_line_2", "postal_address", "postal_addresses", "postal_code",
+    "postal_codes", "postcode", "postcodes", "zip", "zips", "zip_code", "zip_codes", "zipcode", "zipcodes"
+  )
+  births = c(
+    "date_of_birth", "dates_of_birth", "birth_date", "birth_dates", "birthdate", "birthdates", "dob", "dobs"
+  )
+  credentials = c(
+    "social_security_number", "social_security_numbers", "ssn", "ssns", "national_id", "national_ids",
+    "passport_number", "passport_numbers", "driver_license_number", "driver_license_numbers", "government_id",
+    "government_ids", "government_identifier", "government_identifiers", "account_id", "account_ids",
+    "account_identifier", "account_identifiers", "account_number", "account_numbers", "tax_id", "tax_ids",
+    "tax_identifier", "tax_identifiers"
+  )
+  device_and_location = c(
+    "ip", "ip_address", "ip_addresses", "mac_address", "mac_addresses", "device_id", "device_ids",
+    "device_identifier", "device_identifiers", "advertising_id", "advertising_ids", "gps_coordinate",
+    "gps_coordinates", "home_latitude", "home_longitude"
+  )
+  person_prefix = paste0(
+    "^(student|school|respondent|participant|person|individual|record|subject|user|patient)_",
+    "(id|ids|key|keys|uuid|uuids|index|indices|code|codes|identifier|identifiers|hash|hashes|token|tokens|",
+    "name|names|email|emails|phone|phones|address|addresses)$"
+  )
+  private = normalized %in% c(
+    if (isTRUE(generic_identifiers)) generic else character(),
+    direct_identifiers,
+    names,
+    contacts,
+    addresses,
+    births,
+    credentials,
+    device_and_location
+  ) | grepl(person_prefix, normalized)
+  unique(fields[private])
+}
+
+.export_observed_field_names = function(fields) {
+  normalized = .normalize_export_field_names(fields)
+  observed_records = c(
+    "truth", "actual", "actual_value", "actual_outcome", "actual_response", "observed", "observed_value",
+    "observed_outcome", "observed_response", "true_label", "y_true"
+  )
+  unique(fields[normalized %in% observed_records])
+}
+
+.export_fitted_field_names = function(fields) {
+  normalized = .normalize_export_field_names(fields)
+  fitted_records = c(
+    "prediction", "predictions", "pred", "prob",
+    "probability", "predicted_value", "predicted_values", "predicted_score", "predicted_scores", "prediction_score",
+    "prediction_scores", "predicted_probability", "predicted_probabilities", "class_probability",
+    "class_probabilities", "fitted_value", "fitted_values", "yhat", "yhats", "y_pred", "y_preds", "residual",
+    "residuals", "observation_level"
+  )
+  unique(fields[normalized %in% fitted_records])
+}
+
+.export_prediction_table_columns = function(columns) {
+  normalized = .normalize_export_field_names(columns)
+  row_identifiers = c("row_id", "row_ids", "case_id", "case_ids")
+  split_membership = c(
+    "fold_assignment", "fold_assignments", "fold_id", "fold_ids", "split_id", "split_ids", "train_set",
+    "train_sets", "test_set", "test_sets", "train_indices", "test_indices", "row_map"
+  )
+  unique(c(
+    columns[normalized %in% c(row_identifiers, split_membership)],
+    .export_observed_field_names(columns),
+    .export_fitted_field_names(columns)
+  ))
+}
+
+.export_sensitive_table_columns = function(columns) {
+  unique(c(.export_private_field_names(columns), .export_prediction_table_columns(columns)))
+}
+
+.export_is_prediction_record = function(x) {
+  if (!is.list(x) || is.null(names(x))) {
+    return(FALSE)
+  }
+  length(.export_observed_field_names(names(x))) > 0L && length(.export_fitted_field_names(names(x))) > 0L
+}
+
+.export_is_fitted_model = function(x) {
+  known_classes = c(
+    "lm", "glm", "nls", "rpart", "randomForest", "ranger", "xgb.Booster", "lgb.Booster", "gbm", "glmnet",
+    "cv.glmnet", "train", "workflow", "model_fit", "gam", "survfit", "stanfit", "WrappedModel"
+  )
+  classes = class(x)
+  inherits(x, known_classes) || any(grepl("(model|fit|booster|learner|forest)$", tolower(classes)))
+}
+
+.export_model_container_names = function(fields) {
+  normalized = .normalize_export_field_names(fields)
+  unique(fields[grepl("(^|_)(model|models|learner|learners|fit|fits|fitted_object|booster|boosters)$", normalized)])
+}
+
+.export_private_container_names = function(fields) {
+  normalized = .normalize_export_field_names(fields)
+  explicit = c(
+    "pii", "personal_information", "personally_identifiable_information", "contact_information", "contact_details",
+    "private_data", "protected_data", "raw_data"
+  )
+  person_container = paste0(
+    "^(student|school|respondent|participant|person|individual|record|subject|user|patient)_",
+    "(contact|contacts|contact_details|profile|profiles|record|records|details|identifiers)$"
+  )
+  unique(fields[normalized %in% explicit | grepl(person_container, normalized)])
+}
+
+.export_prediction_container_names = function(fields) {
+  normalized = .normalize_export_field_names(fields)
+  pattern = paste0(
+    "^(prediction|predictions|prediction_record|prediction_records|",
+    "(?:oof|row|case|individual|observation)_(?:scores?|predictions?|prediction_records?))$"
+  )
+  unique(fields[grepl(pattern, normalized, perl = TRUE)])
+}
+
+.strip_export_attributes = function(x) {
+  current = attributes(x)
+  if (is.null(current)) {
+    return(x)
+  }
+  allowed = c("names", "class", "row.names", "dim", "dimnames", "levels", "tzone", "units")
+  attributes(x) = current[intersect(names(current), allowed)]
+  x
+}
+
+.export_fields_require_removal = function(fields, include_predictions, allow_generic_identifiers = FALSE) {
+  length(.export_private_field_names(fields, generic_identifiers = !allow_generic_identifiers)) > 0L ||
+    (!isTRUE(include_predictions) && length(.export_prediction_table_columns(fields)) > 0L)
+}
+
+.export_contains_private_object = function(x, include_models, include_predictions) {
+  if (inherits(x, c("Task", "DataBackend", "Resampling"))) {
+    return(TRUE)
+  }
+  if (inherits(x, "Learner")) {
+    return(!isTRUE(include_models))
+  }
+  if (inherits(x, "Prediction")) {
+    return(!isTRUE(include_predictions))
+  }
+  if (.export_is_fitted_model(x)) {
+    return(!isTRUE(include_models))
+  }
+  if (is.environment(x)) {
+    return(TRUE)
+  }
+  if (!is.list(x)) {
+    return(FALSE)
+  }
+  any(vapply(
+    seq_along(x),
+    function(index) .export_contains_private_object(x[[index]], include_models, include_predictions),
+    logical(1L)
+  ))
+}
+
+.sanitize_export_object = function(x, include_models, include_predictions, allow_generic_identifiers = FALSE) {
   if (inherits(x, c("Task", "DataBackend", "Resampling"))) {
     return(NULL)
   }
-  if (inherits(x, "Learner") && !isTRUE(include_models)) {
+  if (inherits(x, "Learner")) {
+    return(if (isTRUE(include_models)) x else NULL)
+  }
+  if (inherits(x, "Prediction")) {
+    return(if (isTRUE(include_predictions)) x else NULL)
+  }
+  if (.export_is_fitted_model(x)) {
+    return(if (isTRUE(include_models)) x else NULL)
+  }
+  if (isS4(x)) {
     return(NULL)
   }
-  if (inherits(x, "Prediction") && !isTRUE(include_predictions)) {
+  if (is.environment(x)) {
     return(NULL)
   }
-  if (is.data.frame(x) || data.table::is.data.table(x)) {
-    if (!isTRUE(include_predictions) && any(c("row_id", "row_ids", "case_id") %in% names(x))) {
+  x = .strip_export_attributes(x)
+  if (is.data.frame(x) || is.data.table(x)) {
+    private_columns = .export_private_field_names(names(x))
+    prediction_columns = .export_prediction_table_columns(names(x))
+    if (length(private_columns) || (!isTRUE(include_predictions) && length(prediction_columns))) {
       return(NULL)
     }
-    return(x)
+    contains_private_object = any(vapply(
+      x,
+      .export_contains_private_object,
+      logical(1L),
+      include_models = include_models,
+      include_predictions = include_predictions
+    ))
+    if (contains_private_object) {
+      return(NULL)
+    }
+    out_table = x
+    row.names(out_table) = NULL
+    return(out_table)
+  }
+  if (is.matrix(x)) {
+    fields = colnames(x) %||% character()
+    if (.export_fields_require_removal(fields, include_predictions)) {
+      return(NULL)
+    }
+    matrix_values = as.vector(x)
+    if (is.list(matrix_values) && any(vapply(
+      matrix_values,
+      .export_contains_private_object,
+      logical(1L),
+      include_models = include_models,
+      include_predictions = include_predictions
+    ))) {
+      return(NULL)
+    }
+    out_matrix = x
+    rownames(out_matrix) = NULL
+    return(out_matrix)
+  }
+  if (is.array(x)) {
+    dimension_labels = unlist(dimnames(x), use.names = FALSE)
+    dimension_fields = c(names(dimnames(x)), dimension_labels)
+    if (.export_fields_require_removal(dimension_fields, include_predictions)) {
+      return(NULL)
+    }
+    array_values = as.vector(x)
+    if (is.list(array_values) && any(vapply(
+      array_values,
+      .export_contains_private_object,
+      logical(1L),
+      include_models = include_models,
+      include_predictions = include_predictions
+    ))) {
+      return(NULL)
+    }
+    out_array = x
+    dimnames(out_array) = NULL
+    return(out_array)
+  }
+  if (!is.list(x) && !is.null(names(x)) && .export_fields_require_removal(
+    names(x),
+    include_predictions,
+    allow_generic_identifiers
+  )) {
+    return(NULL)
   }
   if (!is.list(x)) return(x)
+
+  if (.export_is_prediction_record(x)) {
+    if (length(.export_private_field_names(names(x))) || !isTRUE(include_predictions)) {
+      return(NULL)
+    }
+  }
 
   out = x
   if (!isTRUE(include_predictions)) {
@@ -164,29 +440,73 @@ csdg_claim_report = function(x) {
       out$coefficients = NULL
     }
   }
-  for (name in names(x)) {
+  item_names = names(out)
+  if (is.null(item_names)) {
+    item_names = rep("", length(out))
+  }
+  for (index in rev(seq_along(out))) {
+    name = item_names[[index]]
     safe_scalar_description = name %in% c("weights", "clusters") &&
-      checkmate::test_string(out[[name]], min.chars = 1L)
-    remove = name %in% c("task", "backend", "backends", "resampling") ||
-      (!isTRUE(include_models) && name %in% c("learner", "learners", "model", "models")) ||
+      test_string(out[[index]], min.chars = 1L)
+    remove = length(.export_private_field_names(name, generic_identifiers = !allow_generic_identifiers)) > 0L ||
+      length(.export_private_container_names(name)) > 0L ||
+      (!isTRUE(include_predictions) && length(.export_prediction_table_columns(name)) > 0L) ||
+      name %in% c("task", "backend", "backends", "resampling") ||
+      (!isTRUE(include_models) && length(.export_model_container_names(name)) > 0L) ||
+      (!isTRUE(include_predictions) && length(.export_prediction_container_names(name)) > 0L) ||
       (!isTRUE(include_predictions) &&
         name %in% c(
-          "prediction", "predictions", "observation_level", "train_sets", "test_sets",
+          "observation_level",
+          "train_sets", "test_sets",
           "row_map", "assignments", "group", "row_id", "row_ids", "case_id", "case_ids",
           "case", "cases", "case_data", "local_cases", "background", "additional"
         )) ||
       (!isTRUE(include_predictions) && name %in% c("weights", "clusters") && !safe_scalar_description)
     if (remove) {
-      out[[name]] = NULL
-    } else if (!is.null(out[[name]])) {
-      out[[name]] = .sanitize_export_object(
-        out[[name]],
+      out[index] = NULL
+    } else if (!is.null(out[[index]])) {
+      sanitized = .sanitize_export_object(
+        out[[index]],
         include_models = include_models,
-        include_predictions = include_predictions
+        include_predictions = include_predictions,
+        allow_generic_identifiers = FALSE
       )
+      if (is.null(sanitized) || (is.list(sanitized) && !length(sanitized) && !nzchar(name))) {
+        out[index] = NULL
+      } else {
+        out[[index]] = sanitized
+      }
     }
   }
   out
+}
+
+.sanitize_export_plan = function(plan, include_models, include_predictions) {
+  allowed = c(
+    "gate_id", "gate_name", "required", "applicable", "applicability", "trigger",
+    "required_components", "evidence_role", "execute"
+  )
+  plan = copy(as.data.table(plan))
+  plan = plan[, intersect(allowed, names(plan)), with = FALSE]
+  sanitized = .sanitize_export_object(
+    plan,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
+  if (is.null(sanitized)) {
+    .csdg_stop("The gate plan contains a private or unsupported object and cannot be exported safely.")
+  }
+  structure(sanitized, class = c("CSDGGatePlan", class(sanitized)))
+}
+
+.export_measure_ids = function(x) {
+  if (inherits(x, "Measure")) {
+    return(x$id)
+  }
+  if (is.list(x)) {
+    return(lapply(x, .export_measure_ids))
+  }
+  x
 }
 
 .sanitize_result_for_export = function(x, include_models, include_predictions) {
@@ -194,7 +514,8 @@ csdg_claim_report = function(x) {
   out$claim = .sanitize_export_object(
     out$claim,
     include_models = include_models,
-    include_predictions = include_predictions
+    include_predictions = include_predictions,
+    allow_generic_identifiers = TRUE
   )
   out$measurement = .sanitize_export_object(
     out$measurement,
@@ -206,19 +527,43 @@ csdg_claim_report = function(x) {
     include_models = include_models,
     include_predictions = include_predictions
   )
+  export_config = out$config
+  export_config$performance$measures = .export_measure_ids(export_config$performance$measures)
+  export_config$performance$primary = .export_measure_ids(export_config$performance$primary)
+  config_resampling = .sanitize_export_object(
+    export_config$resampling,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
+  if (is.null(config_resampling)) {
+    .csdg_stop("The resampling configuration contains a private or unsupported object and cannot be exported safely.")
+  }
+  out$config = .sanitize_export_object(
+    export_config,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
+  out$config$resampling = config_resampling
+  out$metadata = .sanitize_export_object(
+    out$metadata,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
+  out$plan = .sanitize_export_plan(
+    out$plan,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
   out$artifacts = .sanitize_export_object(
     out$artifacts,
     include_models = include_models,
     include_predictions = include_predictions
   )
-  out$gates = lapply(out$gates, function(gate) {
-    gate$evidence = .sanitize_export_object(
-      gate$evidence,
-      include_models = include_models,
-      include_predictions = include_predictions
-    )
-    gate
-  })
+  out$gates = .sanitize_export_object(
+    out$gates,
+    include_models = include_models,
+    include_predictions = include_predictions
+  )
   out
 }
 
@@ -262,16 +607,16 @@ csdg_export = function(
       .write_json(cards[[card_name]], file.path(tmp, "cards", paste0(card_name, ".json")))
     }
     .write_json(cards, file.path(tmp, "cards", "cards.json"))
-    .write_csv(x$plan, file.path(tmp, "gate_plan.csv"))
-    .write_csv(csdg_report_card(x), file.path(tmp, "report_card.csv"))
-    .write_csv(csdg_claim_report(x), file.path(tmp, "claim_report.csv"))
+    .write_csv(export_result$plan, file.path(tmp, "gate_plan.csv"))
+    .write_csv(csdg_report_card(export_result), file.path(tmp, "report_card.csv"))
+    .write_csv(csdg_claim_report(export_result), file.path(tmp, "claim_report.csv"))
     saveRDS(
       export_result,
       file = file.path(tmp, "csdg_result.rds"),
       version = 3
     )
 
-    for (gate_id in names(x$gates)) {
+    for (gate_id in names(export_result$gates)) {
       gate = export_result$gates[[gate_id]]
       gate_dir = file.path(tmp, "gates", gate_id)
       dir.create(gate_dir, recursive = TRUE)
@@ -286,7 +631,7 @@ csdg_export = function(
     artifacts = export_result$artifacts
     .write_nested_evidence(artifacts, file.path(tmp, "artifacts"), "artifact")
 
-    writeLines(.bundle_readme(x), file.path(tmp, "README.md"))
+    writeLines(.bundle_readme(export_result), file.path(tmp, "README.md"))
     writeLines(.uncertainty_note(), file.path(tmp, "UNCERTAINTY_SCOPE.md"))
     writeLines(
       .capture_session_info(),
@@ -298,12 +643,12 @@ csdg_export = function(
         package_version = .package_version(),
         created_at = .now_utc(),
         result_hash = .hash_object(list(
-          claim = x$claim,
-          measurement = x$measurement,
-          explanation = x$explanation,
-          report_card = csdg_report_card(x)
+          claim = export_result$claim,
+          measurement = export_result$measurement,
+          explanation = export_result$explanation,
+          report_card = csdg_report_card(export_result)
         )),
-        metadata = x$metadata
+        metadata = export_result$metadata
       ),
       file.path(tmp, "provenance", "run_metadata.json")
     )

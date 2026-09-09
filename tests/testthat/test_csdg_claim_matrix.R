@@ -2,15 +2,15 @@ test_that("claim matrices retain explicit judgments without an overall score", {
   matrix = csdg_claim_matrix(
     claim = c("A scoped performance claim", "A transport claim"),
     evidence_needed = c("Repeated out-of-fold estimates", "External validation"),
-    conclusion = c("Supported for the analytic sample", "Not established outside the sample"),
-    status = c("supported_scoped", "not_established"),
+    conclusion = c("Met for the analytic sample", "Not evaluated outside the sample"),
+    status = c("met", "not_applicable"),
     claim_id = c("performance", "transport")
   )
 
   expect_s3_class(matrix, "CSDGClaimMatrix")
   expect_s3_class(matrix, "data.table")
   expect_identical(matrix$claim_order, 1:2)
-  expect_identical(matrix$status_label, c("Supported (scoped)", "Not established"))
+  expect_identical(matrix$status_label, c("Met", "Not applicable"))
   expect_identical(
     names(matrix),
     c(
@@ -27,7 +27,7 @@ test_that("claim matrices reject ambiguous schemas", {
       claim = c("Claim one", "Claim two"),
       evidence_needed = "Evidence",
       conclusion = c("Conclusion one", "Conclusion two"),
-      status = c("unresolved", "not_evaluated")
+      status = c("unresolved", "not_applicable")
     ),
     "equal lengths"
   )
@@ -45,7 +45,7 @@ test_that("claim matrices reject ambiguous schemas", {
       claim = c("Claim one", "Claim two"),
       evidence_needed = c("Evidence one", "Evidence two"),
       conclusion = c("Conclusion one", "Conclusion two"),
-      status = c("not_established", "unresolved"),
+      status = c("not_met", "unresolved"),
       claim_id = c("duplicate", "duplicate")
     ),
     "duplicated|unique"
@@ -53,9 +53,7 @@ test_that("claim matrices reject ambiguous schemas", {
 })
 
 test_that("claim matrix plots use explicit status labels and scale to the supplied rows", {
-  statuses = c(
-    "supported_scoped", "unresolved", "not_supported", "not_established", "not_evaluated"
-  )
+  statuses = c("met", "not_met", "unresolved", "not_applicable")
   matrix = csdg_claim_matrix(
     claim = paste("Claim", seq_along(statuses)),
     evidence_needed = paste("Evidence", seq_along(statuses)),
@@ -70,10 +68,7 @@ test_that("claim matrix plots use explicit status labels and scale to the suppli
   expect_equal(nrow(built$data[[1L]]), length(statuses))
   expect_equal(nrow(built$data[[2L]]), length(statuses))
   expect_equal(nrow(built$data[[3L]]), length(statuses))
-  expect_setequal(
-    gsub("\n", " ", built$data[[3L]]$label),
-    c("Supported (scoped)", "Unresolved", "Not supported", "Not established", "Not evaluated")
-  )
+  expect_setequal(gsub("\n", " ", built$data[[3L]]$label), c("Met", "Not met", "Unresolved", "Not applicable"))
   expect_identical(plot$labels$title, "Claim-by-evidence matrix")
   expect_match(plot$labels$subtitle, "not combined into an overall score")
   expect_identical(plot$theme$text$family, "Arial")

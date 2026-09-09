@@ -23,6 +23,7 @@ csdg_claim(
   scientific_use = NULL,
   explanation_design = NULL,
   claim_level = "substantive",
+  use_claim = FALSE,
   claim_version = "C0",
   parent_claim_id = NULL,
   revision_relation = "original",
@@ -79,6 +80,7 @@ csdg_config(
   generalization = list(),
   subgroup = list(),
   decision = list(),
+  criteria = list(),
   export = list(),
   ...
 )
@@ -109,13 +111,15 @@ causal claim, or recourse claim.}
 
 \item{explanation_design}{Explanation design or comparison to which the claim is restricted.}
 
-\item{claim_level}{Level at which the claim is made: functional, predictive, substantive, or use.}
+\item{claim_level}{Inference level of the claim: functional, predictive, or substantive.}
+
+\item{use_claim}{Whether the claim additionally asserts adequacy for an audience, workflow, implementation, or use.}
 
 \item{claim_version}{Stable version label for the claim.}
 
 \item{parent_claim_id}{Identifier of the parent claim when the current claim is a revision.}
 
-\item{revision_relation}{Declared relationship to the parent claim.}
+\item{revision_relation}{Declared relationship to the parent claim across all six claim coordinates.}
 
 \item{intended_users}{Intended audience or users.}
 
@@ -178,11 +182,17 @@ Unknown top-level fields supplied to \code{csdg_config()} are rejected.}
 \item{seed}{Master random seed.}
 
 \item{resampling, performance, dependence, calibration, faithfulness, stability, generalization, subgroup, decision, export}{Named lists that override configuration defaults.}
+
+\item{criteria}{Named criterion metadata keyed by the documented configuration path.
+
+Every entry must contain nonempty \code{source} and \code{rationale} fields.}
 }
 \value{
 A \code{CSDGClaim}, \code{CSDGMeasurement}, \code{CSDGExplanation}, or \code{CSDGConfig} object.
 }
 \description{
 These constructors create explicit, serializable cards that define the claim, measurement,
-explanation semantics, and diagnostic thresholds before results are interpreted.
+explanation semantics, and any claim-specific criteria before results are interpreted.
+CSDG criteria have no universal substantive defaults and require a recorded source and rationale when they are
+used for adjudication.
 }

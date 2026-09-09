@@ -29,6 +29,35 @@ test_that("calibration bootstrap reports reproducible respondent intervals", {
   expect_equal(first$summary, second$summary)
   expect_equal(first$curve, second$curve)
   expect_true(all(c("calibration_intercept", "calibration_slope") %in% first$summary$estimand))
+  canonical_name = "uniform_grid_mean_absolute_calibration_error"
+  deprecated_name = "integrated_absolute_calibration_error"
+  canonical = first$summary[estimand == canonical_name]
+  deprecated = first$summary[estimand == deprecated_name]
+  expect_equal(deprecated[, .(estimate, lower, upper)], canonical[, .(estimate, lower, upper)])
+  expect_identical(canonical$canonical_estimand, canonical_name)
+  expect_identical(canonical$estimand_status, "canonical")
+  expect_identical(deprecated$canonical_estimand, canonical_name)
+  expect_identical(deprecated$estimand_status, "deprecated_alias")
+  expect_equal(
+    canonical$estimate,
+    mean(abs(first$curve$estimate - first$curve$prediction), na.rm = TRUE)
+  )
+  expect_equal(first$bootstrap_summary[[deprecated_name]], first$bootstrap_summary[[canonical_name]])
+  expect_true(canonical_name %in% first$estimands$estimand)
+  expect_false(deprecated_name %in% first$estimands$estimand)
+  expect_identical(
+    first$metric_aliases,
+    data.table::data.table(
+      alias = deprecated_name,
+      canonical_estimand = canonical_name,
+      alias_status = "deprecated_alias"
+    )
+  )
+  expect_identical(first$grid_specification$points, 25L)
+  expect_identical(first$grid_specification$lower_quantile_probability, 0.01)
+  expect_identical(first$grid_specification$upper_quantile_probability, 0.99)
+  expect_identical(first$grid_specification$quantile_type, 8L)
+  expect_identical(first$grid_specification$weighting, "uniform_discrete")
   expect_equal(nrow(first$curve), 25L)
   expect_identical(first$resampling$unit, "respondent")
 })
@@ -128,6 +157,8 @@ test_that("calibration bootstrap supports prespecified natural regression spline
   expect_identical(unique(result$curve$curve_method), "regression_spline")
   expect_identical(unique(result$curve$spline_df), 4L)
   expect_identical(result$resampling$curve_method, "regression_spline")
+  expect_identical(result$grid_specification$lower_quantile_probability, 0.005)
+  expect_identical(result$grid_specification$upper_quantile_probability, 0.995)
 })
 
 test_that("calibration bootstrap rejects clusters that cross strata", {

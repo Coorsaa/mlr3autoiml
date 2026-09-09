@@ -14,8 +14,10 @@ csdg_rashomon(
   learners,
   resampling,
   primary_measure = NULL,
-  tolerance_absolute = 0,
-  tolerance_relative = 0.02,
+  tolerance_absolute = NULL,
+  tolerance_relative = NULL,
+  tolerance_source = NULL,
+  tolerance_rationale = NULL,
   reference_learner = NULL,
   seed = 20260201L,
   store_models = TRUE
@@ -23,8 +25,10 @@ csdg_rashomon(
 
 csdg_near_equivalence_sensitivity(
   x,
-  tolerance_absolute = 0,
-  tolerance_relative = 0,
+  tolerance_absolute = NULL,
+  tolerance_relative = NULL,
+  tolerance_source = NULL,
+  tolerance_rationale = NULL,
   reference_learner = NULL,
   direction = c("auto", "minimize", "maximize"),
   scenario_id = NULL
@@ -46,7 +50,9 @@ csdg_transport_status(
   measure,
   direction = c("maximize", "minimize"),
   minimum_transport_score = NULL,
-  maximum_transport_score = NULL
+  maximum_transport_score = NULL,
+  criterion_source = NULL,
+  criterion_rationale = NULL
 )
 }
 \arguments{
@@ -61,6 +67,10 @@ csdg_transport_status(
 \item{tolerance_absolute, tolerance_relative}{Prespecified near-equivalence tolerances.
 For \code{csdg_near_equivalence_sensitivity()}, either value may be a vector defining a sensitivity grid;
 vector lengths must be one or equal to the number of scenarios.}
+
+\item{tolerance_source}{Source of the supplied near-equivalence tolerance.}
+
+\item{tolerance_rationale}{Rationale linking the supplied tolerance to the claim.}
 
 \item{reference_learner}{Optional learner name around which the tolerance is defined.
 When omitted, the direction-specific best candidate is the reference.}
@@ -94,6 +104,10 @@ When omitted, the direction-specific best candidate is the reference.}
 \item{minimum_transport_score}{Minimum acceptable score for maximized metrics.}
 
 \item{maximum_transport_score}{Maximum acceptable score for minimized metrics.}
+
+\item{criterion_source}{Source of a supplied transport criterion.}
+
+\item{criterion_rationale}{Rationale linking a supplied transport criterion to the claim.}
 }
 \value{
 Structured candidate, agreement, or leave-one-group-out results.

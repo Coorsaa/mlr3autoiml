@@ -1,7 +1,9 @@
 #' Define CSDG analysis cards and configuration
 #'
 #' These constructors create explicit, serializable cards that define the claim, measurement,
-#' explanation semantics, and diagnostic thresholds before results are interpreted.
+#' explanation semantics, and any claim-specific criteria before results are interpreted.
+#' CSDG criteria have no universal substantive defaults and require a recorded source and rationale when they are
+#' used for adjudication.
 #'
 #' @param id Stable claim identifier.
 #' @param statement Claim to evaluate.
@@ -16,10 +18,11 @@
 #' @param setting_scope Scope over cohorts, sites, countries, times, or settings.
 #' @param scientific_use Intended scientific use of the result.
 #' @param explanation_design Explanation design or comparison to which the claim is restricted.
-#' @param claim_level Level at which the claim is made: functional, predictive, substantive, or use.
+#' @param claim_level Inference level of the claim: functional, predictive, or substantive.
+#' @param use_claim Whether the claim additionally asserts adequacy for an audience, workflow, implementation, or use.
 #' @param claim_version Stable version label for the claim.
 #' @param parent_claim_id Identifier of the parent claim when the current claim is a revision.
-#' @param revision_relation Declared relationship to the parent claim.
+#' @param revision_relation Declared relationship to the parent claim across all six claim coordinates.
 #' @param intended_users Intended audience or users.
 #' @param action Action informed by a decision claim.
 #' @param thresholds Prespecified decision or diagnostic thresholds.
@@ -50,6 +53,9 @@
 #' @param seed Master random seed.
 #' @param resampling,performance,dependence,calibration,faithfulness,stability,generalization,subgroup,decision,export
 #'   Named lists that override configuration defaults.
+#' @param criteria Named criterion metadata keyed by the documented configuration path.
+#'
+#'   Every entry must contain nonempty `source` and `rationale` fields.
 #' @param ... Explicit documented aliases for card constructors.
 #'
 #'   Unknown top-level fields supplied to `csdg_config()` are rejected.
@@ -126,6 +132,7 @@ NULL
 #' @param row_id Observation identifiers for a subgroup vector.
 #' @param threshold Classification cutoff.
 #' @param min_n Minimum descriptive subgroup size.
+#'   The package-level default of one applies no universal sample-size adequacy criterion.
 #' @param cluster Optional cluster vector aligned with the collapsed prediction table, or a two-column data frame
 #'   containing `row_id` and one cluster column.
 #' @param bootstrap_strata Optional bootstrap-stratum vector aligned with the collapsed prediction table, or a
@@ -169,6 +176,8 @@ NULL
 #'   vector lengths must be one or equal to the number of scenarios.
 #' @param reference_learner Optional learner name around which the tolerance is defined.
 #'   When omitted, the direction-specific best candidate is the reference.
+#' @param tolerance_source Source of the supplied near-equivalence tolerance.
+#' @param tolerance_rationale Rationale linking the supplied tolerance to the claim.
 #' @param x A `CSDGRashomon` object or candidate table with unique `learner_name` and finite `mean_score` columns.
 #' @param scenario_id Optional unique labels for the tolerance scenarios.
 #' @param seed Random seed.
@@ -184,6 +193,8 @@ NULL
 #' @param direction Whether higher or lower scores are better.
 #' @param minimum_transport_score Minimum acceptable score for maximized metrics.
 #' @param maximum_transport_score Maximum acceptable score for minimized metrics.
+#' @param criterion_source Source of a supplied transport criterion.
+#' @param criterion_rationale Rationale linking a supplied transport criterion to the claim.
 #' @return Structured candidate, agreement, or leave-one-group-out results.
 #' @name csdg_generalization
 NULL
@@ -233,6 +244,10 @@ NULL
 #'
 #' Creates manuscript-facing report cards, diagnostic plots, and an atomic audit bundle containing cards, gate
 #' evidence, provenance, uncertainty boundaries, and an MD5 manifest.
+#' CSDG report cards keep applicability, evidence role, availability, result direction, criterion provenance,
+#' including distinct criterion source and rationale fields, materiality, adjudication basis, and claim consequence
+#' in separate fields.
+#' They never consume legacy `GateResult` statuses as CSDG claim decisions.
 #'
 #' @param x A `CSDGResult`, gate result, or supported evidence object.
 #' @param path Parent export directory.

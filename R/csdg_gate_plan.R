@@ -17,9 +17,11 @@
 )
 
 .gate_plan_row = function(required, trigger, components, evidence_role) {
+  .assert_choice(evidence_role, .csdg_evidence_roles, "evidence_role")
   list(
     required = required,
-    applicability = if (required) 1L else 0L,
+    applicable = required,
+    applicability = if (required) "applicable" else "not_applicable",
     trigger = trigger,
     required_components = components,
     evidence_role = evidence_role
@@ -29,8 +31,9 @@
 #' Plan claim-scoped evidence modules
 #'
 #' Maps a declared claim to applicable evidence modules.
-#' A required module is a necessary warrant for that claim as declared; optional diagnostics can still provide
-#' graded support, potential defeaters, or descriptive context.
+#' Applicability and evidence role are distinct: an applicable module may be a necessary requirement, potential
+#' defeater, graded support, or descriptive context.
+#' Nonapplicable diagnostics can still be computed descriptively when requested, without changing their role.
 #' The mapping is explicit and contains no aggregate score.
 #'
 #' @param claim A `CSDGClaim`.
@@ -52,7 +55,7 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
   has_decision = "decision" %in% claim_type
   has_calibration = any(claim_type %in% c("calibration", "decision"))
   has_subgroup = "subgroup" %in% claim_type || length(claim$subgroup_variables %||% character()) > 0L
-  has_audience_use = has_decision || identical(claim$claim_level, "use")
+  has_audience_use = has_decision || isTRUE(claim$use_claim)
   has_model_scope = "model_generalization" %in% claim_type ||
     claim$model_scope %in% c("near_equivalent_models", "model_class")
   has_setting_scope = "setting_generalization" %in% claim_type ||
@@ -70,13 +73,13 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
       TRUE,
       "Every interpretation requires a versioned claim and explicit target, semantics, scope, distribution, and use.",
       "claim_card;target;semantics;model_scope;analytic_distribution;scientific_use;explanation_design",
-      "necessary_warrant"
+      "necessary_requirement"
     ),
     G0b = .gate_plan_row(
       TRUE,
       "Every substantive interpretation inherits the measurement, sampling, and preprocessing conditions.",
       "measurement_card;missingness;preprocessing_verification;sampling;weights;clusters",
-      "necessary_warrant"
+      "necessary_requirement"
     ),
     G1 = .gate_plan_row(
       needs_prediction,
@@ -86,7 +89,7 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
         "A purely functional statement about one fixed function does not require predictive adequacy."
       },
       "out_of_fold_performance;baseline;leakage_controls",
-      if (needs_prediction) "necessary_warrant" else "descriptive_context"
+      if (needs_prediction) "necessary_requirement" else "descriptive_context"
     ),
     G2 = .gate_plan_row(
       has_explanation || has_subgroup || has_decision,
@@ -106,7 +109,7 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
         "Calibration is not part of the declared claim."
       },
       "out_of_fold_calibration;calibration_uncertainty;range_calibration",
-      if (has_calibration) "necessary_warrant" else "graded_support"
+      if (has_calibration) "necessary_requirement" else "graded_support"
     ),
     G3b = .gate_plan_row(
       has_decision,
@@ -116,14 +119,14 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
         "No decision or utility claim is declared."
       },
       "action;thresholds;utilities;harms;decision_analysis",
-      if (has_decision) "necessary_warrant" else "descriptive_context"
+      if (has_decision) "necessary_requirement" else "descriptive_context"
     ),
     G4 = .gate_plan_row(
       has_local,
       if (has_local) "The claim is local, regional, counterfactual, or recourse-facing." else
         "No local, regional, counterfactual, or recourse claim is declared.",
       "held_out_local_fidelity;absolute_error;target_case_error;scale;sensitivity;support",
-      if (has_local) "necessary_warrant" else "descriptive_context"
+      if (has_local) "necessary_requirement" else "descriptive_context"
     ),
     G5 = .gate_plan_row(
       has_global,
@@ -140,28 +143,28 @@ csdg_gate_plan = function(claim, measurement, explanation = NULL) {
       if (has_model_scope) "The interpretation extends beyond the focal fitted model." else
         "The interpretation is restricted to the focal fitted model.",
       "near_equivalent_models;prediction_dispersion;explanation_agreement",
-      if (has_model_scope) "necessary_warrant" else "descriptive_context"
+      if (has_model_scope) "necessary_requirement" else "descriptive_context"
     ),
     G6b = .gate_plan_row(
       has_setting_scope,
       if (has_setting_scope) "The interpretation extends beyond the observed analytic setting." else
         "The interpretation is restricted to the observed analytic setting.",
       "setting_unit;external_validation;matched_setting_exclusion;calibration_by_setting",
-      if (has_setting_scope) "necessary_warrant" else "descriptive_context"
+      if (has_setting_scope) "necessary_requirement" else "descriptive_context"
     ),
     G7a = .gate_plan_row(
       has_subgroup,
       if (has_subgroup) "The claim compares or interprets technical behavior across subgroups." else
         "No subgroup comparison is declared.",
       "subgroup_composition;performance;calibration;comparability;contrasts",
-      if (has_subgroup) "necessary_warrant" else "descriptive_context"
+      if (has_subgroup) "necessary_requirement" else "descriptive_context"
     ),
     G7b = .gate_plan_row(
       has_audience_use,
       if (has_audience_use) "The claim assumes an audience, workflow, implementation, or use consequence." else
         "No audience, workflow, or implementation claim is declared.",
       "intended_users;user_understanding;reliance;workflow;implementation;harms",
-      if (has_audience_use) "necessary_warrant" else "descriptive_context"
+      if (has_audience_use) "necessary_requirement" else "descriptive_context"
     )
   )
 

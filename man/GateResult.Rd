@@ -14,6 +14,13 @@ A \link{GateResult} contains a standardized status (\code{pass}, \code{warn}, \c
 optional artifacts (tables and intermediate objects) used for reproducibility
 and plotting.
 }
+\section{Compatibility status}{
+
+\code{GateResult} is retained only for the legacy \code{AutoIML} compatibility workflow.
+Its heuristic \code{pass}, \code{warn}, \code{fail}, and \code{skip} labels are not CSDG evidence roles or claim decisions.
+New analyses should use \code{\link[=csdg_audit]{csdg_audit()}}, \code{\link[=csdg_evidence_record]{csdg_evidence_record()}}, and \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}.
+}
+
 \section{Fields}{
 
 \itemize{

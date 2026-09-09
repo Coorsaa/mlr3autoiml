@@ -8,12 +8,31 @@ test_that("csdg_config rejects unknown top-level fields", {
 })
 
 test_that("csdg_config validates integer and shareable export defaults", {
+  expect_identical(csdg_config()$subgroup$min_n, 1L)
   expect_error(csdg_config(seed = 1.5), "integer")
   expect_error(csdg_config(resampling = list(folds = 2.5)), "integer")
 
   config = csdg_config()
   expect_false(config$export$include_models)
   expect_false(config$export$include_predictions)
+  expect_null(config$generalization$rashomon_tolerance_relative)
+  expect_identical(config$criteria, list())
+})
+
+test_that("criterion metadata requires a source and rationale", {
+  expect_error(
+    csdg_config(criteria = list(
+      performance.maximum_primary_score = list(source = "Protocol")
+    )),
+    "exactly"
+  )
+  config = csdg_config(criteria = list(
+    performance.maximum_primary_score = list(
+      source = "Prospective protocol",
+      rationale = "Maximum loss for the declared use."
+    )
+  ))
+  expect_identical(config$criteria$performance.maximum_primary_score$source, "Prospective protocol")
 })
 
 test_that("csdg_config validates claim-relevant criteria", {

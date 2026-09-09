@@ -6,11 +6,19 @@ claim:
   statement: null
   claim_type: []
   target: null
-  unit: null
-  population: null
   analytic_distribution: null
   model_scope: selected_model
+  semantics: fitted_model_description
+  scientific_use: null
+  explanation_design: null
+  unit: null
+  population: null
   setting_scope: analytic_sample
+  claim_level: substantive
+  use_claim: false
+  claim_version: C0
+  parent_claim_id: null
+  revision_relation: original
 measurement:
   outcome: null
   predictors: []
@@ -40,14 +48,30 @@ explanations:
   local_case_selection: prespecified
 generalization:
   candidate_models: []
-  rashomon_tolerance_absolute: 0
-  rashomon_tolerance_relative: 0.02
+  rashomon_tolerance_absolute: null
+  rashomon_tolerance_relative: null
+  rashomon_tolerance_source: null
+  rashomon_tolerance_rationale: null
   setting_shift: null
   minimum_transport_score: null
   maximum_transport_score: null
 subgroups:
   variables: []
-  minimum_n: 50
+  minimum_n: null
+criteria: {}
+evidence_records:
+  - gate_id: null
+    applicable: null
+    role: null
+    availability: null
+    result_direction: null
+    criterion: null
+    criterion_source: null
+    criterion_rationale: null
+    materiality: null
+    adjudication_basis: null
+    claim_consequence: null
+    rationale: null
 outputs:
   directory: null
   include_predictions: false

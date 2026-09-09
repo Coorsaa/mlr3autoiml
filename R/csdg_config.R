@@ -12,6 +12,7 @@ csdg_config = function(
     generalization = list(),
     subgroup = list(),
     decision = list(),
+    criteria = list(),
     export = list(),
     ...) {
   .extra_config = list(...)
@@ -38,6 +39,7 @@ csdg_config = function(
     generalization = generalization,
     subgroup = subgroup,
     decision = decision,
+    criteria = criteria,
     export = export
   )
   allowed_names = list(
@@ -64,6 +66,28 @@ csdg_config = function(
     ),
     subgroup = c("min_n", "thresholds", "conditional_bootstrap", "metric", "maximum_gap"),
     decision = c("thresholds", "minimum_fraction_beneficial"),
+    criteria = c(
+      "performance.minimum_primary_score",
+      "performance.maximum_primary_score",
+      "performance.minimum_baseline_improvement",
+      "calibration.maximum_brier",
+      "calibration.maximum_logloss",
+      "calibration.maximum_ece",
+      "calibration.maximum_rmse",
+      "calibration.minimum_slope",
+      "calibration.maximum_slope",
+      "calibration.maximum_abs_intercept",
+      "faithfulness.min_weighted_r2",
+      "faithfulness.maximum_weighted_rmse",
+      "faithfulness.maximum_weighted_mae",
+      "faithfulness.maximum_target_case_absolute_error",
+      "stability.min_top_k_overlap",
+      "generalization.rashomon_tolerance",
+      "generalization.minimum_transport_score",
+      "generalization.maximum_transport_score",
+      "subgroup.maximum_gap",
+      "decision.minimum_fraction_beneficial"
+    ),
     export = c("include_models", "include_predictions")
   )
   for (section_name in names(sections)) {
@@ -129,7 +153,7 @@ csdg_config = function(
       maximum_transport_score = NULL
     ),
     subgroup = list(
-      min_n = 50L,
+      min_n = 1L,
       thresholds = 0.5,
       conditional_bootstrap = 0L,
       metric = NULL,
@@ -139,6 +163,7 @@ csdg_config = function(
       thresholds = seq(0.05, 0.95, by = 0.05),
       minimum_fraction_beneficial = NULL
     ),
+    criteria = list(),
     export = list(
       include_models = FALSE,
       include_predictions = FALSE
@@ -155,6 +180,7 @@ csdg_config = function(
   cfg$generalization = .recursive_modify(cfg$generalization, generalization)
   cfg$subgroup = .recursive_modify(cfg$subgroup, subgroup)
   cfg$decision = .recursive_modify(cfg$decision, decision)
+  cfg$criteria = .recursive_modify(cfg$criteria, criteria)
   cfg$export = .recursive_modify(cfg$export, export)
   checkmate::assert_int(cfg$resampling$folds, lower = 2)
   checkmate::assert_int(cfg$resampling$repeats, lower = 1)
@@ -290,6 +316,26 @@ csdg_config = function(
       lower = 0,
       upper = 1,
       finite = TRUE
+    )
+  }
+
+  for (criterion_name in names(cfg$criteria)) {
+    metadata = cfg$criteria[[criterion_name]]
+    .assert_named_list(metadata, sprintf("criteria.%s", criterion_name))
+    assert_subset(
+      names(metadata),
+      c("source", "rationale"),
+      empty.ok = FALSE,
+      .var.name = sprintf("criteria.%s", criterion_name)
+    )
+    if (!setequal(names(metadata), c("source", "rationale"))) {
+      .csdg_stop("`criteria$%s` must contain exactly `source` and `rationale`.", criterion_name)
+    }
+    assert_string(metadata$source, min.chars = 1L, .var.name = sprintf("criteria.%s.source", criterion_name))
+    assert_string(
+      metadata$rationale,
+      min.chars = 1L,
+      .var.name = sprintf("criteria.%s.rationale", criterion_name)
     )
   }
 
