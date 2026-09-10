@@ -451,9 +451,24 @@
 
 .write_json = function(x, path, pretty = TRUE) {
   jsonlite::write_json(
-    x, path = path, pretty = pretty, auto_unbox = TRUE,
+    .csdg_json_arrays(x), path = path, pretty = pretty, auto_unbox = TRUE,
     null = "null", na = "null", digits = NA
   )
+}
+
+.csdg_json_arrays = function(x) {
+  if (!is.list(x) || is.data.frame(x)) return(x)
+  vector_fields = c("evidence_ids", "varied_component", "held_constant")
+  for (i in seq_along(x)) {
+    if (is.null(x[[i]])) next
+    field = if (is.null(names(x))) "" else names(x)[[i]]
+    x[[i]] = if (field %in% vector_fields && is.atomic(x[[i]])) {
+      I(x[[i]])
+    } else {
+      .csdg_json_arrays(x[[i]])
+    }
+  }
+  x
 }
 
 .write_csv = function(x, path) {

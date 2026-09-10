@@ -3,7 +3,7 @@
 
 # mlr3autoiml
 
-`mlr3autoiml` 0.1.1 primarily implements **claim-scoped diagnostic gates
+`mlr3autoiml` 0.1.2 primarily implements **claim-scoped diagnostic gates
 (CSDG)** for interpretable machine-learning analyses in the **mlr3
 ecosystem**. A CSDG audit records the intended claim, measurement and
 preprocessing choices, explanation semantics, gate-specific evidence,
@@ -23,16 +23,38 @@ technical subgroup behavior from audience and workflow evidence
 (G7a/G7b). The earlier combined gate names below belong only to the
 retained `AutoIML` compatibility interface.
 
-The claim object is `C = (T, M, S, D, U, Q)`: target, model scope,
-explanation semantics, analytic distribution and measurement context,
-intended use, and explanation design. `csdg_claim_relation()` records
-`same`, `narrower`, `broader`, or `alternative_or_incomparable` for
-every coordinate; no relation is inferred from text. Evidence roles are
-exactly `necessary_requirement`, `potential_defeater`, `graded_support`,
-and `descriptive_context`. `csdg_evidence_record()` keeps those roles
+The claim object is `C = (phi, kappa)`: `statement` records the
+proposition, while `kappa = (T, M, S, D, U, Q)` records target, model
+scope, explanation semantics, analytic distribution and measurement
+context, intended use, and explanation design. Matching contexts cannot
+establish matching propositions. `csdg_claim_relation()` separates the
+declared context comparison from an explicit proposition comparison;
+without the latter, `relation` is `unchecked`. Neither a declaration nor
+a complete record is a logical proof. Evidence roles are exactly
+`necessary_requirement`, `potential_defeater`, `graded_support`, and
+`descriptive_context`. `csdg_evidence_record()` keeps those roles
 distinct from completion and results, and `csdg_adjudicate_claim()`
 applies conditional non-compensation without adding evidence into a
 score.
+
+Sensitivity records distinguish the varied component, what stays fixed,
+whether the estimand is unchanged, and whether the proposition claims
+invariance. A legitimate change in question is not automatically
+counterevidence. New claim-constraining variation requires a
+required-property, observation, and proposition-relevance chain; changed
+or uncertain estimands additionally require explicitly claimed
+invariance. Legacy records remain readable with linkage marked
+`not_recorded`, not retrospectively validated. Claim provenance can
+record prior specification, exploratory revision, or independently
+confirmed evidence; these are documentary origins, not interpretation
+levels.
+
+`csdg_resolve_sources()` verifies case-exact public paths and declared
+protected or external references without opening protected records or
+fetching external resources. Availability and checksum agreement do not
+prove evidentiary support. See [migration
+notes](inst/MIGRATION_0_1_2.md) for interface examples and the explicit
+context-only compatibility change.
 
 Core dependencies: `mlr3`, `mlr3measures`, `mlr3misc`, `data.table`,
 `checkmate`, `R6`. Optional integrations (pipelines, SHAP, iml,
@@ -47,11 +69,18 @@ remotes::install_github("coorsaa/mlr3autoiml")
 
 ## CSDG quick start
 
-Declare the claim and its scope before running the audit. This example
-requests descriptive held-out performance, calibration, and global
-permutation-importance evidence for one selected model in the analytic
-sample. Because it supplies no use-linked adequacy criterion, the
-corresponding adequacy questions remain unresolved.
+Declare the question, estimand, and scope before evaluating the
+diagnostic results, rather than prescribing a desired positive finding.
+Exploratory revisions are legitimate when their selection basis remains
+explicit. This example requests descriptive held-out performance,
+calibration, and global permutation-importance evidence for one selected
+model in the analytic sample. Because it supplies no use-linked adequacy
+criterion, the corresponding adequacy questions remain unresolved.
+
+Prediction-based triage requires appropriate prediction, calibration,
+use, and consequence evidence, not automatically causal effects of every
+predictor. Advice to change a predictor to improve an outcome requires
+an intervention argument.
 
 ``` r
 library(mlr3)

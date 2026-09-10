@@ -10,10 +10,13 @@ csdg_adjudicate_claim(evidence)
 \item{evidence}{A nonempty list of \code{CSDGEvidenceRecord} objects.}
 }
 \value{
-A \code{CSDGClaimAdjudication} list with \code{decision}, \code{blocking_gate_ids}, \code{unresolved_gate_ids}, and \code{rationale}.
+A \code{CSDGClaimAdjudication} list with \code{decision}, \code{blocking_gate_ids}, \code{unresolved_gate_ids},
+\code{proposition_linkage}, and \code{rationale}.
 }
 \description{
 Applies CSDG's conditional non-compensation rule to orthogonal evidence records.
 An unmet necessary requirement or a materialized challenging defeater prevents retention of the exact claim.
 Graded support and descriptive context never compensate for either condition and never form an aggregate score.
+The returned linkage status distinguishes documented chains from legacy records with missing linkage metadata.
+Neither status independently validates the observations, their relevance, or the proposition.
 }

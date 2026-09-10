@@ -17,7 +17,15 @@ csdg_evidence_record(
     "not_applicable",
   adjudication_basis = NULL,
   claim_consequence = "none",
-  rationale
+  rationale,
+  varied_component = NULL,
+  held_constant = NULL,
+  same_estimand = NA,
+  same_estimand_rationale = NULL,
+  invariance_claimed = NA,
+  required_property = NULL,
+  observation = NULL,
+  relevance_to_proposition = NULL
 )
 }
 \arguments{
@@ -44,6 +52,22 @@ csdg_evidence_record(
 \item{claim_consequence}{Recorded consequence for the exact claim.}
 
 \item{rationale}{Evidence-specific rationale.}
+
+\item{varied_component}{Optional nonempty character vector naming the varied components.}
+
+\item{held_constant}{Optional nonempty character vector naming what the comparison holds fixed.}
+
+\item{same_estimand}{Whether the comparison retains the same estimand; \code{NA} denotes uncertainty or missing metadata.}
+
+\item{same_estimand_rationale}{Reason for the estimand classification, required when variation is documented.}
+
+\item{invariance_claimed}{Whether the proposition requires invariance over this variation; \code{NA} means not recorded.}
+
+\item{required_property}{Property that the exact proposition requires.}
+
+\item{observation}{Diagnostic observation bearing on that property.}
+
+\item{relevance_to_proposition}{Substantive explanation linking that observation to the required property.}
 }
 \value{
 A \code{CSDGEvidenceRecord} list.
@@ -54,4 +78,9 @@ materiality, adjudication basis, and claim consequence.
 It records an analyst's evidence characterization and does not apply a universal threshold or aggregate score.
 Cross-field validation prevents an evidence role or observed direction from being paired with a contradictory
 claim consequence.
+Sensitivity is relative to the proposition: changing an estimand is not automatically counterevidence.
+New variation records that constrain a claim require a property-observation-relevance chain.
+Changed or uncertain estimands additionally require an explicit invariance claim before they constrain a claim.
+Legacy records without these optional fields remain usable with \code{proposition_linkage = "not_recorded"}.
+A documented chain is not independently validated merely because its fields are complete.
 }

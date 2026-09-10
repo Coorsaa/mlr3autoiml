@@ -104,7 +104,8 @@ test_that("claim relations cover all six coordinates and do not force an order",
     rationale = "The target, use, and explanation design change the scientific question."
   )
 
-  expect_identical(relation$relation, "alternative_or_incomparable")
+  expect_identical(relation$relation, "unchecked")
+  expect_identical(relation$context_relation, "alternative_or_incomparable")
   expect_identical(relation$coordinates$coordinate, mlr3autoiml:::.csdg_claim_coordinates)
   narrower = csdg_claim_relation(
     original,
@@ -132,8 +133,10 @@ test_that("claim relations cover all six coordinates and do not force an order",
     ),
     rationale = "Opposing coordinate changes do not define one order."
   )
-  expect_identical(narrower$relation, "narrower")
-  expect_identical(mixed$relation, "alternative_or_incomparable")
+  expect_identical(narrower$relation, "unchecked")
+  expect_identical(narrower$context_relation, "narrower")
+  expect_identical(mixed$relation, "unchecked")
+  expect_identical(mixed$context_relation, "alternative_or_incomparable")
   expect_error(
     csdg_claim_relation(
       original,
@@ -167,7 +170,7 @@ test_that("claim-relation schema requires every formal coordinate exactly once",
   expect_identical(schema$properties$rationale$type, "string")
 })
 
-test_that("claim-relation schema keeps the root and coordinate relations consistent", {
+test_that("claim-relation schema keeps context and coordinate relations consistent", {
   schema_path = system.file("schema", "csdg-claim-relation.schema.json", package = "mlr3autoiml")
   schema = jsonlite::read_json(schema_path, simplifyVector = FALSE)
   validate_fragment = function(value, fragment) {
@@ -226,7 +229,14 @@ test_that("claim-relation schema keeps the root and coordinate relations consist
     list(
       parent_claim_id = "C0",
       claim_id = "C1",
-      relation = relation,
+      relation = "unchecked",
+      context_relation = relation,
+      proposition_relation = "unchecked",
+      proposition_rationale = NULL,
+      parent_statement = "Parent proposition.",
+      claim_statement = "Revised proposition.",
+      revision_kind = "unspecified",
+      semantic_status = "unchecked",
       coordinates = lapply(seq_along(coordinate_relations), function(index) {
         list(
           coordinate = mlr3autoiml:::.csdg_claim_coordinates[[index]],
@@ -261,8 +271,8 @@ test_that("claim-relation schema keeps the root and coordinate relations consist
   expect_true(all(vapply(valid, schema_accepts_relation, logical(1L))))
   expect_false(any(vapply(invalid, schema_accepts_relation, logical(1L))))
   root_relations = vapply(
-    schema$allOf,
-    function(rule) rule[["if"]]$properties$relation$const,
+    Filter(function(rule) !is.null(rule[["if"]]$properties$context_relation), schema$allOf),
+    function(rule) rule[["if"]]$properties$context_relation$const,
     character(1L)
   )
   expect_setequal(root_relations, mlr3autoiml:::.csdg_claim_relations)

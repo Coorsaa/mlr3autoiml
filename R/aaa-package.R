@@ -6,6 +6,11 @@
 #'
 #' The CSDG workflow prespecifies claims, measurement and preprocessing semantics, explanation semantics, and
 #' claim-specific criteria before coordinating out-of-fold diagnostic evidence.
+#' Claims separate an inferential proposition from its six-coordinate context.
+#' Equal contexts do not establish semantic equivalence; explicit proposition relations remain declarations, not proofs.
+#' Variation records link the required property, observation, and relevance to a proposition.
+#' A legitimate change in estimand is not automatically a defeater, and documentary provenance does not remove
+#' the inferential consequences of outcome-dependent selection.
 #' A CSDG evidence record separates module applicability, one of four evidence roles, availability, result direction,
 #' criterion provenance, materiality, adjudication basis, and claim consequence.
 #' Claim cards distinguish exactly three inference levels, functional, predictive, and substantive, from the separate
@@ -24,8 +29,9 @@
 #' \itemize{
 #'   \item [csdg_audit()] for the claim-scoped diagnostic workflow.
 #'   \item [csdg_claim()] for claim, measurement, explanation, and configuration cards.
-#'   \item [csdg_claim_relation()] for six-coordinate claim comparison.
+#'   \item [csdg_claim_relation()] for separate proposition and six-coordinate context comparisons.
 #'   \item [csdg_evidence_record()] for orthogonal evidence records and non-compensatory adjudication.
+#'   \item [csdg_resolve_sources()] for case-sensitive public-source and declared access checks.
 #'   \item [AutoIML] for the established AutoIML orchestrator.
 #'   \item [autoiml()] for a convenience wrapper.
 #'   \item [report_card()] for audit trail summary.

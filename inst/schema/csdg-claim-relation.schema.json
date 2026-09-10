@@ -1,9 +1,15 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/mlr3autoiml/csdg-claim-relation.schema.json",
-  "title": "CSDG claim relation",
+  "title": "CSDG declared proposition and context relation",
   "type": "object",
-  "required": ["parent_claim_id", "claim_id", "relation", "coordinates", "rationale"],
+  "required": [
+    "parent_claim_id",
+    "claim_id",
+    "relation",
+    "coordinates",
+    "rationale"
+  ],
   "properties": {
     "parent_claim_id": {
       "type": "string",
@@ -15,7 +21,13 @@
     },
     "relation": {
       "type": "string",
-      "enum": ["same", "narrower", "broader", "alternative_or_incomparable"]
+      "enum": [
+        "same",
+        "narrower",
+        "broader",
+        "alternative_or_incomparable",
+        "unchecked"
+      ]
     },
     "coordinates": {
       "type": "array",
@@ -25,8 +37,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "target"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "target"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -34,8 +52,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "model_scope"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "model_scope"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -43,8 +67,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "semantics"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "semantics"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -52,8 +82,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "analytic_distribution"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "analytic_distribution"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -61,8 +97,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "scientific_use"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "scientific_use"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -70,8 +112,14 @@
         {
           "contains": {
             "type": "object",
-            "properties": {"coordinate": {"const": "explanation_design"}},
-            "required": ["coordinate"]
+            "properties": {
+              "coordinate": {
+                "const": "explanation_design"
+              }
+            },
+            "required": [
+              "coordinate"
+            ]
           },
           "minContains": 1,
           "maxContains": 1
@@ -79,7 +127,12 @@
       ],
       "items": {
         "type": "object",
-        "required": ["coordinate", "parent_value", "claim_value", "relation"],
+        "required": [
+          "coordinate",
+          "parent_value",
+          "claim_value",
+          "relation"
+        ],
         "properties": {
           "coordinate": {
             "enum": [
@@ -92,16 +145,27 @@
             ]
           },
           "parent_value": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1
           },
           "claim_value": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1
           },
           "relation": {
             "type": "string",
-            "enum": ["same", "narrower", "broader", "alternative_or_incomparable"]
+            "enum": [
+              "same",
+              "narrower",
+              "broader",
+              "alternative_or_incomparable"
+            ]
           }
         },
         "additionalProperties": false
@@ -110,20 +174,80 @@
     "rationale": {
       "type": "string",
       "minLength": 1
+    },
+    "context_relation": {
+      "type": "string",
+      "enum": [
+        "same",
+        "narrower",
+        "broader",
+        "alternative_or_incomparable"
+      ]
+    },
+    "proposition_relation": {
+      "type": "string",
+      "enum": [
+        "unchecked",
+        "same",
+        "logical_weakening",
+        "logical_strengthening",
+        "alternative_or_incomparable"
+      ]
+    },
+    "proposition_rationale": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "parent_statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "revision_kind": {
+      "enum": [
+        "unspecified",
+        "logical_weakening",
+        "context_restriction",
+        "estimand_change"
+      ]
+    },
+    "semantic_status": {
+      "enum": [
+        "unchecked",
+        "declared_not_verified"
+      ]
     }
   },
   "allOf": [
     {
       "if": {
-        "properties": {"relation": {"const": "same"}},
-        "required": ["relation"]
+        "properties": {
+          "context_relation": {
+            "const": "same"
+          }
+        },
+        "required": [
+          "context_relation"
+        ]
       },
       "then": {
         "properties": {
           "coordinates": {
             "items": {
-              "properties": {"relation": {"const": "same"}},
-              "required": ["relation"]
+              "properties": {
+                "relation": {
+                  "const": "same"
+                }
+              },
+              "required": [
+                "relation"
+              ]
             }
           }
         }
@@ -131,19 +255,40 @@
     },
     {
       "if": {
-        "properties": {"relation": {"const": "narrower"}},
-        "required": ["relation"]
+        "properties": {
+          "context_relation": {
+            "const": "narrower"
+          }
+        },
+        "required": [
+          "context_relation"
+        ]
       },
       "then": {
         "properties": {
           "coordinates": {
             "items": {
-              "properties": {"relation": {"enum": ["same", "narrower"]}},
-              "required": ["relation"]
+              "properties": {
+                "relation": {
+                  "enum": [
+                    "same",
+                    "narrower"
+                  ]
+                }
+              },
+              "required": [
+                "relation"
+              ]
             },
             "contains": {
-              "properties": {"relation": {"const": "narrower"}},
-              "required": ["relation"]
+              "properties": {
+                "relation": {
+                  "const": "narrower"
+                }
+              },
+              "required": [
+                "relation"
+              ]
             },
             "minContains": 1
           }
@@ -152,19 +297,40 @@
     },
     {
       "if": {
-        "properties": {"relation": {"const": "broader"}},
-        "required": ["relation"]
+        "properties": {
+          "context_relation": {
+            "const": "broader"
+          }
+        },
+        "required": [
+          "context_relation"
+        ]
       },
       "then": {
         "properties": {
           "coordinates": {
             "items": {
-              "properties": {"relation": {"enum": ["same", "broader"]}},
-              "required": ["relation"]
+              "properties": {
+                "relation": {
+                  "enum": [
+                    "same",
+                    "broader"
+                  ]
+                }
+              },
+              "required": [
+                "relation"
+              ]
             },
             "contains": {
-              "properties": {"relation": {"const": "broader"}},
-              "required": ["relation"]
+              "properties": {
+                "relation": {
+                  "const": "broader"
+                }
+              },
+              "required": [
+                "relation"
+              ]
             },
             "minContains": 1
           }
@@ -173,8 +339,14 @@
     },
     {
       "if": {
-        "properties": {"relation": {"const": "alternative_or_incomparable"}},
-        "required": ["relation"]
+        "properties": {
+          "context_relation": {
+            "const": "alternative_or_incomparable"
+          }
+        },
+        "required": [
+          "context_relation"
+        ]
       },
       "then": {
         "properties": {
@@ -182,8 +354,14 @@
             "anyOf": [
               {
                 "contains": {
-                  "properties": {"relation": {"const": "alternative_or_incomparable"}},
-                  "required": ["relation"]
+                  "properties": {
+                    "relation": {
+                      "const": "alternative_or_incomparable"
+                    }
+                  },
+                  "required": [
+                    "relation"
+                  ]
                 },
                 "minContains": 1
               },
@@ -191,15 +369,27 @@
                 "allOf": [
                   {
                     "contains": {
-                      "properties": {"relation": {"const": "narrower"}},
-                      "required": ["relation"]
+                      "properties": {
+                        "relation": {
+                          "const": "narrower"
+                        }
+                      },
+                      "required": [
+                        "relation"
+                      ]
                     },
                     "minContains": 1
                   },
                   {
                     "contains": {
-                      "properties": {"relation": {"const": "broader"}},
-                      "required": ["relation"]
+                      "properties": {
+                        "relation": {
+                          "const": "broader"
+                        }
+                      },
+                      "required": [
+                        "relation"
+                      ]
                     },
                     "minContains": 1
                   }
@@ -209,7 +399,192 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "required": [
+          "context_relation"
+        ]
+      },
+      "then": {
+        "required": [
+          "proposition_relation",
+          "proposition_rationale",
+          "parent_statement",
+          "claim_statement",
+          "revision_kind",
+          "semantic_status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "proposition_relation": {
+            "const": "unchecked"
+          }
+        },
+        "required": [
+          "proposition_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relation": {
+            "const": "unchecked"
+          },
+          "semantic_status": {
+            "const": "unchecked"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "proposition_relation": {
+            "const": "same"
+          }
+        },
+        "required": [
+          "proposition_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relation": {
+            "const": "same"
+          },
+          "semantic_status": {
+            "const": "declared_not_verified"
+          },
+          "proposition_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "proposition_relation": {
+            "const": "logical_weakening"
+          }
+        },
+        "required": [
+          "proposition_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relation": {
+            "const": "narrower"
+          },
+          "semantic_status": {
+            "const": "declared_not_verified"
+          },
+          "proposition_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "proposition_relation": {
+            "const": "logical_strengthening"
+          }
+        },
+        "required": [
+          "proposition_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relation": {
+            "const": "broader"
+          },
+          "semantic_status": {
+            "const": "declared_not_verified"
+          },
+          "proposition_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "proposition_relation": {
+            "const": "alternative_or_incomparable"
+          }
+        },
+        "required": [
+          "proposition_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "relation": {
+            "const": "alternative_or_incomparable"
+          },
+          "semantic_status": {
+            "const": "declared_not_verified"
+          },
+          "proposition_rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "revision_kind": {
+            "const": "estimand_change"
+          }
+        },
+        "required": [
+          "revision_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "proposition_relation": {
+            "enum": [
+              "unchecked",
+              "alternative_or_incomparable"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "revision_kind": {
+            "const": "logical_weakening"
+          }
+        },
+        "required": [
+          "revision_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "proposition_relation": {
+            "const": "logical_weakening"
+          }
+        }
+      }
     }
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$comment": "Legacy records without proposition_relation have unchecked proposition semantics; their historical relation is not semantic certification."
 }

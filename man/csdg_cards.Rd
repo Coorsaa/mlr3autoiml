@@ -34,6 +34,7 @@ csdg_claim(
   subgroup_variables = NULL,
   confirmatory = FALSE,
   notes = NULL,
+  provenance = NULL,
   ...
 )
 
@@ -88,7 +89,7 @@ csdg_config(
 \arguments{
 \item{id}{Stable claim identifier.}
 
-\item{statement}{Claim to evaluate.}
+\item{statement}{Inferential proposition to evaluate; sentence boundaries need not match proposition boundaries.}
 
 \item{claim_type}{One or more controlled claim types.}
 
@@ -119,7 +120,8 @@ causal claim, or recourse claim.}
 
 \item{parent_claim_id}{Identifier of the parent claim when the current claim is a revision.}
 
-\item{revision_relation}{Declared relationship to the parent claim across all six claim coordinates.}
+\item{revision_relation}{Legacy declared relationship to the parent claim, not a logical certification.
+Use \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} to distinguish proposition and context relations explicitly.}
 
 \item{intended_users}{Intended audience or users.}
 
@@ -131,9 +133,15 @@ causal claim, or recourse claim.}
 
 \item{subgroup_variables}{Prespecified variables for subgroup auditing.}
 
-\item{confirmatory}{Whether the claim was prospectively specified.}
+\item{confirmatory}{Legacy documentary flag for prospective specification; it does not establish valid confirmation.}
 
 \item{notes}{Free-text notes.}
+
+\item{provenance}{Optional named list with \code{origin}, \code{date} (YYYY-MM-DD), \code{time_basis}, \code{selection_basis},
+and character-vector \code{evidence_ids}.
+Origin is \code{"specified_before_results"}, \code{"retrospective_exploratory"}, or \code{"independently_confirmed"}.
+Independent confirmation requires evidence identifiers; metadata cannot establish independence by itself.
+\code{NULL} means not recorded, and revisions do not inherit provenance automatically.}
 
 \item{...}{Explicit documented aliases for card constructors.
 

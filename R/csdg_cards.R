@@ -26,6 +26,7 @@ csdg_claim = function(
     subgroup_variables = NULL,
     confirmatory = FALSE,
     notes = NULL,
+    provenance = NULL,
     ...) {
   dots = list(...)
   .assert_named_dots(dots)
@@ -92,6 +93,7 @@ csdg_claim = function(
   .assert_optional_character(subgroup_variables, "subgroup_variables")
   .assert_optional_character(notes, "notes")
   checkmate::assert_flag(confirmatory)
+  provenance = .csdg_validate_claim_provenance(provenance)
   checkmate::assert_true(
     is.null(thresholds) || is.atomic(thresholds) || is.list(thresholds),
     .var.name = "thresholds"
@@ -134,6 +136,7 @@ csdg_claim = function(
       subgroup_variables = subgroup_variables,
       confirmatory = isTRUE(confirmatory),
       notes = notes,
+      provenance = provenance,
       coordinates = list(
         target = target,
         model_scope = model_scope,
@@ -159,6 +162,9 @@ csdg_claim = function(
 #'
 #' Creates a new claim card linked to an earlier claim.
 #' The function records the analyst's declared relation and does not infer that the revision is supported or maximal.
+#' A revision requires a new identifier.
+#' Provenance and the legacy `confirmatory` flag are not inherited: provide new documentary metadata explicitly.
+#' Recording a revision does not remove the inferential consequences of outcome-dependent selection.
 #'
 #' @param claim A `CSDGClaim` to revise.
 #' @param id Unique identifier for the revised claim.
@@ -197,6 +203,7 @@ csdg_claim_revision = function(
   assert_string(id, min.chars = 1L, .var.name = "id")
   assert_string(statement, min.chars = 1L, .var.name = "statement")
   assert_string(claim_version, min.chars = 1L, .var.name = "claim_version")
+  if (identical(id, claim$id)) .csdg_stop("A revised claim requires a new `id`; historical propositions are preserved.")
   assert_choice(
     revision_relation,
     .csdg_claim_relations,
@@ -213,8 +220,34 @@ csdg_claim_revision = function(
   inherited$claim_version = claim_version
   inherited$parent_claim_id = claim$id
   inherited$revision_relation = revision_relation
+  inherited$provenance = NULL
+  inherited$confirmatory = FALSE
   inherited = .recursive_modify(inherited, replacements)
   do.call(csdg_claim, inherited)
+}
+
+.csdg_validate_claim_provenance = function(provenance) {
+  if (is.null(provenance)) return(NULL)
+  .assert_named_list(provenance, "provenance")
+  required = c("origin", "date", "time_basis", "selection_basis", "evidence_ids")
+  if (!setequal(names(provenance), required)) {
+    .csdg_stop("`provenance` must contain origin, date, time_basis, selection_basis, and evidence_ids.")
+  }
+  assert_choice(provenance$origin, c(
+    "specified_before_results", "retrospective_exploratory", "independently_confirmed"
+  ), .var.name = "provenance$origin")
+  for (field in c("date", "time_basis", "selection_basis")) {
+    assert_string(provenance[[field]], min.chars = 1L, .var.name = paste0("provenance$", field))
+  }
+  date = suppressWarnings(as.Date(provenance$date, format = "%Y-%m-%d"))
+  if (is.na(date) || !identical(format(date, "%Y-%m-%d"), provenance$date)) {
+    .csdg_stop("`provenance$date` must be a valid YYYY-MM-DD date.")
+  }
+  assert_character(provenance$evidence_ids, any.missing = FALSE, unique = TRUE,
+    min.len = if (provenance$origin == "independently_confirmed") 1L else 0L,
+    .var.name = "provenance$evidence_ids")
+  if (any(!nzchar(provenance$evidence_ids))) .csdg_stop("`provenance$evidence_ids` cannot contain empty identifiers.")
+  provenance
 }
 
 .normalize_verification = function(verification) {

@@ -6,7 +6,7 @@
 #' used for adjudication.
 #'
 #' @param id Stable claim identifier.
-#' @param statement Claim to evaluate.
+#' @param statement Inferential proposition to evaluate; sentence boundaries need not match proposition boundaries.
 #' @param claim_type One or more controlled claim types.
 #' @param target Prediction target or explanation target, including a horizon when relevant.
 #' @param semantics Intended interpretation of the claim: a fitted-model description, hypothetical model query,
@@ -22,13 +22,19 @@
 #' @param use_claim Whether the claim additionally asserts adequacy for an audience, workflow, implementation, or use.
 #' @param claim_version Stable version label for the claim.
 #' @param parent_claim_id Identifier of the parent claim when the current claim is a revision.
-#' @param revision_relation Declared relationship to the parent claim across all six claim coordinates.
+#' @param revision_relation Legacy declared relationship to the parent claim, not a logical certification.
+#'   Use [csdg_claim_relation()] to distinguish proposition and context relations explicitly.
 #' @param intended_users Intended audience or users.
 #' @param action Action informed by a decision claim.
 #' @param thresholds Prespecified decision or diagnostic thresholds.
 #' @param consequences Consequences of correct and incorrect decisions.
 #' @param subgroup_variables Prespecified variables for subgroup auditing.
-#' @param confirmatory Whether the claim was prospectively specified.
+#' @param confirmatory Legacy documentary flag for prospective specification; it does not establish valid confirmation.
+#' @param provenance Optional named list with `origin`, `date` (YYYY-MM-DD), `time_basis`, `selection_basis`,
+#'   and character-vector `evidence_ids`.
+#'   Origin is `"specified_before_results"`, `"retrospective_exploratory"`, or `"independently_confirmed"`.
+#'   Independent confirmation requires evidence identifiers; metadata cannot establish independence by itself.
+#'   `NULL` means not recorded, and revisions do not inherit provenance automatically.
 #' @param notes Free-text notes.
 #' @param outcome Outcome name and measurement information.
 #' @param predictors Model predictors.

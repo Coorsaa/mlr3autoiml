@@ -33,6 +33,9 @@ A \code{CSDGClaim} linked to \code{claim} through \code{parent_claim_id}.
 \description{
 Creates a new claim card linked to an earlier claim.
 The function records the analyst's declared relation and does not infer that the revision is supported or maximal.
+A revision requires a new identifier.
+Provenance and the legacy \code{confirmatory} flag are not inherited: provide new documentary metadata explicitly.
+Recording a revision does not remove the inferential consequences of outcome-dependent selection.
 }
 \examples{
 original = csdg_claim(

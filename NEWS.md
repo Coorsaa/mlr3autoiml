@@ -1,3 +1,11 @@
+# mlr3autoiml 0.1.2
+
+- `csdg_adjudicate_claim()` revalidates evidence records and reports missing or documented proposition linkage without treating field completeness as independent validation (strategic review S07).
+- `csdg_claim()` adds optional dated provenance for prior specification, retrospective exploration, and independently confirmed evidence; `csdg_claim_revision()` requires a new identifier and no longer silently inherits provenance or the legacy confirmatory flag (strategic review S08).
+- `csdg_claim_relation()` now separates the proposition from its six-coordinate context; context-only calls return `relation = "unchecked"` and retain the previous coordinate aggregate as `context_relation`, while explicit semantic declarations distinguish logical weakening, context restriction, and alternative estimands (strategic review S03-S05).
+- `csdg_evidence_record()` records variation, held-constant components, estimand identity, claimed invariance, and a property-observation-relevance chain; legitimate estimand changes cannot constrain a claim without the corresponding invariance claim, and legacy missing metadata remain explicitly unrecorded (strategic review S06-S07).
+- `csdg_resolve_sources()` validates case-sensitive public files, optional SHA-256 hashes, registered dependencies, and declared protected or external locators without opening protected files or fetching external resources (strategic review S30).
+
 # mlr3autoiml 0.1.1
 
 - CSDG claim records now represent all six coordinates, use exactly three inference levels and four evidence roles, separate use claims from inference level, separate applicability, availability, result direction, criterion provenance, materiality, adjudication basis, and claim consequence, and apply conditional non-compensation without a score (no issue).

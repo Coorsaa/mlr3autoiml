@@ -2,9 +2,17 @@
 % Please edit documentation in R/csdg_claim_relation.R
 \name{csdg_claim_relation}
 \alias{csdg_claim_relation}
-\title{Compare two CSDG claims coordinate by coordinate}
+\title{Document proposition and context relations between CSDG claims}
 \usage{
-csdg_claim_relation(parent, claim, coordinate_relations, rationale)
+csdg_claim_relation(
+  parent,
+  claim,
+  coordinate_relations,
+  rationale,
+  proposition_relation = "unchecked",
+  proposition_rationale = NULL,
+  revision_kind = "unspecified"
+)
 }
 \arguments{
 \item{parent}{A \code{CSDGClaim} used as the reference claim.}
@@ -15,15 +23,32 @@ csdg_claim_relation(parent, claim, coordinate_relations, rationale)
 or \code{"alternative_or_incomparable"} for every claim coordinate.}
 
 \item{rationale}{A nonempty explanation for the declared coordinate relations.}
+
+\item{proposition_relation}{Declared relation of the revised proposition to the parent: \code{"unchecked"}, \code{"same"},
+\code{"logical_weakening"}, \code{"logical_strengthening"}, or \code{"alternative_or_incomparable"}.
+A weakening means that the parent proposition entails the revised proposition under the stated assumptions.}
+
+\item{proposition_rationale}{Explanation and assumptions for the proposition comparison.
+Required unless \code{proposition_relation = "unchecked"}.}
+
+\item{revision_kind}{Documentary distinction among \code{"unspecified"}, \code{"logical_weakening"},
+\code{"context_restriction"}, and \code{"estimand_change"}; it does not establish entailment.}
 }
 \value{
-A \code{CSDGClaimRelation} list containing the overall relation and a six-row coordinate table.
+A \code{CSDGClaimRelation} list with separate semantic and context relations, proposition statements,
+declarations, and a six-row coordinate table.
+\code{semantic_status} is \code{"unchecked"} or \code{"declared_not_verified"}, not a claim-support decision.
 }
 \description{
 Records a declared relation between two complete CSDG claim objects.
 Every comparison covers target, model scope, explanation semantics, analytic distribution and measurement
 context, intended use, and explanation design.
-The function does not infer restrictions from text because a textual change can alter the scientific question.
+A claim is a proposition (\code{statement}) together with its six-coordinate context.
+Equal contexts do not establish equal propositions, and a smaller population does not generally imply a weaker
+claim about a marginal mean.
+The function records declarations, not logical proofs or empirical validation.
+Without an explicit proposition comparison, \code{relation} is \code{"unchecked"}; the former context aggregate remains
+available as \code{context_relation}.
 }
 \examples{
 broad = csdg_claim(

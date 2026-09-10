@@ -47,6 +47,11 @@
 #' It records an analyst's evidence characterization and does not apply a universal threshold or aggregate score.
 #' Cross-field validation prevents an evidence role or observed direction from being paired with a contradictory
 #' claim consequence.
+#' Sensitivity is relative to the proposition: changing an estimand is not automatically counterevidence.
+#' New variation records that constrain a claim require a property-observation-relevance chain.
+#' Changed or uncertain estimands additionally require an explicit invariance claim before they constrain a claim.
+#' Legacy records without these optional fields remain usable with `proposition_linkage = "not_recorded"`.
+#' A documented chain is not independently validated merely because its fields are complete.
 #'
 #' @param gate_id CSDG module identifier.
 #' @param applicable Whether the module is applicable to the exact claim.
@@ -60,6 +65,14 @@
 #' @param adjudication_basis Transparent basis used to materialize a potential defeater.
 #' @param claim_consequence Recorded consequence for the exact claim.
 #' @param rationale Evidence-specific rationale.
+#' @param varied_component Optional nonempty character vector naming the varied components.
+#' @param held_constant Optional nonempty character vector naming what the comparison holds fixed.
+#' @param same_estimand Whether the comparison retains the same estimand; `NA` denotes uncertainty or missing metadata.
+#' @param same_estimand_rationale Reason for the estimand classification, required when variation is documented.
+#' @param invariance_claimed Whether the proposition requires invariance over this variation; `NA` means not recorded.
+#' @param required_property Property that the exact proposition requires.
+#' @param observation Diagnostic observation bearing on that property.
+#' @param relevance_to_proposition Substantive explanation linking that observation to the required property.
 #'
 #' @return A `CSDGEvidenceRecord` list.
 #' @export
@@ -75,7 +88,15 @@ csdg_evidence_record = function(
     materiality = if (role == "potential_defeater" && applicable) "not_materialized" else "not_applicable",
     adjudication_basis = NULL,
     claim_consequence = "none",
-    rationale) {
+    rationale,
+    varied_component = NULL,
+    held_constant = NULL,
+    same_estimand = NA,
+    same_estimand_rationale = NULL,
+    invariance_claimed = NA,
+    required_property = NULL,
+    observation = NULL,
+    relevance_to_proposition = NULL) {
   assert_choice(gate_id, .csdg_gate_ids, .var.name = "gate_id")
   assert_flag(applicable, .var.name = "applicable")
   assert_choice(role, .csdg_evidence_roles, .var.name = "role")
@@ -88,6 +109,43 @@ csdg_evidence_record = function(
     assert_choice(adjudication_basis, .csdg_adjudication_bases, .var.name = "adjudication_basis")
   }
   .validate_evidence_criterion(criterion, criterion_source, criterion_rationale)
+  assert_character(varied_component, any.missing = FALSE, min.len = 1L, null.ok = TRUE,
+    .var.name = "varied_component")
+  assert_character(held_constant, any.missing = FALSE, min.len = 1L, null.ok = TRUE, .var.name = "held_constant")
+  assert_logical(same_estimand, len = 1L, any.missing = TRUE, .var.name = "same_estimand")
+  assert_logical(invariance_claimed, len = 1L, any.missing = TRUE, .var.name = "invariance_claimed")
+  chain = list(
+    required_property = required_property,
+    observation = observation,
+    relevance_to_proposition = relevance_to_proposition
+  )
+  for (name in names(chain)) {
+    assert_string(chain[[name]], min.chars = 1L, null.ok = TRUE, .var.name = name)
+  }
+  assert_string(same_estimand_rationale, min.chars = 1L, null.ok = TRUE, .var.name = "same_estimand_rationale")
+  variation_recorded = !is.null(varied_component) || !is.null(held_constant) ||
+    !is.null(same_estimand_rationale) || !is.na(same_estimand) || !is.na(invariance_claimed)
+  chain_complete = all(!vapply(chain, is.null, logical(1L)))
+  chain_recorded = any(!vapply(chain, is.null, logical(1L)))
+  if (chain_recorded && !chain_complete) {
+    .csdg_stop("Supply the full required_property, observation, and relevance_to_proposition chain.")
+  }
+  if (variation_recorded && (is.null(varied_component) || is.null(held_constant) ||
+      is.null(same_estimand_rationale))) {
+    .csdg_stop("Variation requires varied_component, held_constant, and same_estimand_rationale.")
+  }
+  if (any(!nzchar(c(varied_component, held_constant)))) {
+    .csdg_stop("Variation components cannot contain empty strings.")
+  }
+  constrains_claim = identical(materiality, "materialized") ||
+    claim_consequence %in% c("revise_claim", "exact_claim_not_retained") ||
+    (identical(role, "necessary_requirement") && identical(result_direction, "challenges"))
+  if (variation_recorded && constrains_claim && !chain_complete) {
+    .csdg_stop("Claim-constraining variation requires the property-observation-relevance chain.")
+  }
+  if (variation_recorded && constrains_claim && !isTRUE(same_estimand) && !isTRUE(invariance_claimed)) {
+    .csdg_stop("A changed or uncertain estimand cannot constrain the claim without explicit claimed invariance.")
+  }
 
   if (!applicable && !identical(availability, "not_applicable")) {
     .csdg_stop("A nonapplicable module must use `availability = \"not_applicable\"`.")
@@ -175,7 +233,17 @@ csdg_evidence_record = function(
       materiality = materiality,
       adjudication_basis = adjudication_basis,
       claim_consequence = claim_consequence,
-      rationale = rationale
+      rationale = rationale,
+      varied_component = varied_component,
+      held_constant = held_constant,
+      same_estimand = same_estimand,
+      same_estimand_rationale = same_estimand_rationale,
+      invariance_claimed = invariance_claimed,
+      required_property = required_property,
+      observation = observation,
+      relevance_to_proposition = relevance_to_proposition,
+      variation_status = if (variation_recorded) "documented_not_verified" else "not_recorded",
+      proposition_linkage = if (chain_complete) "documented_not_verified" else "not_recorded"
     ),
     class = c("CSDGEvidenceRecord", "list")
   )
@@ -187,16 +255,25 @@ csdg_evidence_record = function(
 #' Applies CSDG's conditional non-compensation rule to orthogonal evidence records.
 #' An unmet necessary requirement or a materialized challenging defeater prevents retention of the exact claim.
 #' Graded support and descriptive context never compensate for either condition and never form an aggregate score.
+#' The returned linkage status distinguishes documented chains from legacy records with missing linkage metadata.
+#' Neither status independently validates the observations, their relevance, or the proposition.
 #'
 #' @param evidence A nonempty list of `CSDGEvidenceRecord` objects.
 #'
-#' @return A `CSDGClaimAdjudication` list with `decision`, `blocking_gate_ids`, `unresolved_gate_ids`, and `rationale`.
+#' @return A `CSDGClaimAdjudication` list with `decision`, `blocking_gate_ids`, `unresolved_gate_ids`,
+#'   `proposition_linkage`, and `rationale`.
 #' @export
 csdg_adjudicate_claim = function(evidence) {
   assert_list(evidence, min.len = 1L, .var.name = "evidence")
   if (any(!vapply(evidence, inherits, logical(1L), what = "CSDGEvidenceRecord"))) {
     .csdg_stop("Every element of `evidence` must be a CSDGEvidenceRecord.")
   }
+  evidence = lapply(evidence, function(record) {
+    do.call(csdg_evidence_record, record[intersect(names(record), names(formals(csdg_evidence_record)))])
+  })
+  linkage = if (all(vapply(evidence, function(record) {
+    identical(record$proposition_linkage, "documented_not_verified")
+  }, logical(1L)))) "documented_not_verified" else "not_recorded_for_all_evidence"
 
   applicable = vapply(evidence, function(record) isTRUE(record$applicable), logical(1L))
   if (!any(applicable)) {
@@ -205,6 +282,7 @@ csdg_adjudicate_claim = function(evidence) {
         decision = "not_applicable",
         blocking_gate_ids = character(),
         unresolved_gate_ids = character(),
+        proposition_linkage = linkage,
         rationale = "No supplied evidence module was applicable to the exact claim."
       ),
       class = c("CSDGClaimAdjudication", "list")
@@ -246,6 +324,7 @@ csdg_adjudicate_claim = function(evidence) {
   structure(
     list(
       decision = decision,
+      proposition_linkage = linkage,
       blocking_gate_ids = unique(vapply(evidence[is_blocking], `[[`, character(1L), "gate_id")),
       unresolved_gate_ids = unique(vapply(evidence[is_unresolved], `[[`, character(1L), "gate_id")),
       rationale = switch(

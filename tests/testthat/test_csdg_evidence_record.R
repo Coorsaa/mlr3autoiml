@@ -20,7 +20,9 @@ test_that("evidence roles and fields remain orthogonal", {
     c(
       "gate_id", "applicable", "role", "availability", "result_direction", "criterion",
       "criterion_source", "criterion_rationale", "materiality", "adjudication_basis",
-      "claim_consequence", "rationale"
+      "claim_consequence", "rationale", "varied_component", "held_constant", "same_estimand",
+      "same_estimand_rationale", "invariance_claimed", "required_property", "observation",
+      "relevance_to_proposition", "variation_status", "proposition_linkage"
     )
   )
   expect_setequal(mlr3autoiml:::.csdg_evidence_roles, c(

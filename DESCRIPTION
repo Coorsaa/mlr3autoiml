@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.1
+Version: 0.1.2
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -13,7 +13,7 @@ Description: Implements Claim-Scoped Diagnostic Gates (CSDG) for planning,
     executing, documenting, and exporting diagnostics for interpretable
     machine-learning analyses. The package integrates with the 'mlr3'
     ecosystem and separates predictive performance, measurement and
-    preprocessing review, six-coordinate claim comparison, orthogonal evidence
+    preprocessing review, proposition and six-coordinate context comparison, orthogonal evidence
     roles, non-compensatory claim adjudication, dependence and support,
     calibration, local faithfulness, explanation stability, model and setting
     generalization, and subgroup auditing. The existing AutoIML workflow
@@ -37,7 +37,7 @@ URL: https://github.com/coorsaa/mlr3autoiml,
         https://github.com/mlr-org/mlr3, https://mlr3.mlr-org.com
 BugReports: https://github.com/coorsaa/mlr3autoiml/issues
 NeedsCompilation: no
-Packaged: 2026-09-09 20:15:23 UTC; 35955
+Packaged: 2026-09-10 20:36:48 UTC; 35955
 Author: Stefan Coors [aut, cre],
   Clara Vetter [aut],
   Jonas Hauck [aut],

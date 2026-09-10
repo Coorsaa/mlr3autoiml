@@ -54,6 +54,138 @@
             "scientific_use",
             "explanation_design"
           ],
+          "additionalProperties": false,
+          "properties": {
+            "target": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "model_scope": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "semantics": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "analytic_distribution": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "scientific_use": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "explanation_design": {
+              "type": [
+                "string",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The inferential proposition phi, distinct from the six-coordinate context."
+        },
+        "provenance": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "required": [
+            "origin",
+            "date",
+            "time_basis",
+            "selection_basis",
+            "evidence_ids"
+          ],
+          "properties": {
+            "origin": {
+              "enum": [
+                "specified_before_results",
+                "retrospective_exploratory",
+                "independently_confirmed"
+              ]
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "time_basis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selection_basis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "origin": {
+                    "const": "independently_confirmed"
+                  }
+                },
+                "required": [
+                  "origin"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "evidence_ids": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          ],
           "additionalProperties": false
         }
       },
