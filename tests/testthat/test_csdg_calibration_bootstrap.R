@@ -88,6 +88,34 @@ test_that("calibration bootstrap samples nested clusters within strata", {
   expect_true(all(is.finite(result$summary$estimate)))
 })
 
+test_that("calibration bootstrap retains singleton clusters in every stratum", {
+  sampler = mlr3autoiml:::.calibration_bootstrap_index_sampler(
+    4L,
+    cluster = c("a1", "a1", "b1", "b1"),
+    strata = c("a", "a", "b", "b")
+  )
+  set.seed(99L)
+  draws = replicate(100L, sampler(), simplify = FALSE)
+
+  expect_true(all(vapply(draws, identical, logical(1L), seq_len(4L))))
+})
+
+test_that("calibration bootstrap preserves mixed singleton and multiple-cluster strata", {
+  cluster = rep(c("a1", "a2", "b1", "c1", "c2"), each = 2L)
+  strata = rep(c("a", "a", "b", "c", "c"), each = 2L)
+  sampler = mlr3autoiml:::.calibration_bootstrap_index_sampler(length(cluster), cluster, strata)
+  set.seed(100L)
+  draws = replicate(100L, sampler(), simplify = FALSE)
+  stratum_counts = vapply(draws, function(index) {
+    tabulate(match(strata[index], c("a", "b", "c")), nbins = 3L)
+  }, integer(3L))
+
+  expect_identical(stratum_counts, matrix(rep(c(4L, 2L, 4L), 100L), nrow = 3L))
+  expect_true(all(vapply(draws, function(index) {
+    identical(index[strata[index] == "b"], c(5L, 6L))
+  }, logical(1L))))
+})
+
 test_that("calibration bootstrap preindexes clusters without changing sampled rows", {
   cluster = rep(c("a1", "a2", "b1", "b2"), times = c(2L, 3L, 2L, 3L))
   strata = rep(c("a", "a", "b", "b"), times = c(2L, 3L, 2L, 3L))

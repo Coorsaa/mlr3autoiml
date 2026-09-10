@@ -1,3 +1,7 @@
+# mlr3autoiml 0.1.3
+
+- `csdg_calibration_bootstrap()` preserves the intended cluster in singleton strata by sampling cluster positions; regression tests cover singleton-only and mixed strata (self-review N001, September 10, 2026).
+
 # mlr3autoiml 0.1.2
 
 - `csdg_adjudicate_claim()` revalidates evidence records and reports missing or documented proposition linkage without treating field completeness as independent validation (strategic review S07).

@@ -44,7 +44,7 @@
   })
   function() {
     sampled_cluster_ids = unlist(lapply(clusters_by_stratum, function(cluster_ids) {
-      sample(cluster_ids, length(cluster_ids), replace = TRUE)
+      cluster_ids[sample.int(length(cluster_ids), length(cluster_ids), replace = TRUE)]
     }), use.names = FALSE)
     unlist(rows_by_cluster[as.character(sampled_cluster_ids)], use.names = FALSE)
   }
