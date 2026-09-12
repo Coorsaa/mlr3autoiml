@@ -45,7 +45,7 @@ test_that("evidence roles and fields remain orthogonal", {
   consequences = vapply(schema$allOf, condition_const, character(1L), field = "claim_consequence")
   expect_setequal(
     consequences[!is.na(consequences)],
-    c("retain_exact_claim", "exact_claim_not_retained", "revise_claim")
+    c("retain_exact_claim", "exact_claim_not_retained", "revise_claim", "unresolved")
   )
   descriptive = which(vapply(schema$allOf, condition_const, character(1L), field = "role") ==
     "descriptive_context")
@@ -231,4 +231,105 @@ test_that("new CSDG objects expose no score or IEL fields", {
 
   expect_false(any(grepl("IEL|score|grade|readiness", names_all, ignore.case = TRUE)))
   expect_false(adjudication$decision %in% c("partial", "partly_supported", "partly supported"))
+})
+
+contract_evidence = function(...) {
+  arguments = list(gate_id = "G2", applicable = TRUE, role = "necessary_requirement",
+    result_direction = "supports", rationale = "The recorded observation bears on the stated necessary property.")
+  do.call(csdg_evidence_record, modifyList(arguments, list(...), keep.null = TRUE))
+}
+
+test_that("claim scope is distinct from module applicability and is explicit in results", {
+  irrelevant = contract_evidence(applicable = FALSE, result_direction = "not_evaluated")
+  in_scope = csdg_adjudicate_claim(list(irrelevant), claim_applicable = TRUE)
+  legacy = csdg_adjudicate_claim(list(irrelevant))
+  outside = csdg_adjudicate_claim(list(irrelevant), claim_applicable = FALSE,
+    applicability_rationale = "The proposition is outside the declared evaluation scope.")
+  expect_identical(in_scope$decision, "unresolved")
+  expect_true(in_scope$claim_applicable)
+  expect_identical(in_scope$applicability_source, "explicit")
+  expect_identical(legacy$decision, "unresolved")
+  expect_identical(legacy$applicability_source, "legacy_default")
+  expect_match(legacy$applicability_rationale, "backward-compatible")
+  expect_identical(outside$decision, "not_applicable")
+  expect_false(outside$claim_applicable)
+  expect_identical(outside$applicability_source, "explicit")
+  expect_error(csdg_adjudicate_claim(list(), claim_applicable = FALSE), "applicability_rationale")
+  expect_error(csdg_adjudicate_claim(list(contract_evidence()), claim_applicable = FALSE,
+    applicability_rationale = "Outside scope."), "out-of-scope")
+  expect_error(csdg_adjudicate_claim(list(), claim_applicable = NA), "claim_applicable")
+})
+
+test_that("empty, missing, and incomplete evidence cannot produce met", {
+  expect_identical(csdg_adjudicate_claim()$decision, "unresolved")
+  expect_identical(csdg_adjudicate_claim(list(), claim_applicable = TRUE)$decision, "unresolved")
+  expect_identical(csdg_adjudicate_claim()$proposition_linkage, "not_recorded_for_all_evidence")
+  expect_identical(csdg_adjudicate_claim(list(), claim_applicable = FALSE,
+    applicability_rationale = "Out of scope.")$decision, "not_applicable")
+  expect_error(csdg_adjudicate_claim(NULL), "evidence")
+  expect_error(csdg_adjudicate_claim(list(list())), "CSDGEvidenceRecord")
+  unexpected = contract_evidence()
+  unexpected$unexpected_field = "No silently ignored metadata."
+  expect_error(csdg_adjudicate_claim(list(unexpected)), "unsupported field")
+  for (field in c("role", "availability", "claim_consequence", "criterion")) {
+    damaged = contract_evidence()
+    damaged[[field]] = NULL
+    expect_error(csdg_adjudicate_claim(list(damaged)), "missing required field")
+  }
+  for (availability in c("incomplete", "unavailable")) {
+    record = contract_evidence(availability = availability)
+    result = csdg_adjudicate_claim(list(record))
+    expect_identical(result$decision, "unresolved")
+    expect_identical(result$unresolved_gate_ids, "G2")
+  }
+  for (direction in c("mixed", "descriptive", "not_evaluated")) {
+    record = contract_evidence(result_direction = direction)
+    expect_identical(csdg_adjudicate_claim(list(record))$decision, "unresolved")
+  }
+})
+
+test_that("binding consequences and necessary evidence have coherent precedence", {
+  support = contract_evidence(claim_consequence = "retain_exact_claim")
+  pending = contract_evidence(gate_id = "G4", claim_consequence = "unresolved")
+  challenge = contract_evidence(gate_id = "G1", result_direction = "challenges",
+    claim_consequence = "exact_claim_not_retained")
+  revision = contract_evidence(gate_id = "G3a", result_direction = "mixed", claim_consequence = "revise_claim")
+  expect_identical(csdg_adjudicate_claim(list(support))$decision, "met")
+  expect_match(csdg_adjudicate_claim(list(support))$rationale, "conditional on the supplied")
+  expect_identical(csdg_adjudicate_claim(list(pending))$decision, "unresolved")
+  expect_identical(csdg_adjudicate_claim(list(challenge))$decision, "not_met")
+  expect_identical(csdg_adjudicate_claim(list(revision))$decision, "not_met")
+  expect_length(csdg_adjudicate_claim(list(revision))$unresolved_gate_ids, 0L)
+  for (records in list(list(support, pending), list(pending, support))) {
+    result = csdg_adjudicate_claim(records)
+    expect_identical(result$decision, "unresolved")
+    expect_identical(result$unresolved_gate_ids, "G4")
+  }
+  for (records in list(list(support, pending, challenge), list(challenge, pending, support))) {
+    result = csdg_adjudicate_claim(records)
+    expect_identical(result$decision, "not_met")
+    expect_identical(result$blocking_gate_ids, "G1")
+    expect_identical(result$unresolved_gate_ids, "G4")
+  }
+  expect_identical(csdg_adjudicate_claim(list(contract_evidence(result_direction = "challenges")))$decision, "not_met")
+  expect_error(contract_evidence(result_direction = "challenges", claim_consequence = "unresolved"),
+    "cannot record an unresolved")
+  expect_error(contract_evidence(applicable = FALSE, result_direction = "not_evaluated",
+    claim_consequence = "unresolved"), "nonapplicable module")
+})
+
+test_that("unrelated support cannot satisfy or compensate for required evidence", {
+  support = contract_evidence(role = "graded_support", claim_consequence = "retain_exact_claim")
+  context = contract_evidence(role = "descriptive_context", result_direction = "descriptive")
+  irrelevant = contract_evidence(applicable = FALSE, result_direction = "not_evaluated")
+  needed = contract_evidence(gate_id = "G1", availability = "unavailable", result_direction = "not_evaluated")
+  blocker = contract_evidence(gate_id = "G4", role = "potential_defeater", result_direction = "mixed",
+    materiality = "materialized", adjudication_basis = "substantive_adjudication", claim_consequence = "revise_claim")
+  expect_identical(csdg_adjudicate_claim(list(support, context, irrelevant))$decision, "unresolved")
+  expect_identical(csdg_adjudicate_claim(list(support, context, needed))$decision, "unresolved")
+  expect_identical(csdg_adjudicate_claim(list(support, context, blocker))$decision, "not_met")
+  expect_identical(csdg_adjudicate_claim(list(contract_evidence(), context, irrelevant))$decision, "met")
+  pending = contract_evidence(role = "graded_support", claim_consequence = "unresolved")
+  expect_identical(csdg_adjudicate_claim(list(contract_evidence(), pending))$decision, "unresolved")
+  expect_error(contract_evidence(role = "descriptive_context", claim_consequence = "unresolved"), "Descriptive context")
 })

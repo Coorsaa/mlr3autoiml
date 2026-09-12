@@ -1,3 +1,8 @@
+# mlr3autoiml 0.1.4
+
+- `csdg_adjudicate_claim()` distinguishes claim-level scope from module applicability, records the explicit or legacy-default scope decision, treats absent necessary evidence as unresolved, and honors binding record consequences without compensation; typed JSON gate identifiers and a current adjudication schema preserve the contract in exports (CSDG-F001).
+- `csdg_evidence_record()` rejects inapplicable-module consequences, contradictory unresolved consequences, and damaged records at adjudication while preserving legitimate supporting/unresolved records and JSON round trips (CSDG-F001).
+
 # mlr3autoiml 0.1.3
 
 - `csdg_calibration_bootstrap()` preserves the intended cluster in singleton strata by sampling cluster positions; regression tests cover singleton-only and mixed strata (self-review N001, September 10, 2026).

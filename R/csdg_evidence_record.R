@@ -47,6 +47,11 @@
 #' It records an analyst's evidence characterization and does not apply a universal threshold or aggregate score.
 #' Cross-field validation prevents an evidence role or observed direction from being paired with a contradictory
 #' claim consequence.
+#' The consequence is a binding constraint in [csdg_adjudicate_claim()], not an independent overall verdict.
+#' `"unresolved"` prevents a `"met"` decision, and a justified revision prevents retaining the unchanged claim.
+#' `"retain_exact_claim"` cannot override an unmet requirement, a materialized defeater,
+#' or unresolved evidence elsewhere.
+#' `"none"` adds no constraint beyond the evidence role, availability, and observed direction.
 #' Sensitivity is relative to the proposition: changing an estimand is not automatically counterevidence.
 #' New variation records that constrain a claim require a property-observation-relevance chain.
 #' Changed or uncertain estimands additionally require an explicit invariance claim before they constrain a claim.
@@ -63,13 +68,14 @@
 #' @param criterion_rationale Rationale linking a supplied criterion to the claim and intended use.
 #' @param materiality Whether a potential defeater has been materialized.
 #' @param adjudication_basis Transparent basis used to materialize a potential defeater.
-#' @param claim_consequence Recorded consequence for the exact claim.
+#' @param claim_consequence Binding record-level constraint for the exact claim.
 #' @param rationale Evidence-specific rationale.
 #' @param varied_component Optional nonempty character vector naming the varied components.
 #' @param held_constant Optional nonempty character vector naming what the comparison holds fixed.
-#' @param same_estimand Whether the comparison retains the same estimand; `NA` denotes uncertainty or missing metadata.
+#' @param same_estimand Whether the comparison retains the same estimand; `NA` or JSON `null` denotes missing metadata.
 #' @param same_estimand_rationale Reason for the estimand classification, required when variation is documented.
-#' @param invariance_claimed Whether the proposition requires invariance over this variation; `NA` means not recorded.
+#' @param invariance_claimed Whether the proposition requires invariance over this variation.
+#'   `NA` or `NULL` means not recorded.
 #' @param required_property Property that the exact proposition requires.
 #' @param observation Diagnostic observation bearing on that property.
 #' @param relevance_to_proposition Substantive explanation linking that observation to the required property.
@@ -112,6 +118,8 @@ csdg_evidence_record = function(
   assert_character(varied_component, any.missing = FALSE, min.len = 1L, null.ok = TRUE,
     .var.name = "varied_component")
   assert_character(held_constant, any.missing = FALSE, min.len = 1L, null.ok = TRUE, .var.name = "held_constant")
+  same_estimand = same_estimand %??% NA
+  invariance_claimed = invariance_claimed %??% NA
   assert_logical(same_estimand, len = 1L, any.missing = TRUE, .var.name = "same_estimand")
   assert_logical(invariance_claimed, len = 1L, any.missing = TRUE, .var.name = "invariance_claimed")
   chain = list(
@@ -155,6 +163,9 @@ csdg_evidence_record = function(
   }
   if (!applicable && !identical(materiality, "not_applicable")) {
     .csdg_stop("A nonapplicable module must use `materiality = \"not_applicable\"`.")
+  }
+  if (!applicable && !identical(claim_consequence, "none")) {
+    .csdg_stop("A nonapplicable module cannot impose a claim consequence; use `claim_consequence = \"none\"`.")
   }
   if (applicable && identical(availability, "not_applicable")) {
     .csdg_stop("An applicable module cannot use `availability = \"not_applicable\"`.")
@@ -219,6 +230,10 @@ csdg_evidence_record = function(
       .csdg_stop("`revise_claim` requires challenging or mixed complete evidence with a claim-constraining role.")
     }
   }
+  if (identical(claim_consequence, "unresolved") && identical(role, "necessary_requirement") &&
+      identical(availability, "complete") && identical(result_direction, "challenges")) {
+    .csdg_stop("A complete challenging necessary requirement cannot record an unresolved claim consequence.")
+  }
 
   structure(
     list(
@@ -255,58 +270,112 @@ csdg_evidence_record = function(
 #' Applies CSDG's conditional non-compensation rule to orthogonal evidence records.
 #' An unmet necessary requirement or a materialized challenging defeater prevents retention of the exact claim.
 #' Graded support and descriptive context never compensate for either condition and never form an aggregate score.
+#' Claim applicability is specified independently of module applicability.
+#' For compatibility, an omitted `claim_applicable` means `TRUE` and is recorded as `"legacy_default"`.
+#' An in-scope claim with no applicable supplied necessary evidence remains `"unresolved"`.
+#' Only an explicitly out-of-scope claim with a rationale can return `"not_applicable"`.
+#'
+#' Validated record consequences are binding constraints, with precedence `"not_met"`, `"unresolved"`, then `"met"`.
+#' A justified `"revise_claim"` or `"exact_claim_not_retained"` consequence blocks the unchanged claim.
+#' An explicit `"unresolved"` consequence prevents `"met"`, even when the record supports a necessary property.
+#' `"retain_exact_claim"` expresses favorable record-level evidence and cannot override another record's constraint.
+#' `"none"` imposes no additional constraint but does not suppress the necessary-requirement or defeater rules.
+#' Contradictory consequences within a record are rejected rather than resolved by precedence.
+#' Across records, a genuine blocker takes precedence over uncertainty and support, regardless of order.
+#'
+#' `"met"` is conditional on the supplied applicable necessary requirements, not a completeness certificate.
+#' The caller remains responsible for identifying every requirement relevant to the proposition.
 #' The returned linkage status distinguishes documented chains from legacy records with missing linkage metadata.
 #' Neither status independently validates the observations, their relevance, or the proposition.
 #'
-#' @param evidence A nonempty list of `CSDGEvidenceRecord` objects.
+#' @param evidence A list of `CSDGEvidenceRecord` objects; an empty list supplies no evidence.
+#' @param claim_applicable Whether the proposition itself is within the declared evaluation scope.
+#' @param applicability_rationale Optional rationale for the claim-level scope decision; required when out of scope.
 #'
-#' @return A `CSDGClaimAdjudication` list with `decision`, `blocking_gate_ids`, `unresolved_gate_ids`,
-#'   `proposition_linkage`, and `rationale`.
+#' @return A `CSDGClaimAdjudication` list with `decision`, `claim_applicable`, `applicability_source`,
+#'   `applicability_rationale`, `blocking_gate_ids`, `unresolved_gate_ids`, `proposition_linkage`, and `rationale`.
+#' @examples
+#' supporting = csdg_evidence_record(
+#'   "G5", TRUE, "necessary_requirement", result_direction = "supports",
+#'   claim_consequence = "retain_exact_claim", rationale = "The declared ordering occurs in the supplied evidence."
+#' )
+#' csdg_adjudicate_claim(list(supporting), claim_applicable = TRUE)
+#' csdg_adjudicate_claim(list(), claim_applicable = TRUE)
+#' csdg_adjudicate_claim(
+#'   list(), claim_applicable = FALSE, applicability_rationale = "This proposition is outside the declared evaluation."
+#' )
 #' @export
-csdg_adjudicate_claim = function(evidence) {
-  assert_list(evidence, min.len = 1L, .var.name = "evidence")
+csdg_adjudicate_claim = function(evidence = list(), claim_applicable = TRUE, applicability_rationale = NULL) {
+  applicability_source = if (missing(claim_applicable)) "legacy_default" else "explicit"
+  assert_list(evidence, .var.name = "evidence")
+  assert_flag(claim_applicable, .var.name = "claim_applicable")
+  assert_string(applicability_rationale, min.chars = 1L, null.ok = claim_applicable,
+    .var.name = "applicability_rationale")
+  applicability_rationale = applicability_rationale %??% if (applicability_source == "legacy_default") {
+    "The backward-compatible default treats the proposition as in scope; module applicability does not decide scope."
+  } else {
+    "The caller explicitly designated the proposition as in scope."
+  }
   if (any(!vapply(evidence, inherits, logical(1L), what = "CSDGEvidenceRecord"))) {
     .csdg_stop("Every element of `evidence` must be a CSDGEvidenceRecord.")
   }
   evidence = lapply(evidence, function(record) {
+    required = c("gate_id", "applicable", "role", "availability", "result_direction", "criterion",
+      "criterion_source", "criterion_rationale", "materiality", "adjudication_basis", "claim_consequence", "rationale")
+    missing_fields = setdiff(required, names(record))
+    if (length(missing_fields)) {
+      .csdg_stop("Evidence record is missing required field(s): %s.", paste(missing_fields, collapse = ", "))
+    }
+    allowed = c(names(formals(csdg_evidence_record)), "variation_status", "proposition_linkage")
+    if (any(!names(record) %in% allowed)) {
+      .csdg_stop("Evidence record contains unsupported field(s): %s.",
+        paste(setdiff(names(record), allowed), collapse = ", "))
+    }
     do.call(csdg_evidence_record, record[intersect(names(record), names(formals(csdg_evidence_record)))])
   })
-  linkage = if (all(vapply(evidence, function(record) {
+  linkage = if (length(evidence) && all(vapply(evidence, function(record) {
     identical(record$proposition_linkage, "documented_not_verified")
   }, logical(1L)))) "documented_not_verified" else "not_recorded_for_all_evidence"
 
   applicable = vapply(evidence, function(record) isTRUE(record$applicable), logical(1L))
-  if (!any(applicable)) {
+  if (!claim_applicable && any(applicable)) {
+    .csdg_stop("An out-of-scope claim cannot have supplied modules marked applicable to that claim.")
+  }
+  if (!claim_applicable) {
     return(structure(
       list(
         decision = "not_applicable",
+        claim_applicable = FALSE,
+        applicability_source = applicability_source,
+        applicability_rationale = applicability_rationale,
         blocking_gate_ids = character(),
         unresolved_gate_ids = character(),
         proposition_linkage = linkage,
-        rationale = "No supplied evidence module was applicable to the exact claim."
+        rationale = "The proposition was explicitly placed outside the declared evaluation scope."
       ),
       class = c("CSDGClaimAdjudication", "list")
     ))
   }
 
   is_blocking = vapply(evidence, function(record) {
+    if (!isTRUE(record$applicable)) return(FALSE)
     necessary_challenge = identical(record$role, "necessary_requirement") &&
       identical(record$availability, "complete") &&
       identical(record$result_direction, "challenges")
     materialized_challenge = identical(record$role, "potential_defeater") &&
       identical(record$materiality, "materialized") &&
       record$result_direction %in% c("challenges", "mixed")
-    necessary_challenge || materialized_challenge
+    binding_revision = record$claim_consequence %in% c("revise_claim", "exact_claim_not_retained")
+    necessary_challenge || materialized_challenge || binding_revision
   }, logical(1L))
   is_unresolved = vapply(evidence, function(record) {
     if (!isTRUE(record$applicable)) return(FALSE)
+    if (record$claim_consequence %in% c("revise_claim", "exact_claim_not_retained")) return(FALSE)
     necessary_incomplete = identical(record$role, "necessary_requirement") &&
       (record$availability %in% c("incomplete", "unavailable") ||
         record$result_direction %in% c("mixed", "descriptive", "not_evaluated"))
-    materialized_incomplete = identical(record$role, "potential_defeater") &&
-      identical(record$materiality, "materialized") &&
-      record$availability %in% c("incomplete", "unavailable")
-    necessary_incomplete || materialized_incomplete
+    binding_unresolved = identical(record$claim_consequence, "unresolved")
+    necessary_incomplete || binding_unresolved
   }, logical(1L))
   has_necessary = any(vapply(evidence, function(record) {
     isTRUE(record$applicable) && identical(record$role, "necessary_requirement")
@@ -324,23 +393,28 @@ csdg_adjudicate_claim = function(evidence) {
   structure(
     list(
       decision = decision,
+      claim_applicable = TRUE,
+      applicability_source = applicability_source,
+      applicability_rationale = applicability_rationale,
       proposition_linkage = linkage,
       blocking_gate_ids = unique(vapply(evidence[is_blocking], `[[`, character(1L), "gate_id")),
       unresolved_gate_ids = unique(vapply(evidence[is_unresolved], `[[`, character(1L), "gate_id")),
       rationale = switch(
         decision,
         not_met = paste(
-          "The exact claim is not retained because at least one necessary requirement was unmet or a",
-          "claim-specific potential defeater was materialized. Favorable evidence elsewhere does not compensate."
+          "The exact claim is not retained because a necessary requirement was unmet, a claim-specific defeater",
+          "was materialized, or a binding revision was recorded. Favorable evidence elsewhere does not compensate."
         ),
         unresolved = if (!has_necessary) {
           "The exact claim remains unresolved because no applicable necessary requirement was supplied."
         } else {
-          "The exact claim remains unresolved because required claim-scoped evidence is incomplete."
+          paste("The exact claim remains unresolved because required evidence is incomplete or a binding unresolved",
+            "consequence was recorded.")
         },
         met = paste(
           "All supplied applicable necessary requirements support the exact claim, and no challenging potential",
-          "defeater was materialized. Graded support and descriptive context were not scored."
+          "defeater or unresolved consequence remains. This is conditional on the supplied requirements, not a",
+          "certificate that every relevant requirement was supplied. Graded and descriptive evidence were not scored."
         )
       )
     ),

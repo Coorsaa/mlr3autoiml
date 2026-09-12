@@ -35,6 +35,7 @@
       ]
     },
     "applicable": {
+      "description": "Applicability of this module, not the evaluation scope of the proposition itself.",
       "type": "boolean"
     },
     "role": {
@@ -114,6 +115,7 @@
       ]
     },
     "claim_consequence": {
+      "description": "Binding record-level constraint: unresolved prevents met; revision blocks retention of the unchanged claim. Retention never overrides another record's blocker or unresolved consequence; none adds no constraint beyond role, availability, and direction.",
       "enum": [
         "none",
         "retain_exact_claim",
@@ -251,6 +253,9 @@
           },
           "materiality": {
             "const": "not_applicable"
+          },
+          "claim_consequence": {
+            "const": "none"
           }
         }
       }
@@ -918,6 +923,23 @@
           "variation_status": {
             "const": "documented_not_verified"
           }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"claim_consequence": {"const": "unresolved"}},
+        "required": ["claim_consequence"]
+      },
+      "then": {
+        "properties": {"applicable": {"const": true}},
+        "not": {
+          "properties": {
+            "role": {"const": "necessary_requirement"},
+            "availability": {"const": "complete"},
+            "result_direction": {"const": "challenges"}
+          },
+          "required": ["role", "availability", "result_direction"]
         }
       }
     }

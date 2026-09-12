@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/mlr3autoiml/csdg-claim-adjudication.schema.json",
+  "title": "CSDG claim adjudication",
+  "description": "Current adjudication output with claim scope separate from module applicability. Met is conditional on the supplied requirements, not a certificate of complete scientific support. Historical objects without scope metadata are not silently reinterpreted.",
+  "type": "object",
+  "required": [
+    "decision", "claim_applicable", "applicability_source", "applicability_rationale",
+    "blocking_gate_ids", "unresolved_gate_ids", "proposition_linkage", "rationale"
+  ],
+  "properties": {
+    "decision": {"enum": ["met", "not_met", "unresolved", "not_applicable"]},
+    "claim_applicable": {"type": "boolean"},
+    "applicability_source": {"enum": ["explicit", "legacy_default"]},
+    "applicability_rationale": {"type": "string", "minLength": 1},
+    "blocking_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "unresolved_gate_ids": {"$ref": "#/$defs/gate_ids"},
+    "proposition_linkage": {"enum": ["documented_not_verified", "not_recorded_for_all_evidence"]},
+    "rationale": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "gate_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b"]}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"claim_applicable": {"const": false}}},
+      "then": {
+        "properties": {
+          "decision": {"const": "not_applicable"},
+          "applicability_source": {"const": "explicit"},
+          "blocking_gate_ids": {"maxItems": 0},
+          "unresolved_gate_ids": {"maxItems": 0}
+        }
+      },
+      "else": {"properties": {"decision": {"enum": ["met", "not_met", "unresolved"]}}}
+    },
+    {
+      "if": {"properties": {"decision": {"const": "met"}}},
+      "then": {"properties": {"blocking_gate_ids": {"maxItems": 0}, "unresolved_gate_ids": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"decision": {"const": "not_met"}}},
+      "then": {"properties": {"blocking_gate_ids": {"minItems": 1}}},
+      "else": {"properties": {"blocking_gate_ids": {"maxItems": 0}}}
+    }
+  ],
+  "additionalProperties": false
+}

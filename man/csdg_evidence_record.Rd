@@ -49,7 +49,7 @@ csdg_evidence_record(
 
 \item{adjudication_basis}{Transparent basis used to materialize a potential defeater.}
 
-\item{claim_consequence}{Recorded consequence for the exact claim.}
+\item{claim_consequence}{Binding record-level constraint for the exact claim.}
 
 \item{rationale}{Evidence-specific rationale.}
 
@@ -57,11 +57,12 @@ csdg_evidence_record(
 
 \item{held_constant}{Optional nonempty character vector naming what the comparison holds fixed.}
 
-\item{same_estimand}{Whether the comparison retains the same estimand; \code{NA} denotes uncertainty or missing metadata.}
+\item{same_estimand}{Whether the comparison retains the same estimand; \code{NA} or JSON \code{null} denotes missing metadata.}
 
 \item{same_estimand_rationale}{Reason for the estimand classification, required when variation is documented.}
 
-\item{invariance_claimed}{Whether the proposition requires invariance over this variation; \code{NA} means not recorded.}
+\item{invariance_claimed}{Whether the proposition requires invariance over this variation.
+\code{NA} or \code{NULL} means not recorded.}
 
 \item{required_property}{Property that the exact proposition requires.}
 
@@ -78,6 +79,11 @@ materiality, adjudication basis, and claim consequence.
 It records an analyst's evidence characterization and does not apply a universal threshold or aggregate score.
 Cross-field validation prevents an evidence role or observed direction from being paired with a contradictory
 claim consequence.
+The consequence is a binding constraint in \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}, not an independent overall verdict.
+\code{"unresolved"} prevents a \code{"met"} decision, and a justified revision prevents retaining the unchanged claim.
+\code{"retain_exact_claim"} cannot override an unmet requirement, a materialized defeater,
+or unresolved evidence elsewhere.
+\code{"none"} adds no constraint beyond the evidence role, availability, and observed direction.
 Sensitivity is relative to the proposition: changing an estimand is not automatically counterevidence.
 New variation records that constrain a claim require a property-observation-relevance chain.
 Changed or uncertain estimands additionally require an explicit invariance claim before they constrain a claim.

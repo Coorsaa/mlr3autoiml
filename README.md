@@ -3,7 +3,7 @@
 
 # mlr3autoiml
 
-`mlr3autoiml` 0.1.2 primarily implements **claim-scoped diagnostic gates
+`mlr3autoiml` 0.1.4 primarily implements **claim-scoped diagnostic gates
 (CSDG)** for interpretable machine-learning analyses in the **mlr3
 ecosystem**. A CSDG audit records the intended claim, measurement and
 preprocessing choices, explanation semantics, gate-specific evidence,
@@ -36,6 +36,12 @@ a complete record is a logical proof. Evidence roles are exactly
 distinct from completion and results, and `csdg_adjudicate_claim()`
 applies conditional non-compensation without adding evidence into a
 score.
+
+Claim applicability is declared independently of the supplied modules.
+An in-scope claim with no relevant evidence is unresolved, not out of
+scope. Recorded consequences constrain adjudication; unresolved evidence
+cannot silently become a favorable decision. See [the 0.1.4 contract
+migration note](inst/MIGRATION_0_1_4.md).
 
 Sensitivity records distinguish the varied component, what stays fixed,
 whether the estimand is unchanged, and whether the proposition claims
@@ -252,17 +258,6 @@ auto$run()
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 ```
 
-| gate_id | gate_name | status | summary |
-|:---|:---|:---|:---|
-| G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=TRUE) with semantics=within_support. |
-| G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
-| G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
-| G2 | What is being summarized? (dependence & interactions) | pass | Claim semantics=“within_support”: dependence and/or heterogeneity detected; Gate 2 passes with claim restrictions: prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
-| G3 | Calibration and decision utility | warn | Binary calibration and decision-utility diagnostics were computed. Calibration adequacy remains unadjudicated because no claim-specific criteria were declared. |
-| G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
-| G6 | Multiplicity and transport | pass | Multiplicity and transport checks did not raise major concerns (given available evidence). |
-| G7A | Subgroups / measurement audit | pass | Subgroup audit computed (binary classification performance and calibration; utility if specified). Calibration estimates are descriptive unless claim-specific adequacy criteria are supplied elsewhere. |
-
 With the operative claim card, analysis-derived measurement notes, and
 subgroup audit in place, the remaining warnings are substantive rather
 than setup-related: calibration, net benefit in the declared threshold
@@ -274,8 +269,6 @@ auto$plot("g3_calibration")
 auto$plot("g3_dca")
 ```
 
-<img src="man/figures/README-classif-g3-1.png" width="49%" /><img src="man/figures/README-classif-g3-2.png" width="49%" />
-
 Gate 2 then shows why the package warns instead of presenting a single
 global effect curve as the main story: `amount` and `duration` dominate,
 and they interact strongly.
@@ -284,8 +277,6 @@ and they interact strongly.
 auto$plot("g2_hstats", top_n = 3L)
 auto$plot("g2_ale_2d", feature1 = "amount", feature2 = "duration", class_label = task$positive)
 ```
-
-<img src="man/figures/README-classif-g2-1.png" width="49%" /><img src="man/figures/README-classif-g2-2.png" width="49%" />
 
 When Gate 2 regionalization is enabled
 (`auto$ctx$structure$regionalize = TRUE`) and the interaction screen
@@ -386,16 +377,6 @@ auto$run()
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
 ```
 
-| gate_id | gate_name | status | summary |
-|:---|:---|:---|:---|
-| G0A | Scope claim & use | pass | Claim scope set (global=TRUE, local=FALSE, decision=FALSE) with semantics=within_support. |
-| G0B | Measurement readiness | pass | Measurement readiness screened (psychometric evidence is user-supplied when needed, and pipeline notes may be analysis-derived). |
-| G1 | Modeling and data validity (preflight) | pass | Predictive adequacy established with honest resampling. |
-| G2 | What is being summarized? (dependence & interactions) | pass | Claim semantics=“within_support”: dependence and/or heterogeneity detected; Gate 2 passes with claim restrictions: prefer dependence- and interaction-aware summaries (ALE/ICE + regionalization) and avoid overinterpreting simple global narratives. |
-| G5 | Stability and robustness | pass | Permutation-based stability check suggests robust importance ordering under bootstrap perturbations. |
-| G6 | Multiplicity and transport | warn | Evidence of multiplicity (Rashomon set contains multiple near-tie models) and/or limited transportability across groups; scope interpretive claims accordingly. |
-| G7A | Subgroups / measurement audit | pass | Subgroup audit computed (regression RMSE, R², mean_y by group). |
-
 The effect plots focus on the housing variables that dominate the model
 story: income and coastal location. `ranger` keeps the global effects
 readable, while Gate 6 benchmarks it against lasso, `xgboost`, and a
@@ -405,8 +386,6 @@ single tree baseline.
 auto$plot("g2_effect", feature = c("median_income", "latitude", "longitude"))
 ```
 
-<img src="man/figures/README-regr-g2-1.png" alt="ALE effects for median income and spatial coordinates" width="100%" />
-
 The supporting views below add two complementary angles: conditional
 SHAP importance for the fitted tree, and a Rashomon rank heatmap for the
 near-tie models in Gate 6.
@@ -415,8 +394,6 @@ near-tie models in Gate 6.
 auto$plot("shap_importance", n_rows = 40L, sample_size = 15L, background_n = 40L, top_n = 8L)
 auto$plot("g6_rank_heatmap", top_n = 8L)
 ```
-
-<img src="man/figures/README-regr-shap-g6-1.png" width="49%" /><img src="man/figures/README-regr-shap-g6-2.png" width="49%" />
 
 ``` r
 export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")

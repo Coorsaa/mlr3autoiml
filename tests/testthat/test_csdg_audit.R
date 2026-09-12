@@ -98,7 +98,7 @@ test_that("report-card schema rejects contradictory evidence states", {
   consequences = vapply(rules, condition_const, character(1L), field = "claim_consequence")
   expect_setequal(
     consequences[!is.na(consequences)],
-    c("retain_exact_claim", "exact_claim_not_retained", "revise_claim")
+    c("retain_exact_claim", "exact_claim_not_retained", "revise_claim", "unresolved")
   )
   descriptive = which(vapply(rules, condition_const, character(1L), field = "evidence_role") ==
     "descriptive_context")

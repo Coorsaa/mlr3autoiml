@@ -1,0 +1,14 @@
+{
+  "gate_id": "G2",
+  "applicable": true,
+  "role": "necessary_requirement",
+  "availability": "complete",
+  "result_direction": "supports",
+  "criterion": null,
+  "criterion_source": null,
+  "criterion_rationale": null,
+  "materiality": "not_applicable",
+  "adjudication_basis": "substantive_adjudication",
+  "claim_consequence": "unresolved",
+  "rationale": "A property is supported, but the analyst records the exact claim as unresolved."
+}

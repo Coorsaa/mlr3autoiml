@@ -120,7 +120,7 @@ When the claim also requires evidence that the curve persists across resampled a
 The returned percentile intervals are pointwise, not simultaneous, and remain conditional on the fixed learner
 specification and analysis design.
 
-```{r ale-bootstrap, eval=FALSE}
+```{r ale-bootstrap, eval=FALSE, purl=FALSE}
 fitted_learner = learner$clone(deep = TRUE)
 fitted_learner$train(task)
 
@@ -142,7 +142,10 @@ csdg_plot_data(ale_intervals$ale_1d, type = "ale", style = "monochrome")
 For clustered observations, set `resampling_unit = "cluster"`, supply one cluster label per task row, and use
 `strata` when clusters must be sampled independently within prespecified strata.
 
-## Reading status labels
+## Reading gate-status labels
+
+The following labels describe individual gate records, not the claim-level decision returned by
+`csdg_adjudicate_claim()`.
 
 `not_applicable` means that the prespecified claim does not invoke a gate.
 `unresolved` means that a required component, criterion, or scope check is missing or cannot yet be adjudicated.
@@ -155,9 +158,30 @@ Nor do they establish population transport, fairness, user comprehension, or
 real-world utility unless those components were explicitly designed and
 supplied.
 
+## Adjudicating the exact claim
+
+Claim applicability is separate from module applicability. Use `claim_applicable = TRUE` for an in-scope proposition;
+empty or irrelevant supplied evidence leaves that proposition unresolved. Only an explicit out-of-scope declaration
+with a rationale can yield the claim decision `not_applicable`. Existing calls that omit the argument retain an
+explicitly recorded in-scope default, not an inference from module applicability.
+
+```{r claim-adjudication}
+evidence_record = csdg_evidence_record(
+  "G5", TRUE, "necessary_requirement", result_direction = "supports",
+  claim_consequence = "unresolved",
+  rationale = "The necessary property is supported, but an unresolved qualification limits the exact claim."
+)
+csdg_adjudicate_claim(list(evidence_record), claim_applicable = TRUE)
+```
+
+Record consequences are binding constraints: a justified nonretention or revision takes precedence over unresolved
+evidence, and unresolved evidence prevents `met`. Favorable evidence cannot compensate for either constraint.
+`met` is conditional on the supplied applicable necessary requirements; it does not certify that every relevant
+obligation was identified. See `inst/MIGRATION_0_1_4.md` for legacy handling and the complete decision contract.
+
 ## Exporting the audit trail
 
-```{r export, eval=FALSE}
+```{r export, eval=FALSE, purl=FALSE}
 bundle = csdg_export(result, path = "results")
 bundle
 ```

@@ -1,0 +1,14 @@
+{
+  "gate_id": "G2",
+  "applicable": false,
+  "role": "necessary_requirement",
+  "availability": "not_applicable",
+  "result_direction": "not_evaluated",
+  "criterion": null,
+  "criterion_source": null,
+  "criterion_rationale": null,
+  "materiality": "not_applicable",
+  "adjudication_basis": null,
+  "claim_consequence": "none",
+  "rationale": "This particular module does not apply to an otherwise in-scope claim."
+}

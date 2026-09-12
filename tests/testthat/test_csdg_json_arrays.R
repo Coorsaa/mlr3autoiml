@@ -36,3 +36,21 @@ test_that("the claim-card schema admits exactly its required context coordinates
     all(c("string", "array", "null") %in% unlist(rule$type))
   }, logical(1L))))
 })
+
+test_that("adjudication gate identifiers round trip as arrays and scope remains explicit", {
+  record = csdg_evidence_record("G2", TRUE, "necessary_requirement", result_direction = "supports",
+    claim_consequence = "unresolved", rationale = "A necessary property is supported but the claim remains unresolved.")
+  result = csdg_adjudicate_claim(list(record), claim_applicable = TRUE)
+  path = tempfile(fileext = ".json")
+  on.exit(unlink(path))
+  .write_json(list(evidence = unclass(record), adjudication = unclass(result)), path)
+  restored = jsonlite::read_json(path, simplifyVector = FALSE)
+  expect_identical(restored$adjudication$unresolved_gate_ids, list("G2"))
+  expect_identical(restored$adjudication$blocking_gate_ids, list())
+  expect_identical(restored$adjudication$claim_applicable, TRUE)
+  expect_identical(restored$adjudication$applicability_source, "explicit")
+  arguments = restored$evidence[intersect(names(restored$evidence), names(formals(csdg_evidence_record)))]
+  recreated = do.call(csdg_evidence_record, arguments)
+  expect_identical(recreated, record)
+  expect_identical(csdg_adjudicate_claim(list(recreated), claim_applicable = TRUE), result)
+})

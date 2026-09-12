@@ -458,7 +458,7 @@
 
 .csdg_json_arrays = function(x) {
   if (!is.list(x) || is.data.frame(x)) return(x)
-  vector_fields = c("evidence_ids", "varied_component", "held_constant")
+  vector_fields = c("evidence_ids", "varied_component", "held_constant", "blocking_gate_ids", "unresolved_gate_ids")
   for (i in seq_along(x)) {
     if (is.null(x[[i]])) next
     field = if (is.null(names(x))) "" else names(x)[[i]]

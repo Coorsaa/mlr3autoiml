@@ -98,6 +98,7 @@
         ]
       },
       "claim_consequence": {
+        "description": "Binding record-level constraint, not an aggregate gate score or an independent overall verdict.",
         "enum": [
           "none",
           "retain_exact_claim",
@@ -181,6 +182,32 @@
         },
         "then": {
           "properties": {"availability": {"not": {"const": "not_applicable"}}}
+        }
+      },
+      {
+        "if": {
+          "properties": {"applicable": {"const": false}},
+          "required": ["applicable"]
+        },
+        "then": {
+          "properties": {"claim_consequence": {"const": "none"}}
+        }
+      },
+      {
+        "if": {
+          "properties": {"claim_consequence": {"const": "unresolved"}},
+          "required": ["claim_consequence"]
+        },
+        "then": {
+          "properties": {"applicable": {"const": true}},
+          "not": {
+            "properties": {
+              "evidence_role": {"const": "necessary_requirement"},
+              "availability": {"const": "complete"},
+              "result_direction": {"const": "challenges"}
+            },
+            "required": ["evidence_role", "availability", "result_direction"]
+          }
         }
       },
       {

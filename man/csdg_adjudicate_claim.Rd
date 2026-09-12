@@ -4,19 +4,53 @@
 \alias{csdg_adjudicate_claim}
 \title{Adjudicate one exact claim without compensation or scoring}
 \usage{
-csdg_adjudicate_claim(evidence)
+csdg_adjudicate_claim(
+  evidence = list(),
+  claim_applicable = TRUE,
+  applicability_rationale = NULL
+)
 }
 \arguments{
-\item{evidence}{A nonempty list of \code{CSDGEvidenceRecord} objects.}
+\item{evidence}{A list of \code{CSDGEvidenceRecord} objects; an empty list supplies no evidence.}
+
+\item{claim_applicable}{Whether the proposition itself is within the declared evaluation scope.}
+
+\item{applicability_rationale}{Optional rationale for the claim-level scope decision; required when out of scope.}
 }
 \value{
-A \code{CSDGClaimAdjudication} list with \code{decision}, \code{blocking_gate_ids}, \code{unresolved_gate_ids},
-\code{proposition_linkage}, and \code{rationale}.
+A \code{CSDGClaimAdjudication} list with \code{decision}, \code{claim_applicable}, \code{applicability_source},
+\code{applicability_rationale}, \code{blocking_gate_ids}, \code{unresolved_gate_ids}, \code{proposition_linkage}, and \code{rationale}.
 }
 \description{
 Applies CSDG's conditional non-compensation rule to orthogonal evidence records.
 An unmet necessary requirement or a materialized challenging defeater prevents retention of the exact claim.
 Graded support and descriptive context never compensate for either condition and never form an aggregate score.
+Claim applicability is specified independently of module applicability.
+For compatibility, an omitted \code{claim_applicable} means \code{TRUE} and is recorded as \code{"legacy_default"}.
+An in-scope claim with no applicable supplied necessary evidence remains \code{"unresolved"}.
+Only an explicitly out-of-scope claim with a rationale can return \code{"not_applicable"}.
+
+Validated record consequences are binding constraints, with precedence \code{"not_met"}, \code{"unresolved"}, then \code{"met"}.
+A justified \code{"revise_claim"} or \code{"exact_claim_not_retained"} consequence blocks the unchanged claim.
+An explicit \code{"unresolved"} consequence prevents \code{"met"}, even when the record supports a necessary property.
+\code{"retain_exact_claim"} expresses favorable record-level evidence and cannot override another record's constraint.
+\code{"none"} imposes no additional constraint but does not suppress the necessary-requirement or defeater rules.
+Contradictory consequences within a record are rejected rather than resolved by precedence.
+Across records, a genuine blocker takes precedence over uncertainty and support, regardless of order.
+
+\code{"met"} is conditional on the supplied applicable necessary requirements, not a completeness certificate.
+The caller remains responsible for identifying every requirement relevant to the proposition.
 The returned linkage status distinguishes documented chains from legacy records with missing linkage metadata.
 Neither status independently validates the observations, their relevance, or the proposition.
+}
+\examples{
+supporting = csdg_evidence_record(
+  "G5", TRUE, "necessary_requirement", result_direction = "supports",
+  claim_consequence = "retain_exact_claim", rationale = "The declared ordering occurs in the supplied evidence."
+)
+csdg_adjudicate_claim(list(supporting), claim_applicable = TRUE)
+csdg_adjudicate_claim(list(), claim_applicable = TRUE)
+csdg_adjudicate_claim(
+  list(), claim_applicable = FALSE, applicability_rationale = "This proposition is outside the declared evaluation."
+)
 }
