@@ -55,7 +55,6 @@ data/
 paper_artifacts/
 IML_ARTICLE/
 *.pdf
-Simulation_Study.R
 
 # AI assistant configuration
 CLAUDE.md

@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.5
+Version: 0.1.5.9000
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),

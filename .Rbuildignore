@@ -8,7 +8,6 @@
 ^AGENTS\.md$
 ^CLAUDE\.md$
 ^README\.Rmd$
-^Simulation_Study\.R$
 ^.*\.pdf$
 ^.*\.zip$
 ^.*\.sha256$

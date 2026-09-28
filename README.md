@@ -5,13 +5,13 @@
 
 Start with **[the complete claim-to-evidence
 walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**. After
-installing this local revision, open
+installation (see below), open
 `vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`. It
-runs the same three-claim example as the paper, a small mlr3 audit, and
-an export/read-back check. The local revision delivery also includes a
-standalone rendered HTML version.
+works through the numerical example of the accompanying article (its two
+claims plus an unresolved third claim), a small mlr3 audit, and an export
+and read-back check.
 
-`mlr3autoiml` 0.1.5 primarily implements **claim-scoped diagnostic gates
+`mlr3autoiml` 0.1.5 primarily implements **Claim-Scoped Diagnostic Gates
 (CSDG)** for interpretable machine-learning analyses in the **mlr3
 ecosystem**. A CSDG audit records the intended claim, measurement and
 preprocessing choices, explanation semantics, gate-specific evidence,
@@ -182,7 +182,8 @@ local-fidelity audits, importance agreement, matched-setting utilities,
 plotting, reporting, and provenance. Study-specific equal-country
 sampling, plausible-value loops, SHILD and PISA orchestration, country
 exclusion schedules, matched-control scheduling, and manuscript
-synthesis remain in the analysis scripts. No single package call
+synthesis remain in the analysis scripts, which are kept in a separate
+repository. No single package call
 reproduces either complete empirical study.
 
 Keep `output_dir = NULL` while inspecting an audit, and export to a

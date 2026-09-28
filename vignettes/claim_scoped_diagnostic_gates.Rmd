@@ -44,7 +44,7 @@ Two predictors carry identical information: let `Z` be standard normal and set `
 Model A returns predictor 1 and model B returns predictor 2, for every input; both predict the outcome without error.
 The claim is: **both models rely more on predictor 1 than on predictor 2**. Its scope measures reliance by marginal
 permutation feature importance (PFI) with squared error. The claim describes two explicitly defined prediction
-functions, not the causal importance of an item. The record also notes that the claim was written before the values
+functions, not the causal importance of either predictor. The record also notes that the claim was written before the values
 were computed.
 
 ```{r claim}

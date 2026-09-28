@@ -1,3 +1,7 @@
+# mlr3autoiml (development version)
+
+* Documentation fixes in the README and the vignette.
+
 # mlr3autoiml 0.1.5
 
 * The CSDG vignette follows the five steps of the accompanying article (write the claim, specify the scope, derive the required properties, evaluate the evidence, decide and report), assesses three claims about a numerical example, runs a small `mlr3` audit, and exports and re-reads all assessments.
@@ -42,7 +46,6 @@
 - Gate 3 no longer applies universal ECE or calibration-slope cutoffs; it reports unadjudicated calibration unless the analyst supplies claim-specific criteria.
 - Gate 7A no longer converts a universal subgroup-ECE cutoff into a warning; subgroup calibration remains descriptive unless it is adjudicated against claim-specific criteria.
 - Second-order ALE interaction surfaces now remove both first-order marginal components and use observed-cell weighting, so additive effects do not appear as interactions.
-- SHILD preprocessing now recodes heights below 100 cm and weights below 20 kg to missing for the adult analytic sample, without inferring or converting alternative units.
 - `AutoIML$shap()` now applies its seed before sampling background rows, making the complete attribution calculation reproducible.
 - `autoiml_palette()` and `autoiml_model_colors()` now accept an explicit `style` argument and expose the shared color or monochrome palettes used by package plots.
 - `csdg_ale_bootstrap()` adds row- or stratified cluster-resampled pointwise percentile intervals that refit the complete learner pipeline and recompute one-dimensional ALE on common grids, while reporting point-curve and bootstrap-interval support separately.
