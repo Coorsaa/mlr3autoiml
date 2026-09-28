@@ -1,35 +1,42 @@
-test_that("independent transfer scenarios preserve claim-specific decision boundaries", {
-  supported = function(gate = "G1") csdg_evidence_record(gate, TRUE, "necessary_requirement",
-    result_direction = "supports", rationale = "The stated property was directly evaluated and supported.")
-  missing = csdg_evidence_record("G4", TRUE, "necessary_requirement", availability = "unavailable",
-    result_direction = "not_evaluated", rationale = "Required local evidence is absent.")
-  failed = csdg_evidence_record("G4", TRUE, "necessary_requirement", result_direction = "challenges",
-    rationale = "Observed error exceeds the scenario's explicitly justified error tolerance.")
-  irrelevant = csdg_evidence_record("G4", FALSE, "descriptive_context",
-    rationale = "The claim is a global function description and asserts no local-surrogate property.")
-  graded = csdg_evidence_record("G5", TRUE, "graded_support", result_direction = "supports",
-    rationale = "Some repeated results recur, without specifying a sufficient requirement.")
-  mixed = csdg_evidence_record("G5", TRUE, "necessary_requirement", result_direction = "mixed",
+test_that("predefined cases preserve the decision rule", {
+  property = function(gate = "G1", status = "supported") csdg_evidence_record(gate, TRUE, "required_property",
+    status = status, rationale = "The stated property was directly evaluated.")
+  missing = csdg_evidence_record("G4", TRUE, "required_property", status = "open", availability = "unavailable",
+    rationale = "Required local evidence is absent.")
+  failed = property("G4", "contradicted")
+  irrelevant = csdg_evidence_record("G4", FALSE, "context",
+    rationale = "The claim is a global model description and asserts no property of a local surrogate.")
+  context = csdg_evidence_record("G5", TRUE, "context", result_direction = "supports",
+    rationale = "Some repeated results recur, without a criterion.")
+  inconclusive = csdg_evidence_record("G5", TRUE, "required_property", result_direction = "mixed",
     rationale = "The required stability property is not settled by mixed evidence.")
-  defeater = csdg_evidence_record("G2", TRUE, "potential_defeater", result_direction = "challenges",
-    materiality = "materialized", adjudication_basis = "substantive_adjudication",
-    claim_consequence = "exact_claim_not_retained",
-    rationale = "A verified column swap invalidates the named feature's reported contrast.")
-  unsubstantiated = csdg_evidence_record("G2", TRUE, "potential_defeater", result_direction = "descriptive",
+  counterevidence = csdg_evidence_record("G2", TRUE, "established_counterevidence",
+    rationale = "A verified column swap invalidates the reported contrast.",
+    required_property = "The procedure computes the named quantity.",
+    observation = "Two columns were swapped before the PFI computation.",
+    relevance_to_proposition = "The swap changes which item the reported value refers to.")
+  objection = csdg_evidence_record("G2", TRUE, "context", result_direction = "descriptive",
     rationale = "A possible objection has been documented but not established.")
-  unresolved_constraint = csdg_evidence_record("G5", TRUE, "graded_support", result_direction = "supports",
-    claim_consequence = "unresolved", rationale = "An explicit remaining qualification constrains this sentence.")
+  # A legacy 0.1.5 record: a graded_support record with an "unresolved" consequence is context in 0.1.6.
+  legacy_context = suppressWarnings(csdg_evidence_record("G5", TRUE, "graded_support", result_direction = "supports",
+    claim_consequence = "unresolved", rationale = "A remaining qualification recorded in version 0.1.5."))
+  threat = csdg_evidence_record("G1", TRUE, "unresolved_threat",
+    rationale = "The optimism caused by predictor selection was not quantified.",
+    required_property = "Held-out performance is not inflated by predictor selection.",
+    observation = "Predictors were selected on the same data outside the cross-validation.")
   scenarios = list(
-    list(supported()), list(supported(), failed), list(supported(), missing),
-    list(supported(), irrelevant), list(irrelevant), list(graded),
-    list(supported(), mixed), list(supported(), defeater), list(supported(), unsubstantiated),
-    list(supported(), unresolved_constraint), list(failed, missing)
+    list(property()), list(property(), failed), list(property(), missing),
+    list(property(), irrelevant), list(irrelevant), list(context),
+    list(property(), inconclusive), list(property(), counterevidence), list(property(), objection),
+    list(property(), legacy_context), list(failed, missing), list(property(), threat)
   )
   expected = c("met", "not_met", "unresolved", "met", "unresolved", "unresolved", "unresolved",
-    "not_met", "met", "unresolved", "not_met")
-  actual = vapply(scenarios, function(records) csdg_adjudicate_claim(records)$decision, character(1L))
+    "not_met", "met", "met", "not_met", "unresolved")
+  actual = vapply(scenarios, function(records) {
+    csdg_adjudicate_claim(records, claim_applicable = TRUE)$assessment
+  }, character(1L))
   expect_identical(actual, expected)
   expect_identical(csdg_adjudicate_claim(list(), claim_applicable = FALSE,
-    applicability_rationale = "This scenario explicitly places the statement outside this evaluation.")$decision,
+    applicability_rationale = "This scenario explicitly places the statement outside this evaluation.")$assessment,
     "not_applicable")
 })

@@ -5,20 +5,21 @@ claim:
   id: null
   statement: null
   claim_type: []
-  target: null
-  analytic_distribution: null
-  model_scope: selected_model
-  semantics: fitted_model_description
-  scientific_use: null
-  explanation_design: null
+  # The six scope elements of the claim (quantity, model, procedure, data, meaning, use).
+  quantity: null
+  model: fitted_model # fitted_model | learner | several_models | unspecified
+  procedure: null
+  data: null
+  meaning: model_description # model_description | population_claim | causal_claim
+  use: null
   unit: null
   population: null
   setting_scope: analytic_sample
-  claim_level: substantive
-  use_claim: false
+  claim_level: substantive # documentary only; does not affect the gate plan
+  use_claim: false # TRUE if the claim asserts that intended users understand or benefit (G7b)
   claim_version: C0
   parent_claim_id: null
-  revision_relation: original
+  revision_relation: original # original | same | narrower | broader | incomparable
 measurement:
   outcome: null
   predictors: []
@@ -60,17 +61,18 @@ subgroups:
   minimum_n: null
 criteria: {}
 evidence_records:
-  - gate_id: null
+  - gate_id: null # one of the 12 gates, or CD for the causal design
     applicable: null
-    role: null
+    role: null # required_property | established_counterevidence | unresolved_threat | context
+    status: null # required_property only: supported | contradicted | open
     availability: null
     result_direction: null
     criterion: null
     criterion_source: null
     criterion_rationale: null
-    materiality: null
-    adjudication_basis: null
-    claim_consequence: null
+    required_property: null
+    observation: null
+    relevance_to_proposition: null
     rationale: null
 outputs:
   directory: null

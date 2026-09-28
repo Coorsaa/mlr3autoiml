@@ -4,7 +4,7 @@
 #' Protected locators are not opened, and external resources are not fetched.
 #' Dependencies and available aggregate substitutions form separate acyclic graphs: an aggregate may legitimately
 #' depend on the protected source for which it is also the available public substitute.
-#' File availability does not establish that the file supports a proposition or reproduces protected analyses.
+#' File availability does not establish that the file supports a claim or reproduces protected analyses.
 #'
 #' @param registry Nonempty list of source entries.
 #'   Each entry requires a unique `id`, `access` (`"public"`, `"protected"`, or `"external"`), and `rationale`.

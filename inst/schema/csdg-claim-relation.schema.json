@@ -7,6 +7,8 @@
     "parent_claim_id",
     "claim_id",
     "relation",
+    "scope_relation",
+    "scope",
     "coordinates",
     "rationale"
   ],
@@ -25,7 +27,7 @@
         "same",
         "narrower",
         "broader",
-        "alternative_or_incomparable",
+        "incomparable",
         "unchecked"
       ]
     },
@@ -164,7 +166,7 @@
               "same",
               "narrower",
               "broader",
-              "alternative_or_incomparable"
+              "incomparable"
             ]
           }
         },
@@ -181,7 +183,7 @@
         "same",
         "narrower",
         "broader",
-        "alternative_or_incomparable"
+        "incomparable"
       ]
     },
     "proposition_relation": {
@@ -191,7 +193,7 @@
         "same",
         "logical_weakening",
         "logical_strengthening",
-        "alternative_or_incomparable"
+        "incomparable"
       ]
     },
     "proposition_rationale": {
@@ -213,8 +215,8 @@
       "enum": [
         "unspecified",
         "logical_weakening",
-        "context_restriction",
-        "estimand_change"
+        "restriction_without_entailment",
+        "change_of_question"
       ]
     },
     "semantic_status": {
@@ -222,9 +224,352 @@
         "unchecked",
         "declared_not_verified"
       ]
+    },
+    "scope": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "quantity"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "model"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "procedure"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "data"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "meaning"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "element": {
+                "const": "use"
+              }
+            },
+            "required": [
+              "element"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "element",
+          "parent_value",
+          "claim_value",
+          "relation"
+        ],
+        "properties": {
+          "element": {
+            "enum": [
+              "quantity",
+              "model",
+              "procedure",
+              "data",
+              "meaning",
+              "use"
+            ]
+          },
+          "parent_value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "claim_value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "same",
+              "narrower",
+              "broader",
+              "incomparable"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "scope_relation": {
+      "type": "string",
+      "enum": [
+        "same",
+        "narrower",
+        "broader",
+        "incomparable"
+      ]
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope_relation": {
+            "const": "same"
+          }
+        },
+        "required": [
+          "scope_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "items": {
+              "properties": {
+                "relation": {
+                  "const": "same"
+                }
+              },
+              "required": [
+                "relation"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope_relation": {
+            "const": "narrower"
+          }
+        },
+        "required": [
+          "scope_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "items": {
+              "properties": {
+                "relation": {
+                  "enum": [
+                    "same",
+                    "narrower"
+                  ]
+                }
+              },
+              "required": [
+                "relation"
+              ]
+            },
+            "contains": {
+              "properties": {
+                "relation": {
+                  "const": "narrower"
+                }
+              },
+              "required": [
+                "relation"
+              ]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope_relation": {
+            "const": "broader"
+          }
+        },
+        "required": [
+          "scope_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "items": {
+              "properties": {
+                "relation": {
+                  "enum": [
+                    "same",
+                    "broader"
+                  ]
+                }
+              },
+              "required": [
+                "relation"
+              ]
+            },
+            "contains": {
+              "properties": {
+                "relation": {
+                  "const": "broader"
+                }
+              },
+              "required": [
+                "relation"
+              ]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope_relation": {
+            "const": "incomparable"
+          }
+        },
+        "required": [
+          "scope_relation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "anyOf": [
+              {
+                "contains": {
+                  "properties": {
+                    "relation": {
+                      "const": "incomparable"
+                    }
+                  },
+                  "required": [
+                    "relation"
+                  ]
+                },
+                "minContains": 1
+              },
+              {
+                "allOf": [
+                  {
+                    "contains": {
+                      "properties": {
+                        "relation": {
+                          "const": "narrower"
+                        }
+                      },
+                      "required": [
+                        "relation"
+                      ]
+                    },
+                    "minContains": 1
+                  },
+                  {
+                    "contains": {
+                      "properties": {
+                        "relation": {
+                          "const": "broader"
+                        }
+                      },
+                      "required": [
+                        "relation"
+                      ]
+                    },
+                    "minContains": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "scope_relation"
+        ]
+      },
+      "then": {
+        "required": [
+          "proposition_relation",
+          "proposition_rationale",
+          "parent_statement",
+          "claim_statement",
+          "revision_kind",
+          "semantic_status"
+        ]
+      }
+    },
     {
       "if": {
         "properties": {
@@ -341,7 +686,7 @@
       "if": {
         "properties": {
           "context_relation": {
-            "const": "alternative_or_incomparable"
+            "const": "incomparable"
           }
         },
         "required": [
@@ -356,7 +701,7 @@
                 "contains": {
                   "properties": {
                     "relation": {
-                      "const": "alternative_or_incomparable"
+                      "const": "incomparable"
                     }
                   },
                   "required": [
@@ -521,7 +866,7 @@
       "if": {
         "properties": {
           "proposition_relation": {
-            "const": "alternative_or_incomparable"
+            "const": "incomparable"
           }
         },
         "required": [
@@ -531,7 +876,7 @@
       "then": {
         "properties": {
           "relation": {
-            "const": "alternative_or_incomparable"
+            "const": "incomparable"
           },
           "semantic_status": {
             "const": "declared_not_verified"
@@ -547,7 +892,7 @@
       "if": {
         "properties": {
           "revision_kind": {
-            "const": "estimand_change"
+            "const": "change_of_question"
           }
         },
         "required": [
@@ -559,7 +904,7 @@
           "proposition_relation": {
             "enum": [
               "unchecked",
-              "alternative_or_incomparable"
+              "incomparable"
             ]
           }
         }
@@ -583,8 +928,35 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "revision_kind": {
+            "const": "restriction_without_entailment"
+          }
+        },
+        "required": [
+          "revision_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "proposition_relation": {
+            "enum": [
+              "unchecked",
+              "logical_strengthening",
+              "incomparable"
+            ]
+          },
+          "scope_relation": {
+            "const": "narrower"
+          }
+        }
+      }
     }
   ],
   "additionalProperties": false,
-  "$comment": "Legacy records without proposition_relation have unchecked proposition semantics; their historical relation is not semantic certification."
+  "$comment": "Legacy records without proposition_relation have unchecked proposition semantics; their historical relation is not semantic certification.",
+  "description": "Relation between a revised claim and its predecessor (mlr3autoiml 0.1.6): one relation per scope element and a separate declaration of whether the revised claim follows."
 }

@@ -2,55 +2,65 @@
 % Please edit documentation in R/csdg_evidence_record.R
 \name{csdg_adjudicate_claim}
 \alias{csdg_adjudicate_claim}
-\title{Adjudicate one exact claim without compensation or scoring}
+\title{Apply the decision rule to one claim}
 \usage{
 csdg_adjudicate_claim(
   evidence = list(),
   claim_applicable = TRUE,
-  applicability_rationale = NULL
+  applicability_rationale = NULL,
+  plan = NULL
 )
 }
 \arguments{
 \item{evidence}{A list of \code{CSDGEvidenceRecord} objects; an empty list supplies no evidence.}
 
-\item{claim_applicable}{Whether the proposition itself is within the declared evaluation scope.}
+\item{claim_applicable}{Whether the claim itself is within the evaluation.}
 
-\item{applicability_rationale}{Optional rationale for the claim-level scope decision; required when out of scope.}
+\item{applicability_rationale}{Optional rationale for that decision; required when the claim is out of scope.}
+
+\item{plan}{Optional \code{CSDGGatePlan} from \code{\link[=csdg_gate_plan]{csdg_gate_plan()}} (or any table with columns \code{gate_id} and
+\code{required}), which adds the plan's required gates that have no entry as open properties.}
 }
 \value{
-A \code{CSDGClaimAdjudication} list with \code{decision}, \code{claim_applicable}, \code{applicability_source},
-\code{applicability_rationale}, \code{blocking_gate_ids}, \code{unresolved_gate_ids}, \code{proposition_linkage}, and \code{rationale}.
+A \code{CSDGClaimAdjudication} list with the \code{assessment} (\code{"met"}, \code{"not_met"}, \code{"unresolved"}, or
+\code{"not_applicable"}), \code{decision_options} (the decisions that the assessment permits: \code{"retain"}, or \code{"revise"}
+and \code{"withhold"}; the researcher takes the decision), the
+table \code{properties} (gate, status, source, rationale), the gate identifiers of contradicted and open properties,
+of counterevidence, threats, and context, \code{claim_applicable}, \code{applicability_source},
+\code{applicability_rationale}, \code{proposition_linkage}, and \code{rationale}. \code{blocking_gate_ids} and
+\code{unresolved_gate_ids} are kept as aliases of the contradicted and open gate identifiers.
+\code{decision} is a deprecated alias of \code{assessment} (versions up to 0.1.5 stored the assessment under this name);
+it will be removed in a later release. Use \code{assessment} for met, not met, or unresolved, and \code{decision_options}
+for retain, revise, or withhold.
 }
 \description{
-Applies CSDG's conditional non-compensation rule to orthogonal evidence records.
-An unmet necessary requirement or a materialized challenging defeater prevents retention of the exact claim.
-Graded support and descriptive context never compensate for either condition and never form an aggregate score.
-Claim applicability is specified independently of module applicability.
-For compatibility, an omitted \code{claim_applicable} means \code{TRUE} and is recorded as \code{"legacy_default"}.
-An in-scope claim with no applicable supplied necessary evidence remains \code{"unresolved"}.
-Only an explicitly out-of-scope claim with a rationale can return \code{"not_applicable"}.
+Applies the fixed decision rule of the article (Step 5) to the entries of one claim record:
+a claim is \code{"not_met"} if at least one required property is contradicted, including by established
+counterevidence; otherwise it is \code{"unresolved"} if at least one required property is open, including through an
+unresolved threat, or if no required property was supplied; otherwise it is \code{"met"}.
+Favorable results never offset a contradicted property, and context never changes the assessment.
+A met claim is retained; a claim that is not met or unresolved is revised or withheld (\code{decision_options}).
 
-Validated record consequences are binding constraints, with precedence \code{"not_met"}, \code{"unresolved"}, then \code{"met"}.
-A justified \code{"revise_claim"} or \code{"exact_claim_not_retained"} consequence blocks the unchanged claim.
-An explicit \code{"unresolved"} consequence prevents \code{"met"}, even when the record supports a necessary property.
-\code{"retain_exact_claim"} expresses favorable record-level evidence and cannot override another record's constraint.
-\code{"none"} imposes no additional constraint but does not suppress the necessary-requirement or defeater rules.
-Contradictory consequences within a record are rejected rather than resolved by precedence.
-Across records, a genuine blocker takes precedence over uncertainty and support, regardless of order.
+If \code{plan} is supplied, every gate that the plan requires but that has no entry is an open property ("no evidence
+supplied"), and a causal claim without an entry for the causal design (\code{gate_id = "CD"}) is open as well.
+An unresolved threat to a gate that the plan does not require is reported as context, with a warning.
+Established counterevidence on such a gate still contradicts it (a demonstrated problem is never discarded), with a
+warning to attach it to the required property it affects.
+Without a plan, a threat to a property that has no required-property entry adds that property as open.
 
-\code{"met"} is conditional on the supplied applicable necessary requirements, not a completeness certificate.
-The caller remains responsible for identifying every requirement relevant to the proposition.
-The returned linkage status distinguishes documented chains from legacy records with missing linkage metadata.
-Neither status independently validates the observations, their relevance, or the proposition.
+\code{"met"} holds relative to the listed required properties; it is not a certificate that every relevant property
+was identified. The label \code{"not_applicable"} is reserved for a claim that the researcher explicitly places outside
+the evaluation, with a rationale (\code{claim_applicable = FALSE}). For compatibility, an omitted \code{claim_applicable}
+means \code{TRUE} and is recorded as \code{"legacy_default"}.
 }
 \examples{
-supporting = csdg_evidence_record(
-  "G5", TRUE, "necessary_requirement", result_direction = "supports",
-  claim_consequence = "retain_exact_claim", rationale = "The declared ordering occurs in the supplied evidence."
+supported = csdg_evidence_record(
+  "G5", TRUE, "required_property", status = "supported",
+  rationale = "The ordering recurs in every repetition."
 )
-csdg_adjudicate_claim(list(supporting), claim_applicable = TRUE)
+csdg_adjudicate_claim(list(supported), claim_applicable = TRUE)
 csdg_adjudicate_claim(list(), claim_applicable = TRUE)
 csdg_adjudicate_claim(
-  list(), claim_applicable = FALSE, applicability_rationale = "This proposition is outside the declared evaluation."
+  list(), claim_applicable = FALSE, applicability_rationale = "This claim is outside the evaluation."
 )
 }

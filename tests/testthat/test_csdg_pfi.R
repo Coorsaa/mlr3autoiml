@@ -247,3 +247,29 @@ test_that("OOF local surrogate handles a held-out case with a missing feature", 
   expect_equal(local$summary$case_imputed_features, "x1")
   expect_true(is.finite(local$summary$weighted_rmse))
 })
+
+test_that("squared-error PFI of a fixed predictor matches a hand computation", {
+  skip_if_not_installed("mlr3learners")
+  skip_if_not_installed("mlr3pipelines")
+  requireNamespace("mlr3learners", quietly = TRUE)
+  set.seed(5L)
+  z = rnorm(200L)
+  task = mlr3::as_task_regr(data.frame(x1 = z, x2 = z, y = z), target = "y")
+  learner = mlr3::as_learner(mlr3pipelines::`%>>%`(
+    mlr3pipelines::po("select", selector = mlr3pipelines::selector_name("x1")),
+    mlr3::lrn("regr.lm")
+  ))
+  oof = csdg_resample(task, learner, mlr3::rsmp("cv", folds = 2L), store_models = TRUE, seed = 6L)
+  # With y = x1 = x2 and a linear model of x1 alone, the fitted model reproduces y exactly and ignores x2.
+  pfi = csdg_fold_pfi(oof, feature_groups = list(x1 = "x1", x2 = "x2"), loss = "mse", repetitions = 3L, seed = 7L)
+  expect_true(all(abs(pfi$raw$baseline_loss) < 1e-20))
+  expect_true(all(abs(pfi$raw[feature_group == "x2", importance]) < 1e-20))
+  row = pfi$raw[feature_group == "x1"][1L]
+  test_rows = oof$test_sets[[row$iteration]]
+  truth = z[test_rows]
+  set.seed(7L + row$iteration * 100000L + 1L * 1000L + row$permutation_repetition)
+  permuted = truth[sample(seq_along(truth))]
+  expect_equal(row$importance, mean((truth - permuted)^2), tolerance = 1e-10)
+  rmse = csdg_fold_pfi(oof, feature_groups = list(x1 = "x1"), loss = "rmse", repetitions = 3L, seed = 7L)
+  expect_equal(rmse$raw$importance, sqrt(pfi$raw[feature_group == "x1", importance]), tolerance = 1e-10)
+})

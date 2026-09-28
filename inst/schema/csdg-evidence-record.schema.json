@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/mlr3autoiml/csdg-evidence-record.schema.json",
   "title": "CSDG evidence record",
+  "description": "One entry of a claim record (mlr3autoiml 0.1.6). A required property has the status supported, contradicted, or open; established counterevidence contradicts the property named by gate_id; an unresolved threat leaves it open unless it is contradicted; context never changes the assessment. Records written with the roles of versions up to 0.1.5 are accepted as legacy input without a status.",
   "type": "object",
   "required": [
     "gate_id",
@@ -19,6 +20,7 @@
   ],
   "properties": {
     "gate_id": {
+      "description": "Gate of the property; CD is the causal design (not a gate).",
       "enum": [
         "G0a",
         "G0b",
@@ -31,19 +33,42 @@
         "G6a",
         "G6b",
         "G7a",
-        "G7b"
+        "G7b",
+        "CD"
       ]
     },
     "applicable": {
-      "description": "Applicability of this module, not the evaluation scope of the proposition itself.",
+      "description": "Whether the gate applies to the claim.",
       "type": "boolean"
     },
     "role": {
       "enum": [
+        "required_property",
+        "established_counterevidence",
+        "unresolved_threat",
+        "context",
         "necessary_requirement",
         "potential_defeater",
         "graded_support",
         "descriptive_context"
+      ]
+    },
+    "status": {
+      "description": "Status of a required property.",
+      "enum": [
+        "supported",
+        "contradicted",
+        "open",
+        null
+      ]
+    },
+    "legacy_role": {
+      "enum": [
+        "necessary_requirement",
+        "potential_defeater",
+        "graded_support",
+        "descriptive_context",
+        null
       ]
     },
     "availability": {
@@ -99,6 +124,7 @@
       "minLength": 1
     },
     "materiality": {
+      "description": "Deprecated documentary field (0.1.5).",
       "enum": [
         "not_materialized",
         "materialized",
@@ -115,7 +141,7 @@
       ]
     },
     "claim_consequence": {
-      "description": "Binding record-level constraint: unresolved prevents met; revision blocks retention of the unchanged claim. Retention never overrides another record's blocker or unresolved consequence; none adds no constraint beyond role, availability, and direction.",
+      "description": "Deprecated (0.1.5). On a required property it must agree with the status; on any other entry it is ignored.",
       "enum": [
         "none",
         "retain_exact_claim",
@@ -156,18 +182,18 @@
         "null"
       ]
     },
-    "invariance_claimed": {
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
     "same_estimand_rationale": {
       "type": [
         "string",
         "null"
       ],
       "minLength": 1
+    },
+    "invariance_claimed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
     },
     "required_property": {
       "type": [
@@ -192,17 +218,18 @@
     },
     "variation_status": {
       "enum": [
-        "not_recorded",
-        "documented_not_verified"
+        "documented_not_verified",
+        "not_recorded"
       ]
     },
     "proposition_linkage": {
       "enum": [
-        "not_recorded",
-        "documented_not_verified"
+        "documented_not_verified",
+        "not_recorded"
       ]
     }
   },
+  "additionalProperties": false,
   "allOf": [
     {
       "if": {
@@ -210,7 +237,10 @@
           "criterion": {
             "type": "object"
           }
-        }
+        },
+        "required": [
+          "criterion"
+        ]
       },
       "then": {
         "properties": {
@@ -223,8 +253,20 @@
             "minLength": 1
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "criterion": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "criterion"
+        ]
       },
-      "else": {
+      "then": {
         "properties": {
           "criterion_source": {
             "type": "null"
@@ -241,7 +283,10 @@
           "applicable": {
             "const": false
           }
-        }
+        },
+        "required": [
+          "applicable"
+        ]
       },
       "then": {
         "properties": {
@@ -256,6 +301,9 @@
           },
           "claim_consequence": {
             "const": "none"
+          },
+          "status": {
+            "type": "null"
           }
         }
       }
@@ -285,9 +333,45 @@
       "if": {
         "properties": {
           "role": {
-            "not": {
-              "const": "potential_defeater"
-            }
+            "const": "required_property"
+          },
+          "applicable": {
+            "const": true
+          }
+        },
+        "required": [
+          "role",
+          "applicable"
+        ]
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "open"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "enum": [
+              "established_counterevidence",
+              "unresolved_threat",
+              "context",
+              "necessary_requirement",
+              "potential_defeater",
+              "graded_support",
+              "descriptive_context"
+            ]
           }
         },
         "required": [
@@ -296,8 +380,8 @@
       },
       "then": {
         "properties": {
-          "materiality": {
-            "const": "not_applicable"
+          "status": {
+            "type": "null"
           }
         }
       }
@@ -305,24 +389,26 @@
     {
       "if": {
         "properties": {
-          "applicable": {
-            "const": true
-          },
-          "role": {
-            "const": "potential_defeater"
+          "status": {
+            "const": "supported"
           }
         },
         "required": [
-          "applicable",
-          "role"
+          "status"
         ]
       },
       "then": {
         "properties": {
-          "materiality": {
+          "availability": {
+            "const": "complete"
+          },
+          "result_direction": {
+            "const": "supports"
+          },
+          "claim_consequence": {
             "enum": [
-              "not_materialized",
-              "materialized"
+              "none",
+              "retain_exact_claim"
             ]
           }
         }
@@ -331,18 +417,31 @@
     {
       "if": {
         "properties": {
-          "adjudication_basis": {
-            "const": "prespecified_claim_specific_criterion"
+          "status": {
+            "const": "contradicted"
           }
         },
         "required": [
-          "adjudication_basis"
+          "status"
         ]
       },
       "then": {
         "properties": {
-          "criterion": {
-            "type": "object"
+          "availability": {
+            "const": "complete"
+          },
+          "result_direction": {
+            "enum": [
+              "challenges",
+              "mixed"
+            ]
+          },
+          "claim_consequence": {
+            "enum": [
+              "none",
+              "revise_claim",
+              "exact_claim_not_retained"
+            ]
           }
         }
       }
@@ -350,15 +449,40 @@
     {
       "if": {
         "properties": {
-          "materiality": {
-            "const": "materialized"
+          "status": {
+            "const": "open"
           }
-        }
+        },
+        "required": [
+          "status"
+        ]
       },
       "then": {
         "properties": {
+          "claim_consequence": {
+            "enum": [
+              "none",
+              "unresolved"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "role": {
-            "const": "potential_defeater"
+            "const": "established_counterevidence"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "applicable": {
+            "const": true
           },
           "availability": {
             "const": "complete"
@@ -369,16 +493,78 @@
               "mixed"
             ]
           },
-          "adjudication_basis": {
-            "type": "string"
-          },
           "claim_consequence": {
             "enum": [
+              "none",
               "revise_claim",
               "exact_claim_not_retained"
             ]
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "unresolved_threat"
+          }
+        },
+        "required": [
+          "role"
+        ]
+      },
+      "then": {
+        "properties": {
+          "applicable": {
+            "const": true
+          },
+          "result_direction": {
+            "not": {
+              "const": "supports"
+            }
+          },
+          "claim_consequence": {
+            "enum": [
+              "none",
+              "unresolved"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "context"
+          },
+          "claim_consequence": {
+            "not": {
+              "const": "none"
+            }
+          }
+        },
+        "required": [
+          "role",
+          "claim_consequence"
+        ]
+      },
+      "then": {
+        "properties": {
+          "legacy_role": {
+            "const": "graded_support"
+          },
+          "claim_consequence": {
+            "enum": [
+              "retain_exact_claim",
+              "unresolved"
+            ]
+          }
+        },
+        "required": [
+          "legacy_role"
+        ]
       }
     },
     {
@@ -403,56 +589,30 @@
     {
       "if": {
         "properties": {
-          "role": {
-            "const": "potential_defeater"
-          },
           "materiality": {
-            "const": "not_materialized"
+            "const": "materialized"
           }
         },
         "required": [
-          "role",
           "materiality"
         ]
       },
       "then": {
         "properties": {
-          "claim_consequence": {
-            "enum": [
-              "none",
-              "unresolved"
-            ]
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "claim_consequence": {
-            "const": "retain_exact_claim"
-          }
-        },
-        "required": [
-          "claim_consequence"
-        ]
-      },
-      "then": {
-        "properties": {
-          "applicable": {
-            "const": true
-          },
           "role": {
             "enum": [
-              "necessary_requirement",
-              "graded_support"
+              "established_counterevidence",
+              "potential_defeater"
             ]
           },
           "availability": {
             "const": "complete"
           },
           "result_direction": {
-            "const": "supports"
+            "enum": [
+              "challenges",
+              "mixed"
+            ]
           }
         }
       }
@@ -460,490 +620,21 @@
     {
       "if": {
         "properties": {
-          "claim_consequence": {
-            "const": "exact_claim_not_retained"
+          "adjudication_basis": {
+            "const": "prespecified_claim_specific_criterion"
           }
         },
         "required": [
-          "claim_consequence"
+          "adjudication_basis"
         ]
       },
       "then": {
         "properties": {
-          "applicable": {
-            "const": true
-          },
-          "availability": {
-            "const": "complete"
+          "criterion": {
+            "type": "object"
           }
-        },
-        "anyOf": [
-          {
-            "properties": {
-              "role": {
-                "const": "necessary_requirement"
-              },
-              "result_direction": {
-                "const": "challenges"
-              }
-            },
-            "required": [
-              "role",
-              "result_direction"
-            ]
-          },
-          {
-            "properties": {
-              "role": {
-                "const": "potential_defeater"
-              },
-              "materiality": {
-                "const": "materialized"
-              },
-              "result_direction": {
-                "enum": [
-                  "challenges",
-                  "mixed"
-                ]
-              }
-            },
-            "required": [
-              "role",
-              "materiality",
-              "result_direction"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "claim_consequence": {
-            "const": "revise_claim"
-          }
-        },
-        "required": [
-          "claim_consequence"
-        ]
-      },
-      "then": {
-        "properties": {
-          "applicable": {
-            "const": true
-          },
-          "availability": {
-            "const": "complete"
-          }
-        },
-        "anyOf": [
-          {
-            "properties": {
-              "role": {
-                "const": "necessary_requirement"
-              },
-              "result_direction": {
-                "enum": [
-                  "challenges",
-                  "mixed"
-                ]
-              }
-            },
-            "required": [
-              "role",
-              "result_direction"
-            ]
-          },
-          {
-            "properties": {
-              "role": {
-                "const": "potential_defeater"
-              },
-              "materiality": {
-                "const": "materialized"
-              },
-              "result_direction": {
-                "enum": [
-                  "challenges",
-                  "mixed"
-                ]
-              }
-            },
-            "required": [
-              "role",
-              "materiality",
-              "result_direction"
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "variation_status": {
-            "const": "documented_not_verified"
-          }
-        },
-        "required": [
-          "variation_status"
-        ]
-      },
-      "then": {
-        "required": [
-          "varied_component",
-          "held_constant",
-          "same_estimand",
-          "same_estimand_rationale",
-          "invariance_claimed"
-        ],
-        "properties": {
-          "varied_component": {
-            "type": "array"
-          },
-          "held_constant": {
-            "type": "array"
-          },
-          "same_estimand_rationale": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "proposition_linkage": {
-            "const": "documented_not_verified"
-          }
-        },
-        "required": [
-          "proposition_linkage"
-        ]
-      },
-      "then": {
-        "required": [
-          "required_property",
-          "observation",
-          "relevance_to_proposition"
-        ],
-        "properties": {
-          "required_property": {
-            "type": "string",
-            "minLength": 1
-          },
-          "observation": {
-            "type": "string",
-            "minLength": 1
-          },
-          "relevance_to_proposition": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "anyOf": [
-          {
-            "properties": {
-              "required_property": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "required_property"
-            ]
-          },
-          {
-            "properties": {
-              "observation": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "observation"
-            ]
-          },
-          {
-            "properties": {
-              "relevance_to_proposition": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "relevance_to_proposition"
-            ]
-          }
-        ]
-      },
-      "then": {
-        "required": [
-          "required_property",
-          "observation",
-          "relevance_to_proposition",
-          "proposition_linkage"
-        ],
-        "properties": {
-          "required_property": {
-            "type": "string",
-            "minLength": 1
-          },
-          "observation": {
-            "type": "string",
-            "minLength": 1
-          },
-          "relevance_to_proposition": {
-            "type": "string",
-            "minLength": 1
-          },
-          "proposition_linkage": {
-            "const": "documented_not_verified"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "allOf": [
-          {
-            "properties": {
-              "variation_status": {
-                "const": "documented_not_verified"
-              }
-            },
-            "required": [
-              "variation_status"
-            ]
-          },
-          {
-            "anyOf": [
-              {
-                "properties": {
-                  "materiality": {
-                    "const": "materialized"
-                  }
-                },
-                "required": [
-                  "materiality"
-                ]
-              },
-              {
-                "properties": {
-                  "claim_consequence": {
-                    "enum": [
-                      "revise_claim",
-                      "exact_claim_not_retained"
-                    ]
-                  }
-                },
-                "required": [
-                  "claim_consequence"
-                ]
-              },
-              {
-                "properties": {
-                  "role": {
-                    "const": "necessary_requirement"
-                  },
-                  "result_direction": {
-                    "const": "challenges"
-                  }
-                },
-                "required": [
-                  "role",
-                  "result_direction"
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "then": {
-        "required": [
-          "required_property",
-          "observation",
-          "relevance_to_proposition",
-          "proposition_linkage"
-        ],
-        "properties": {
-          "required_property": {
-            "type": "string",
-            "minLength": 1
-          },
-          "observation": {
-            "type": "string",
-            "minLength": 1
-          },
-          "relevance_to_proposition": {
-            "type": "string",
-            "minLength": 1
-          },
-          "proposition_linkage": {
-            "const": "documented_not_verified"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "allOf": [
-          {
-            "properties": {
-              "variation_status": {
-                "const": "documented_not_verified"
-              },
-              "same_estimand": {
-                "not": {
-                  "const": true
-                }
-              }
-            },
-            "required": [
-              "variation_status",
-              "same_estimand"
-            ]
-          },
-          {
-            "anyOf": [
-              {
-                "properties": {
-                  "materiality": {
-                    "const": "materialized"
-                  }
-                },
-                "required": [
-                  "materiality"
-                ]
-              },
-              {
-                "properties": {
-                  "claim_consequence": {
-                    "enum": [
-                      "revise_claim",
-                      "exact_claim_not_retained"
-                    ]
-                  }
-                },
-                "required": [
-                  "claim_consequence"
-                ]
-              },
-              {
-                "properties": {
-                  "role": {
-                    "const": "necessary_requirement"
-                  },
-                  "result_direction": {
-                    "const": "challenges"
-                  }
-                },
-                "required": [
-                  "role",
-                  "result_direction"
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "then": {
-        "required": [
-          "invariance_claimed"
-        ],
-        "properties": {
-          "invariance_claimed": {
-            "const": true
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "anyOf": [
-          {
-            "properties": {
-              "varied_component": {
-                "type": "array"
-              }
-            },
-            "required": [
-              "varied_component"
-            ]
-          },
-          {
-            "properties": {
-              "held_constant": {
-                "type": "array"
-              }
-            },
-            "required": [
-              "held_constant"
-            ]
-          },
-          {
-            "properties": {
-              "same_estimand": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "same_estimand"
-            ]
-          },
-          {
-            "properties": {
-              "same_estimand_rationale": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "same_estimand_rationale"
-            ]
-          },
-          {
-            "properties": {
-              "invariance_claimed": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "invariance_claimed"
-            ]
-          }
-        ]
-      },
-      "then": {
-        "required": [
-          "variation_status"
-        ],
-        "properties": {
-          "variation_status": {
-            "const": "documented_not_verified"
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {"claim_consequence": {"const": "unresolved"}},
-        "required": ["claim_consequence"]
-      },
-      "then": {
-        "properties": {"applicable": {"const": true}},
-        "not": {
-          "properties": {
-            "role": {"const": "necessary_requirement"},
-            "availability": {"const": "complete"},
-            "result_direction": {"const": "challenges"}
-          },
-          "required": ["role", "availability", "result_direction"]
         }
       }
     }
-  ],
-  "additionalProperties": false,
-  "$comment": "New linkage fields are documentary, not empirical validation. Missing legacy linkage is not recorded; no new certification is implied."
+  ]
 }

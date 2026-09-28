@@ -6,11 +6,11 @@ csdg_claim = function(
     statement = NULL,
     claim_type = "predictive_performance",
     target = NULL,
-    semantics = "fitted_model_description",
+    semantics = NULL,
     unit = NULL,
     population = NULL,
     analytic_distribution = NULL,
-    model_scope = "selected_model",
+    model_scope = "fitted_model",
     setting_scope = "analytic_sample",
     scientific_use = NULL,
     explanation_design = NULL,
@@ -27,6 +27,11 @@ csdg_claim = function(
     confirmatory = FALSE,
     notes = NULL,
     provenance = NULL,
+    quantity = NULL,
+    procedure = NULL,
+    data = NULL,
+    meaning = NULL,
+    use = NULL,
     ...) {
   dots = list(...)
   .assert_named_dots(dots)
@@ -36,9 +41,28 @@ csdg_claim = function(
   }
   if (!is.null(dots$type)) claim_type = dots$type
   if (!is.null(dots$types)) claim_type = dots$types
-  if (!is.null(dots$model)) model_scope = dots$model
+  if (!is.null(dots$model)) {
+    if (!missing(model_scope) && !identical(model_scope, dots$model)) {
+      .csdg_stop("Supply either `model` or its legacy alias `model_scope`, not both with different values.")
+    }
+    model_scope = dots$model
+  }
   if (!is.null(dots$setting)) setting_scope = dots$setting
   if (!is.null(dots$subgroups)) subgroup_variables = dots$subgroups
+
+  merge_alias = function(new, old, new_name, old_name) {
+    if (!is.null(new) && !is.null(old) && !identical(new, old)) {
+      .csdg_stop(
+        "Supply either `%s` or its legacy alias `%s`, not both with different values.",
+        new_name, old_name
+      )
+    }
+    new %||% old
+  }
+  target = merge_alias(quantity, target, "quantity", "target")
+  explanation_design = merge_alias(procedure, explanation_design, "procedure", "explanation_design")
+  analytic_distribution = merge_alias(data, analytic_distribution, "data", "analytic_distribution")
+  scientific_use = merge_alias(use, scientific_use, "use", "scientific_use")
 
   allowed = c(
     "predictive_performance",
@@ -55,21 +79,35 @@ csdg_claim = function(
   .assert_scalar_string(id, "id")
   .assert_scalar_string(statement, "statement")
   .assert_choice(claim_type, allowed, "claim_type", multiple = TRUE)
-  .assert_choice(
-    model_scope,
-    c("selected_model", "cross_fitted_pipeline", "near_equivalent_models", "model_class", "unspecified"),
-    "model_scope"
-  )
-  .assert_choice(
-    semantics,
-    c("fitted_model_description", "hypothetical_model_query", "causal", "recourse"),
-    "semantics"
-  )
+  .assert_scalar_string(model_scope, "model_scope")
+  model_scope = .csdg_map_legacy(model_scope, .csdg_legacy_model_scopes, "Model value")
+  .assert_choice(model_scope, .csdg_model_scopes, "model")
+  if (!is.null(semantics)) {
+    .assert_choice(
+      semantics,
+      c("fitted_model_description", "hypothetical_model_query", "causal", "recourse"),
+      "semantics"
+    )
+    semantic_meaning = unname(.csdg_legacy_semantics[[semantics]])
+    .csdg_deprecate(semantics, paste0("meaning = ", semantic_meaning), "semantics")
+  }
+  if (!is.null(meaning)) {
+    .assert_choice(meaning, .csdg_meanings, "meaning")
+    if (!is.null(semantics) &&
+        xor(identical(meaning, "causal_claim"), identical(semantic_meaning, "causal_claim"))) {
+      .csdg_stop("`meaning = \"%s\"` contradicts the legacy `semantics = \"%s\"`.", meaning, semantics)
+    }
+  } else {
+    meaning = if (is.null(semantics)) "model_description" else semantic_meaning
+  }
+  semantics = semantics %||% if (identical(meaning, "causal_claim")) "causal" else "fitted_model_description"
   .assert_choice(claim_level, c("functional", "predictive", "substantive"), "claim_level")
   assert_flag(use_claim, .var.name = "use_claim")
+  .assert_scalar_string(revision_relation, "revision_relation")
+  revision_relation = .csdg_map_legacy(revision_relation, .csdg_legacy_relations, "Revision relation")
   .assert_choice(
     revision_relation,
-    c("original", .csdg_claim_relations),
+    c("original", .csdg_scope_relations),
     "revision_relation"
   )
   .assert_scalar_string(claim_version, "claim_version")
@@ -81,12 +119,12 @@ csdg_claim = function(
     .csdg_stop("`parent_claim_id` is required for a revised or excluded claim.")
   }
   .assert_scalar_string(setting_scope, "setting_scope")
-  .assert_optional_character(target, "target")
+  .assert_optional_character(target, "quantity")
   .assert_optional_character(unit, "unit")
   .assert_optional_character(population, "population")
-  .assert_optional_character(analytic_distribution, "analytic_distribution")
-  .assert_optional_character(scientific_use, "scientific_use")
-  .assert_optional_character(explanation_design, "explanation_design")
+  .assert_optional_character(analytic_distribution, "data")
+  .assert_optional_character(scientific_use, "use")
+  .assert_optional_character(explanation_design, "procedure")
   .assert_optional_character(intended_users, "intended_users")
   .assert_optional_character(action, "action")
   .assert_optional_character(consequences, "consequences")
@@ -117,6 +155,7 @@ csdg_claim = function(
       claim_type = claim_type,
       target = target,
       semantics = semantics,
+      meaning = meaning,
       unit = unit,
       population = population,
       analytic_distribution = analytic_distribution,
@@ -137,6 +176,14 @@ csdg_claim = function(
       confirmatory = isTRUE(confirmatory),
       notes = notes,
       provenance = provenance,
+      scope = list(
+        quantity = target,
+        model = model_scope,
+        procedure = explanation_design,
+        data = analytic_distribution,
+        meaning = meaning,
+        use = scientific_use
+      ),
       coordinates = list(
         target = target,
         model_scope = model_scope,
@@ -158,37 +205,46 @@ csdg_claim = function(
   )
 }
 
-#' Revise an interpretation claim explicitly
+#' Revise a claim explicitly
 #'
 #' Creates a new claim card linked to an earlier claim.
-#' The function records the analyst's declared relation and does not infer that the revision is supported or maximal.
+#' A revised claim is a new claim with its own record and assessment, linked to its predecessor.
+#' The function records the declared relation of the scope and does not infer that the revision is supported.
 #' A revision requires a new identifier.
-#' Provenance and the legacy `confirmatory` flag are not inherited: provide new documentary metadata explicitly.
+#' Provenance and the legacy `confirmatory` flag are not inherited: provide new documentary metadata explicitly;
+#' a claim written after the results were seen is exploratory.
 #' Recording a revision does not remove the inferential consequences of outcome-dependent selection.
 #'
 #' @param claim A `CSDGClaim` to revise.
 #' @param id Unique identifier for the revised claim.
 #' @param statement Complete revised claim statement.
 #' @param claim_version Version label for the revised claim.
-#' @param revision_relation One of `"same"`, `"narrower"`, `"broader"`, or
-#'   `"alternative_or_incomparable"`.
-#' @param ... Named claim-card fields that replace fields inherited from `claim`.
+#' @param revision_relation Relation of the revised scope to the predecessor's scope: `"same"`, `"narrower"`,
+#'   `"broader"`, or `"incomparable"`. The legacy value `"alternative_or_incomparable"` is accepted with a
+#'   deprecation warning.
+#' @param ... Named claim-card fields that replace fields inherited from `claim`, for example `model =
+#'   "fitted_model"` or `quantity = "..."`.
 #'
 #' @return A `CSDGClaim` linked to `claim` through `parent_claim_id`.
 #' @examples
 #' original = csdg_claim(
-#'   id = "claim_original",
-#'   statement = "The explanation applies to every model and setting.",
-#'   target = "prediction",
-#'   population = "analytic sample",
-#'   analytic_distribution = "observed rows"
+#'   id = "both_models",
+#'   statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
+#'   claim_type = "global_explanation",
+#'   quantity = "marginal PFI with squared error",
+#'   model = "several_models",
+#'   procedure = "each item permuted independently of the other item and the outcome",
+#'   data = "Z standard normal; item 1 = item 2 = outcome = Z",
+#'   meaning = "model_description",
+#'   use = "scientific description"
 #' )
 #' revised = csdg_claim_revision(
 #'   original,
-#'   id = "claim_revised",
+#'   id = "model_a",
 #'   claim_version = "C1",
 #'   revision_relation = "narrower",
-#'   statement = "The explanation describes the selected model in the analytic sample."
+#'   statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
+#'   model = "fitted_model"
 #' )
 #' revised
 #' @export
@@ -203,18 +259,56 @@ csdg_claim_revision = function(
   assert_string(id, min.chars = 1L, .var.name = "id")
   assert_string(statement, min.chars = 1L, .var.name = "statement")
   assert_string(claim_version, min.chars = 1L, .var.name = "claim_version")
-  if (identical(id, claim$id)) .csdg_stop("A revised claim requires a new `id`; historical propositions are preserved.")
+  if (identical(id, claim$id)) .csdg_stop("A revised claim requires a new `id`; earlier claims are preserved.")
+  assert_string(revision_relation, min.chars = 1L, .var.name = "revision_relation")
+  revision_relation = .csdg_map_legacy(revision_relation, .csdg_legacy_relations, "Revision relation")
   assert_choice(
     revision_relation,
-    .csdg_claim_relations,
+    .csdg_scope_relations,
     .var.name = "revision_relation"
   )
   replacements = list(...)
   .assert_named_dots(replacements)
+  if (!is.null(replacements$model)) {
+    replacements$model_scope = replacements$model
+    replacements$model = NULL
+  }
+  if (!is.null(replacements$model_scope)) {
+    replacements$model_scope = .csdg_map_legacy(replacements$model_scope, .csdg_legacy_model_scopes, "Model value")
+  }
+  if (!is.null(replacements$semantics)) {
+    .assert_choice(
+      replacements$semantics,
+      c("fitted_model_description", "hypothetical_model_query", "causal", "recourse"),
+      "semantics"
+    )
+    .csdg_deprecate(
+      replacements$semantics,
+      paste0("meaning = ", .csdg_legacy_semantics[[replacements$semantics]]),
+      "semantics"
+    )
+  }
   inherited = unclass(claim)
   inherited$completeness = NULL
   inherited$coordinates = NULL
+  inherited$scope = NULL
   inherited$additional = NULL
+  # A replacement under either name replaces both the scope element and its legacy alias.
+  aliases = c(quantity = "target", procedure = "explanation_design", data = "analytic_distribution",
+    use = "scientific_use", meaning = "semantics")
+  for (new_name in names(aliases)) {
+    old_name = aliases[[new_name]]
+    if (new_name %in% names(replacements) || old_name %in% names(replacements)) {
+      inherited[[new_name]] = NULL
+      inherited[[old_name]] = NULL
+    }
+  }
+  if (is.null(inherited$meaning) && is.null(replacements$meaning) && is.null(replacements$semantics)) {
+    inherited$meaning = claim$meaning %||% "model_description"
+  }
+  if (!is.null(replacements$meaning) && is.null(replacements$semantics)) {
+    inherited$semantics = NULL
+  }
   inherited$id = id
   inherited$statement = statement
   inherited$claim_version = claim_version
@@ -223,7 +317,11 @@ csdg_claim_revision = function(
   inherited$provenance = NULL
   inherited$confirmatory = FALSE
   inherited = .recursive_modify(inherited, replacements)
-  do.call(csdg_claim, inherited)
+  # Legacy values supplied as replacements were reported above; inherited legacy fields are not reported again.
+  withCallingHandlers(
+    do.call(csdg_claim, inherited),
+    mlr3autoiml_deprecated = function(w) invokeRestart("muffleWarning")
+  )
 }
 
 .csdg_validate_claim_provenance = function(provenance) {

@@ -455,7 +455,8 @@ csdg_transport_status = function(
     (.is_scalar_string(criterion_source) && .is_scalar_string(criterion_rationale))
   if (!any(finite)) {
     return(list(
-      status = "unresolved",
+      status = "open",
+      legacy_status = "unresolved",
       passed = NA,
       threshold = threshold,
       criterion_source = criterion_source,
@@ -466,7 +467,8 @@ csdg_transport_status = function(
   }
   if (!is.null(threshold) && !criterion_complete) {
     return(list(
-      status = "unresolved",
+      status = "open",
+      legacy_status = "unresolved",
       passed = NA,
       threshold = threshold,
       criterion_source = criterion_source,
@@ -478,7 +480,8 @@ csdg_transport_status = function(
   if (identical(direction, "maximize")) {
     if (is.null(minimum_transport_score)) {
       return(list(
-        status = "unresolved",
+        status = "open",
+        legacy_status = "unresolved",
         passed = NA,
         threshold = NULL,
         criterion_source = NULL,
@@ -488,7 +491,8 @@ csdg_transport_status = function(
     }
     passed = all(values[finite] >= minimum_transport_score)
     list(
-      status = if (passed) "met" else "not_met",
+      status = if (passed) "supported" else "contradicted",
+      legacy_status = if (passed) "met" else "not_met",
       passed = passed,
       threshold = minimum_transport_score,
       criterion_source = criterion_source,
@@ -498,7 +502,8 @@ csdg_transport_status = function(
   } else {
     if (is.null(maximum_transport_score)) {
       return(list(
-        status = "unresolved",
+        status = "open",
+        legacy_status = "unresolved",
         passed = NA,
         threshold = NULL,
         criterion_source = NULL,
@@ -508,7 +513,8 @@ csdg_transport_status = function(
     }
     passed = all(values[finite] <= maximum_transport_score)
     list(
-      status = if (passed) "met" else "not_met",
+      status = if (passed) "supported" else "contradicted",
+      legacy_status = if (passed) "met" else "not_met",
       passed = passed,
       threshold = maximum_transport_score,
       criterion_source = criterion_source,

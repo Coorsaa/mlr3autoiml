@@ -6,6 +6,9 @@
 #' [`mlr3`][mlr3::mlr3-package] tasks and learners. It produces a reproducible
 #' audit trail and data-/task-dependent interpretability artifacts.
 #'
+#' This is the earlier AutoIML workflow, kept for compatibility. Its gate identifiers and pass/warn/fail/skip labels
+#' are not the CSDG gate registry ([csdg_gate_registry()]) or its vocabulary; use [csdg_audit()] for CSDG.
+#'
 #' Run the workflow with `$run()`; inspect results with `$overview()` and
 #' `$report_card()`; retrieve non-plot tables via `$tables()`; and generate
 #' ggplot2 outputs via `$plot(type=...)`.

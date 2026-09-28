@@ -1,18 +1,27 @@
 formal_concept,package_function_or_class,software_field,allowed_values_or_scope
-Claim target,csdg_claim,target,Free-text target or interpreted quantity
-Claim model scope,csdg_claim,model_scope,selected_model|cross_fitted_pipeline|near_equivalent_models|model_class|unspecified
-Claim explanation semantics,csdg_claim,semantics,fitted_model_description|hypothetical_model_query|causal|recourse
-Claim analytic context,csdg_claim,analytic_distribution,Free-text distribution population measurement and sampling context
-Claim intended use,csdg_claim,scientific_use,Free-text intended and excluded use
-Claim explanation design,csdg_claim,explanation_design,Free-text perturbation reference neighborhood and support design
-Inference level,csdg_claim,claim_level,functional|predictive|substantive
-Use adequacy assertion,csdg_claim,use_claim,TRUE|FALSE; separate from inference level
-Claim relation,csdg_claim_relation,relation,same|narrower|broader|alternative_or_incomparable
-Module applicability,csdg_gate_plan;csdg_evidence_record,applicable,TRUE|FALSE
-Evidence role,csdg_gate_plan;csdg_evidence_record,role,necessary_requirement|potential_defeater|graded_support|descriptive_context
-Evidence availability,csdg_evidence_record,availability,complete|incomplete|unavailable|not_applicable
-Observed result,csdg_evidence_record,result_direction,supports|challenges|mixed|descriptive|not_evaluated
-Claim-specific criterion,csdg_evidence_record,criterion;criterion_source;criterion_rationale,No universal substantive default
-Defeater materiality,csdg_evidence_record,materiality;adjudication_basis,Explicit transparent materialization only
-Claim consequence,csdg_evidence_record,claim_consequence,none|retain_exact_claim|revise_claim|exact_claim_not_retained|unresolved
-Claim decision,csdg_adjudicate_claim,decision,met|not_met|unresolved|not_applicable
+Claim,csdg_claim,statement,Free-text claim as it would appear in the article
+Origin,csdg_claim,provenance$origin,specified_before_results (prespecified)|retrospective_exploratory (exploratory)|independently_confirmed (later tested on new data)
+Scope element quantity (T),csdg_claim,quantity (legacy field target),Free-text quantity (estimand) with definition scale and domain
+Scope element model (M),csdg_claim,model (legacy field model_scope),fitted_model|learner|several_models|unspecified
+Scope element procedure (Q),csdg_claim,procedure (legacy field explanation_design),Free-text estimator: perturbation reference data resampling neighborhood aggregation
+Scope element data (D),csdg_claim,data (legacy field analytic_distribution),Free-text sample or population with measurement inclusion weighting missing data and clustering
+Scope element meaning (S),csdg_claim,meaning,model_description|population_claim|causal_claim
+Scope element use (U),csdg_claim,use (legacy field scientific_use),Free-text intended and excluded uses
+Use asserting understanding or benefit,csdg_claim,use_claim,TRUE|FALSE; requires G7b
+Gate,csdg_gate_registry,gate_id;gate_name;area,G0a Specification|G0b Measurement and data|G1 Predictive performance|G2 Procedure|G3a Calibration|G3b Decisions|G4 Local fidelity|G5 Stability|G6a Models|G6b Settings|G7a Subgroups|G7b Users
+Gate area,csdg_gate_registry,area,"Foundation of the claim|Predictions, explanations, and decisions|Extensions"
+Required if the claim ...,csdg_gate_registry;csdg_gate_plan,required_if;required,Condition of Table 3 applied to the scope
+Causal design (not a gate),csdg_gate_plan;csdg_evidence_record,attr(plan; causal_design_required);gate_id = CD,Required by a causal claim
+Required property (R),csdg_evidence_record,role = required_property;status,supported|contradicted|open
+Established counterevidence (K),csdg_evidence_record,role = established_counterevidence,Sets the property named by gate_id to contradicted
+Unresolved threat,csdg_evidence_record,role = unresolved_threat,Sets the property named by gate_id to open unless it is contradicted
+Context (X),csdg_evidence_record;csdg_report_card,role = context;evidence_role = context and status = context,Reported only; no property status; never changes the assessment
+Property entries,csdg_evidence_record,required_property;criterion;criterion_source;criterion_rationale;observation;relevance_to_proposition,No universal substantive default for criteria
+Variation,csdg_evidence_record,varied_component;held_constant;same_estimand;invariance_claimed,What varied and what was held fixed
+Assessment,csdg_adjudicate_claim;csdg_claim_report,assessment (deprecated alias decision),met|not_met|unresolved|not_applicable (claim placed outside the evaluation)
+Decision,csdg_adjudicate_claim;csdg_claim_report;csdg_claim_matrix,decision_options (csdg_claim_matrix: decision),retain|revise|withhold
+Scope relation of a revision,csdg_claim_relation,coordinate_relations;scope_relation,same|narrower|broader|incomparable
+Logical relation of a revision,csdg_claim_relation,proposition_relation,unchecked|same|logical_weakening|logical_strengthening|incomparable
+Kind of revision,csdg_claim_relation,revision_kind,unspecified|logical_weakening (weakening)|restriction_without_entailment|change_of_question
+Corrected resampled interval,csdg_learner_pfi_interval,estimate;se;lower;upper;df,Nadeau and Bengio (2003) correction with K - 1 degrees of freedom
+Monte Carlo rule,csdg_pfi_mc_difference,threshold;beyond_monte_carlo_error,t quantile with R - 1 degrees of freedom times the Monte Carlo standard error

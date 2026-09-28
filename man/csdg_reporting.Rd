@@ -11,7 +11,7 @@
 \usage{
 csdg_report_card(x)
 
-csdg_claim_report(x)
+csdg_claim_report(x, evidence = NULL)
 
 csdg_export(
   x,
@@ -32,6 +32,8 @@ csdg_plot(
 }
 \arguments{
 \item{x}{A \code{CSDGResult}, gate result, or supported evidence object.}
+
+\item{evidence}{Optional list of \code{CSDGEvidenceRecord} objects for \code{csdg_claim_report()}.}
 
 \item{path}{Parent export directory.}
 
@@ -56,10 +58,23 @@ print-oriented rendering with redundant shapes and line types.}
 A report table, claim report, invisibly returned bundle path, or \link[ggplot2:ggplot]{ggplot2::ggplot} object.
 }
 \description{
-Creates manuscript-facing report cards, diagnostic plots, and an atomic audit bundle containing cards, gate
-evidence, provenance, uncertainty boundaries, and an MD5 manifest.
-CSDG report cards keep applicability, evidence role, availability, result direction, criterion provenance,
-including distinct criterion source and rationale fields, materiality, adjudication basis, and claim consequence
-in separate fields.
-They never consume legacy \code{GateResult} statuses as CSDG claim decisions.
+\code{csdg_report_card()} lists the gates with their area, evidence question, the condition under which the claim
+requires them, whether they are required (\code{required}, \code{plan_role}), and the status of each required property
+(\code{"supported"}, \code{"contradicted"}, \code{"open"}, or \code{"error"}). A gate that the claim does not require is context
+(\code{evidence_role = "context"}): it is reported only and has no property status, so its \code{status} is \code{"context"} if
+it was run and \code{"not_required"} otherwise. The column \code{diagnostic_status} keeps the computed result of every gate
+(for a required gate it equals \code{status}); for a context gate it never changes the assessment.
+\code{csdg_claim_report()} applies the decision rule to the required properties: the \code{assessment} is \code{"not_met"} if at
+least one is contradicted; otherwise \code{"unresolved"} if at least one is open (an error counts as open, and a causal
+claim without a causal design is open); otherwise \code{"met"}. \code{decision_options} lists the decisions that the
+assessment permits: a met claim is retained; a claim that is not met or unresolved is revised or withheld.
+Records supplied in \code{evidence} replace the audit status of their gates, and established counterevidence and
+unresolved threats are applied as in \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}. A claim written after the results were seen
+(origin \code{"retrospective_exploratory"}) is labeled "(exploratory)".
+\code{csdg_export()} writes an atomic audit bundle containing cards, gate evidence, provenance, uncertainty
+boundaries, and an MD5 manifest. No aggregate score is computed.
+The columns \code{applicable}, \code{applicability}, \code{materiality}, \code{adjudication_basis}, and \code{claim_consequence} of the
+report card and \code{decision} (an alias of \code{assessment}), \code{decision_basis} (an alias of \code{assessment_basis}),
+\code{met_gates}, \code{not_met_gates}, and \code{unresolved_gates} of the claim report are deprecated aliases kept for one
+release for compatibility with versions up to 0.1.5, which stored the assessment under the name \code{decision}.
 }

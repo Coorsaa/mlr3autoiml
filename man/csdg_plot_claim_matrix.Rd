@@ -8,7 +8,7 @@ csdg_plot_claim_matrix(
   x,
   title = "Claim-by-evidence matrix",
   subtitle = paste("User-supplied claim judgments; not inferred by the package.",
-    "Statuses are categorical and are not combined into an overall score."),
+    "Assessments are categorical and are not combined into an overall score."),
   claim_width = 34L,
   evidence_width = 22L,
   conclusion_width = 48L,

@@ -2,50 +2,328 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/mlr3autoiml/csdg-claim-adjudication.schema.json",
   "title": "CSDG claim adjudication",
-  "description": "Current adjudication output with claim scope separate from module applicability. Met is conditional on the supplied requirements, not a certificate of complete scientific support. Historical objects without scope metadata are not silently reinterpreted.",
+  "description": "Output of the decision rule (mlr3autoiml 0.1.6): the assessment is not met if a required property is contradicted (including by established counterevidence); otherwise unresolved if one is open or none was supplied; otherwise met. Met holds relative to the listed required properties. decision_options lists the decisions that the assessment permits (retain; or revise and withhold). The field decision is a deprecated alias of assessment.",
   "type": "object",
   "required": [
-    "decision", "claim_applicable", "applicability_source", "applicability_rationale",
-    "blocking_gate_ids", "unresolved_gate_ids", "proposition_linkage", "rationale"
+    "assessment",
+    "decision",
+    "decision_options",
+    "claim_applicable",
+    "applicability_source",
+    "applicability_rationale",
+    "proposition_linkage",
+    "properties",
+    "contradicted_gate_ids",
+    "open_gate_ids",
+    "counterevidence_gate_ids",
+    "threat_gate_ids",
+    "context_gate_ids",
+    "blocking_gate_ids",
+    "unresolved_gate_ids",
+    "rationale"
   ],
   "properties": {
-    "decision": {"enum": ["met", "not_met", "unresolved", "not_applicable"]},
-    "claim_applicable": {"type": "boolean"},
-    "applicability_source": {"enum": ["explicit", "legacy_default"]},
-    "applicability_rationale": {"type": "string", "minLength": 1},
-    "blocking_gate_ids": {"$ref": "#/$defs/gate_ids"},
-    "unresolved_gate_ids": {"$ref": "#/$defs/gate_ids"},
-    "proposition_linkage": {"enum": ["documented_not_verified", "not_recorded_for_all_evidence"]},
-    "rationale": {"type": "string", "minLength": 1}
+    "assessment": {
+      "enum": [
+        "met",
+        "not_met",
+        "unresolved",
+        "not_applicable"
+      ]
+    },
+    "decision": {
+      "description": "Deprecated alias of assessment (versions up to 0.1.5); equal to assessment.",
+      "enum": [
+        "met",
+        "not_met",
+        "unresolved",
+        "not_applicable"
+      ]
+    },
+    "decision_options": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "retain",
+          "revise",
+          "withhold"
+        ]
+      }
+    },
+    "claim_applicable": {
+      "type": "boolean"
+    },
+    "applicability_source": {
+      "enum": [
+        "explicit",
+        "legacy_default"
+      ]
+    },
+    "applicability_rationale": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proposition_linkage": {
+      "enum": [
+        "documented_not_verified",
+        "not_recorded_for_all_evidence"
+      ]
+    },
+    "properties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "gate_id",
+          "status",
+          "source",
+          "rationale"
+        ],
+        "properties": {
+          "gate_id": {
+            "enum": [
+              "G0a",
+              "G0b",
+              "G1",
+              "G2",
+              "G3a",
+              "G3b",
+              "G4",
+              "G5",
+              "G6a",
+              "G6b",
+              "G7a",
+              "G7b",
+              "CD"
+            ]
+          },
+          "status": {
+            "enum": [
+              "supported",
+              "contradicted",
+              "open"
+            ]
+          },
+          "source": {
+            "enum": [
+              "record",
+              "plan",
+              "counterevidence",
+              "threat"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "contradicted_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "open_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "counterevidence_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "threat_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "context_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "blocking_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "unresolved_gate_ids": {
+      "$ref": "#/$defs/gate_ids"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
   },
   "$defs": {
     "gate_ids": {
       "type": "array",
       "uniqueItems": true,
-      "items": {"enum": ["G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b"]}
+      "items": {
+        "enum": [
+          "G0a",
+          "G0b",
+          "G1",
+          "G2",
+          "G3a",
+          "G3b",
+          "G4",
+          "G5",
+          "G6a",
+          "G6b",
+          "G7a",
+          "G7b",
+          "CD"
+        ]
+      }
     }
   },
   "allOf": [
     {
-      "if": {"properties": {"claim_applicable": {"const": false}}},
-      "then": {
+      "if": {
         "properties": {
-          "decision": {"const": "not_applicable"},
-          "applicability_source": {"const": "explicit"},
-          "blocking_gate_ids": {"maxItems": 0},
-          "unresolved_gate_ids": {"maxItems": 0}
+          "claim_applicable": {
+            "const": false
+          }
         }
       },
-      "else": {"properties": {"decision": {"enum": ["met", "not_met", "unresolved"]}}}
+      "then": {
+        "properties": {
+          "assessment": {
+            "const": "not_applicable"
+          },
+          "decision": {
+            "const": "not_applicable"
+          },
+          "applicability_source": {
+            "const": "explicit"
+          },
+          "decision_options": {
+            "maxItems": 0
+          },
+          "properties": {
+            "maxItems": 0
+          },
+          "blocking_gate_ids": {
+            "maxItems": 0
+          },
+          "unresolved_gate_ids": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "assessment": {
+            "enum": [
+              "met",
+              "not_met",
+              "unresolved"
+            ]
+          },
+          "decision": {
+            "enum": [
+              "met",
+              "not_met",
+              "unresolved"
+            ]
+          }
+        }
+      }
     },
     {
-      "if": {"properties": {"decision": {"const": "met"}}},
-      "then": {"properties": {"blocking_gate_ids": {"maxItems": 0}, "unresolved_gate_ids": {"maxItems": 0}}}
+      "if": {
+        "properties": {
+          "assessment": {
+            "const": "met"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "met"
+          },
+          "blocking_gate_ids": {
+            "maxItems": 0
+          },
+          "unresolved_gate_ids": {
+            "maxItems": 0
+          },
+          "contradicted_gate_ids": {
+            "maxItems": 0
+          },
+          "open_gate_ids": {
+            "maxItems": 0
+          },
+          "counterevidence_gate_ids": {
+            "maxItems": 0
+          },
+          "properties": {
+            "minItems": 1
+          },
+          "decision_options": {
+            "const": [
+              "retain"
+            ]
+          }
+        }
+      }
     },
     {
-      "if": {"properties": {"decision": {"const": "not_met"}}},
-      "then": {"properties": {"blocking_gate_ids": {"minItems": 1}}},
-      "else": {"properties": {"blocking_gate_ids": {"maxItems": 0}}}
+      "if": {
+        "properties": {
+          "assessment": {
+            "const": "not_met"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "not_met"
+          },
+          "blocking_gate_ids": {
+            "minItems": 1
+          },
+          "contradicted_gate_ids": {
+            "minItems": 1
+          },
+          "decision_options": {
+            "const": [
+              "revise",
+              "withhold"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "blocking_gate_ids": {
+            "maxItems": 0
+          },
+          "contradicted_gate_ids": {
+            "maxItems": 0
+          },
+          "counterevidence_gate_ids": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assessment": {
+            "const": "unresolved"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "const": "unresolved"
+          },
+          "decision_options": {
+            "const": [
+              "revise",
+              "withhold"
+            ]
+          }
+        }
+      }
     }
   ],
   "additionalProperties": false

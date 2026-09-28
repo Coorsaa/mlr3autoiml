@@ -3,76 +3,39 @@
 
 # mlr3autoiml
 
-Start with **[the complete claim-to-evidence
-walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**. After
-installation (see below), open
-`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`. It
-works through the numerical example of the accompanying article (its two
-claims plus an unresolved third claim), a small mlr3 audit, and an export
-and read-back check.
+`mlr3autoiml` implements **Claim-Scoped Diagnostic Gates (CSDG)** for
+the **mlr3 ecosystem**. CSDG replaces the question “What does this
+explanation show?” with “Does the evidence support this claim?” Its
+workflow has five steps: write the claim, the conclusion you intend to
+report (`csdg_claim()`); specify its scope in six elements, the
+quantity, model, procedure, data, meaning, and use; derive the
+properties the claim requires from the 12 gates (`csdg_gate_registry()`,
+`csdg_gate_plan()`); evaluate the evidence on each required property
+(`csdg_evidence_record()`, with diagnostics from `csdg_audit()`); and
+decide and report with a fixed rule (`csdg_adjudicate_claim()`).
 
-`mlr3autoiml` 0.1.5 primarily implements **Claim-Scoped Diagnostic Gates
-(CSDG)** for interpretable machine-learning analyses in the **mlr3
-ecosystem**. A CSDG audit records the intended claim, measurement and
-preprocessing choices, explanation semantics, gate-specific evidence,
-and the limits of the resulting interpretation. Module availability,
-evidence role, result direction, criterion provenance, materiality, and
-claim consequence are separate fields. CSDG does not calculate an
-aggregate score, readiness grade, or Interpretation Evidence Level, and
-it does not certify causal validity, fairness, or deployment readiness.
-Claims use exactly three inference levels (`functional`, `predictive`,
-and `substantive`). A separate `use_claim` flag records whether the
-proposition additionally asserts adequacy for an audience, workflow,
-implementation, or use.
+The package records the claim and its scope, derives the gate plan,
+computes diagnostics, and applies the decision rule. The researcher sets
+the criteria, states the relevance of each observation, and enters
+established counterevidence and unresolved threats. Favorable results
+never offset a contradicted property, and no aggregate score is
+computed.
 
-The claim-scoped interface distinguishes calibration from utility
-(G3a/G3b), model multiplicity from setting transport (G6a/G6b), and
-technical subgroup behavior from audience and workflow evidence
-(G7a/G7b). The earlier combined gate names below belong only to the
-retained `AutoIML` compatibility interface.
+| Term | Values |
+|----|----|
+| Scope elements | quantity, model, procedure, data, meaning (model description, population claim, causal claim), use |
+| Evidence roles | required property, established counterevidence, unresolved threat, context |
+| Status of a required property | supported, contradicted, open |
+| Assessment of a claim | not met if a required property is contradicted; otherwise unresolved if one is open; otherwise met |
+| Decision | a met claim is retained; a claim that is not met or unresolved is revised or withheld |
 
-The claim object is `C = (phi, kappa)`: `statement` records the
-proposition, while `kappa = (T, M, S, D, U, Q)` records target, model
-scope, explanation semantics, analytic distribution and measurement
-context, intended use, and explanation design. Matching contexts cannot
-establish matching propositions. `csdg_claim_relation()` separates the
-declared context comparison from an explicit proposition comparison;
-without the latter, `relation` is `unchecked`. Neither a declaration nor
-a complete record is a logical proof. Evidence roles are exactly
-`necessary_requirement`, `potential_defeater`, `graded_support`, and
-`descriptive_context`. `csdg_evidence_record()` keeps those roles
-distinct from completion and results, and `csdg_adjudicate_claim()`
-applies conditional non-compensation without adding evidence into a
-score.
-
-Claim applicability is declared independently of the supplied modules.
-An in-scope claim with no relevant evidence is unresolved, not out of
-scope. Recorded consequences constrain adjudication; unresolved evidence
-cannot silently become a favorable decision. See [the 0.1.4 contract
-migration note](inst/MIGRATION_0_1_4.md).
-
-Sensitivity records distinguish the varied component, what stays fixed,
-whether the estimand is unchanged, and whether the proposition claims
-invariance. A legitimate change in question is not automatically
-counterevidence. New claim-constraining variation requires a
-required-property, observation, and proposition-relevance chain; changed
-or uncertain estimands additionally require explicitly claimed
-invariance. Legacy records remain readable with linkage marked
-`not_recorded`, not retrospectively validated. Claim provenance can
-record prior specification, exploratory revision, or independently
-confirmed evidence; these are documentary origins, not interpretation
-levels.
-
-`csdg_resolve_sources()` verifies case-exact public paths and declared
-protected or external references without opening protected records or
-fetching external resources. Availability and checksum agreement do not
-prove evidentiary support. See [migration
-notes](inst/MIGRATION_0_1_2.md) for interface examples and the explicit
-context-only compatibility change.
-
-Core dependencies: `mlr3`, `mlr3measures`, `mlr3misc`, `data.table`,
-`checkmate`, `R6`. Optional integrations (pipelines, SHAP, iml,
-plotting) activate when the corresponding packages are available.
+Start with **[the complete
+walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**
+(`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`),
+which follows the five steps with the numerical example of the
+accompanying article. Version 0.1.6 uses the vocabulary of the article;
+labels of earlier versions still work with a deprecation warning (see
+[the migration note](inst/MIGRATION_0_1_6.md)).
 
 ## Installation
 
@@ -84,107 +47,239 @@ library(mlr3autoiml)
 vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")
 ```
 
-Released versions are tagged. Version 0.1.0 produced the primary analyses of the accompanying article; install a
-tagged version with, for example, `remotes::install_github("coorsaa/mlr3autoiml@v0.1.5")`.
+Released versions are tagged, for example
+`remotes::install_github("coorsaa/mlr3autoiml@v0.1.6")`. Version 0.1.0
+produced the primary analyses of the accompanying article.
 
-## CSDG quick start
+## Quick start: the numerical example of the article
 
-Declare the question, estimand, and scope before evaluating the
-diagnostic results, rather than prescribing a desired positive finding.
-Exploratory revisions are legitimate when their selection basis remains
-explicit. This example requests descriptive held-out performance,
-calibration, and global permutation-importance evidence for one selected
-model in the analytic sample. Because it supplies no use-linked adequacy
-criterion, the corresponding adequacy questions remain unresolved.
-
-Prediction-based triage requires appropriate prediction, calibration,
-use, and consequence evidence, not automatically causal effects of every
-predictor. Advice to change a predictor to improve an outcome requires
-an intervention argument.
+Two items carry the same information: `Z` is standard normal, and both
+items and the outcome equal `Z`. Model A predicts with item 1 and model
+B with item 2 (`f_A(x) = x1`, `f_B(x) = x2`); because the outcome equals
+each item, the linear fit in every fold is exact. The held-out PFI with
+squared error is computed with the package.
 
 ``` r
 library(mlr3)
-library(mlr3autoiml)
 library(mlr3learners)
+library(mlr3pipelines)
+library(mlr3autoiml)
+library(data.table)
 
-task = tsk("german_credit")
-learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
-
-claim = csdg_claim(
-  id = "credit_risk_description",
-  statement = paste(
-    "Held-out predictive performance, calibration, and global permutation importance",
-    "are described for the selected model in the analytic sample."
-  ),
-  claim_type = c("predictive_performance", "calibration", "global_explanation"),
-  target = "credit risk",
-  unit = "credit application",
-  population = "applications represented by the analytic sample",
-  analytic_distribution = "the observed German credit example data",
-  model_scope = "selected_model",
-  setting_scope = "analytic_sample",
-  scientific_use = "descriptive model audit",
-  explanation_design = "held-out marginal permutation importance"
+set.seed(20260926)
+n = 10000L
+z = rnorm(n)
+task = as_task_regr(data.frame(item_1 = z, item_2 = z, y = z), target = "y", id = "numerical_example")
+model_using = function(item) {
+  as_learner(po("select", selector = selector_name(item), id = paste0("use_", item)) %>>% lrn("regr.lm"))
+}
+folds = rsmp("cv", folds = 2L)
+fits = list(
+  A = csdg_resample(task, model_using("item_1"), folds, measures = msrs("regr.mse"), seed = 1L),
+  B = csdg_resample(task, model_using("item_2"), folds, measures = msrs("regr.mse"), seed = 1L)
 )
-
-measurement = csdg_measurement(
-  outcome = task$target_names,
-  predictors = task$feature_names,
-  data_source = "mlr3 German credit example task",
-  sample_definition = "all rows in the example task",
-  unit = "credit application",
-  missingness = "no missing values in the supplied task",
-  preprocessing = "the complete learner is refitted within every training split",
-  verification = list(status = "not_checked")
-)
-
-explanation = csdg_explanation(
-  method_ids = "pfi",
-  scope = "global",
-  target = "positive-class probability"
-)
-
-audit = csdg_audit(
-  task = task,
-  learner = learner,
-  claim = claim,
-  measurement = measurement,
-  explanation = explanation,
-  config = csdg_config(
-    seed = 42L,
-    resampling = list(folds = 3L, repeats = 1L),
-    stability = list(pfi_repetitions = 3L)
-  )
-)
-
-csdg_report_card(audit)
-csdg_claim_report(audit)
-bundle = csdg_export(audit, path = "csdg-output")
+groups = list(item_1 = "item_1", item_2 = "item_2", both_items = c("item_1", "item_2"))
+pfi = lapply(fits, csdg_fold_pfi, feature_groups = groups, loss = "mse", repetitions = 20L, seed = 2L)
+marginal = rbindlist(lapply(names(pfi), function(model) {
+  pfi[[model]]$summary[, .(model = model, feature_group, mean_importance)]
+}))
+dcast(marginal, model ~ feature_group, value.var = "mean_importance")[, lapply(.SD, function(x) {
+  if (is.numeric(x)) round(x, 2) else x
+})]
+#> Key: <model>
+#>     model both_items item_1 item_2
+#>    <char>      <num>  <num>  <num>
+#> 1:      A       1.98   1.98   0.00
+#> 2:      B       1.98   0.00   1.99
 ```
 
-When a numerical criterion is appropriate, supply both the value and its
-provenance. For example,
+The exact population values are 2 and 0 in model A and 0 and 2 in model
+B; permuting both items together (grouped PFI) gives 2 in both models.
+Conditional PFI, which draws the permuted item from its distribution
+given the other item, is 0 for both items in both models; here the
+permutation within strata of `Z` implements it, because each item equals
+the other.
+
+``` r
+conditional = lapply(fits, csdg_fold_pfi, feature_groups = groups[1:2], loss = "mse", repetitions = 5L,
+  strata = z, seed = 3L)
+rbindlist(lapply(names(conditional), function(model) {
+  conditional[[model]]$summary[, .(model = model, feature_group, mean_importance)]
+}))
+#>     model feature_group mean_importance
+#>    <char>        <char>           <num>
+#> 1:      A        item_1               0
+#> 2:      A        item_2               0
+#> 3:      B        item_1               0
+#> 4:      B        item_2               0
+```
+
+**Steps 1 and 2: the claim and its scope.** The claim covers both
+models.
+
+``` r
+claim_both = csdg_claim(
+  id = "both_models",
+  statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
+  claim_type = "global_explanation",
+  quantity = "marginal PFI with squared error: increase in expected squared error when one item is permuted",
+  model = "several_models",
+  procedure = "each item permuted independently of the other item and the outcome; 20 permutations per fold",
+  data = "Z standard normal; item 1 = item 2 = outcome = Z; 10,000 simulated observations",
+  meaning = "model_description",
+  use = "scientific description",
+  provenance = list(origin = "specified_before_results", date = "2026-09-26",
+    time_basis = "date of the example", selection_basis = "written before the PFI values were computed",
+    evidence_ids = character())
+)
+measurement = csdg_measurement(outcome = "y", predictors = c("item_1", "item_2"), data_source = "simulation",
+  sample_definition = "all simulated observations", missingness = "none", preprocessing = "none")
+explanation = csdg_explanation(method_ids = "pfi", feature_groups = groups)
+```
+
+**Step 3: the required properties.** Besides G0a and G0b, the claim
+requires G2 (it interprets PFI values), G5 (it states an ordering), and
+G6a (it covers two models). Held-out performance (G1) is context,
+because a model description holds whatever the model’s accuracy.
+
+``` r
+plan = csdg_gate_plan(claim_both, measurement, explanation)
+plan[, .(gate_id, gate_name, required, plan_role)]
+#>     gate_id              gate_name required    plan_role
+#>      <char>                 <char>   <lgcl>       <char>
+#>  1:     G0a          Specification     TRUE     required
+#>  2:     G0b   Measurement and data     TRUE     required
+#>  3:      G1 Predictive performance    FALSE      context
+#>  4:      G2              Procedure     TRUE     required
+#>  5:     G3a            Calibration    FALSE not_required
+#>  6:     G3b              Decisions    FALSE not_required
+#>  7:      G4         Local fidelity    FALSE not_required
+#>  8:      G5              Stability     TRUE     required
+#>  9:     G6a                 Models     TRUE     required
+#> 10:     G6b               Settings    FALSE not_required
+#> 11:     G7a              Subgroups    FALSE not_required
+#> 12:     G7b                  Users    FALSE not_required
+```
+
+**Step 4: the evidence.** In model A, the difference between the two
+items is far beyond the error due to random permutation (Monte Carlo
+rule, per fold). The decisive property is G6a: model B reverses the
+ordering.
+
+``` r
+csdg_pfi_mc_difference(pfi$A, "item_1", "item_2")[, .(iteration, estimate, threshold, beyond_monte_carlo_error)]
+#>    iteration estimate   threshold beyond_monte_carlo_error
+#>        <int>    <num>       <num>                   <lgcl>
+#> 1:         1 1.965369 0.009051588                     TRUE
+#> 2:         2 1.995245 0.009445336                     TRUE
+
+property = function(gate_id, status, required_property, observation, relevance, criterion = NULL) {
+  csdg_evidence_record(
+    gate_id, TRUE, "required_property", status = status,
+    criterion = if (!is.null(criterion)) list(value = criterion, direction = "qualitative"),
+    criterion_source = if (!is.null(criterion)) "translated from the claim",
+    criterion_rationale = if (!is.null(criterion)) required_property,
+    rationale = observation, required_property = required_property, observation = observation,
+    relevance_to_proposition = relevance
+  )
+}
+foundation = list(
+  property("G0a", "supported", "The claim and its six scope elements are stated.",
+    "All six elements are recorded.", "They fix the quantity, the models, and the procedure."),
+  property("G0b", "supported", "The data cover what the claim names.",
+    "The population is defined exactly; there is no measurement error or preprocessing.",
+    "The claim names no construct and no other population."),
+  property("G2", "supported", "Marginal permutation computes the PFI that the claim names.",
+    "Squared error and marginal permutation; both models are defined for all inputs.",
+    "The claim names the perturbation, so the unrealistic permuted inputs are part of what it describes."),
+  property("G5", "supported", "The ordering persists when the quantity is estimated again.",
+    "Exact values do not vary.", "The same quantity is computed again.")
+)
+g6a = property("G6a", "contradicted", "Item 1 has the larger marginal PFI in A and in B.",
+  "PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B.",
+  "Only the model differs between the two computations, and the claim covers both models.",
+  criterion = "strict ordering in both models")
+```
+
+**Step 5: decide and report.** The original claim is not met and is
+revised to model A.
+
+``` r
+assessment_both = csdg_adjudicate_claim(c(foundation, list(g6a)), claim_applicable = TRUE, plan = plan)
+assessment_both
+#> <CSDGClaimAdjudication>
+#>   Assessment: not met 
+#>   Decision options: revise or withhold 
+#>   Required properties:
+#>    G0a: supported (record)
+#>    G0b: supported (record)
+#>    G2: supported (record)
+#>    G5: supported (record)
+#>    G6a: contradicted (record)
+#> 
+#>   A required property is contradicted; favorable results never offset it.
+
+claim_a = csdg_claim_revision(
+  claim_both, id = "model_a", claim_version = "C1", revision_relation = "narrower",
+  statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
+  model = "fitted_model",
+  provenance = list(origin = "retrospective_exploratory", date = "2026-09-26", time_basis = "date of the example",
+    selection_basis = "restriction chosen after the comparison of A and B", evidence_ids = "both_models_G6a")
+)
+plan_a = csdg_gate_plan(claim_a, measurement, explanation)
+plan_a[required == TRUE, gate_id]
+#> [1] "G0a" "G0b" "G2"  "G5"
+g2_a = property("G2", "supported",
+  "Marginal PFI with squared error in model A is larger for item 1, and the wording names the perturbation.",
+  "2 versus 0; conditional PFI 0 versus 0.",
+  "The computation uses the model, perturbation, and loss that the claim names.",
+  criterion = "strict ordering of the exact values; qualifier in the wording")
+assessment_a = csdg_adjudicate_claim(c(foundation[c(1L, 2L, 4L)], list(g2_a)), claim_applicable = TRUE,
+  plan = plan_a)
+assessment_a$assessment
+#> [1] "met"
+assessment_a$decision_options
+#> [1] "retain"
+```
+
+The revised claim is met (exploratory; it was written after the results
+were seen) and retained.
+
+## Diagnostics in an mlr3 workflow
+
+`csdg_audit()` derives the gate plan and computes the diagnostics of an
+mlr3 learner: held-out performance, dependence and support, calibration,
+decision curves, cross-fitted local fidelity, stability of held-out PFI,
+comparisons with similarly accurate models, leave-one-setting-out
+refits, and subgroup results. `csdg_report_card()` lists the gates with
+the status of each required property (a gate that the claim does not
+require is reported as context, without a property status), and
+`csdg_claim_report()` applies the decision rule to the audit and to
+evidence records that the researcher supplies.
+`csdg_learner_pfi_interval()` computes the corrected resampled interval
+of a learner-level mean across folds, and `csdg_pfi_mc_difference()`
+applies the Monte Carlo rule. `csdg_local_fidelity_audit()` evaluates
+local surrogates on points not used to fit them (the fitted surrogate is
+described in `?csdg_diagnostics`, section “Local surrogate”). A
+numerical criterion needs a source and a rationale: for example,
 `performance = list(maximum_primary_score = value)` must be accompanied
 by
-`criteria = list(performance.maximum_primary_score = list(source = source, rationale = rationale))`.
-Without both strings, the diagnostic remains descriptive and the module
-decision is `unresolved`.
-
-`csdg_rashomon()` is likewise descriptive by default. It returns
-candidate performance without an accepted set unless an absolute or
-relative tolerance and its source and rationale are supplied explicitly.
+`criteria = list(performance.maximum_primary_score = list(source = source, rationale = rationale))`;
+without them, the property remains open. `csdg_rashomon()` likewise
+returns candidate performance without an accepted set unless a tolerance
+with its source and rationale is supplied.
 
 ## Package and study-script boundary
 
-The package owns reusable claim and evidence records, gate planning,
+The package owns reusable claim and evidence records, the gate plan,
 resampling, permutation importance, calibration, ALE bootstrap,
 local-fidelity audits, importance agreement, matched-setting utilities,
 plotting, reporting, and provenance. Study-specific equal-country
 sampling, plausible-value loops, SHILD and PISA orchestration, country
 exclusion schedules, matched-control scheduling, and manuscript
 synthesis remain in the analysis scripts, which are kept in a separate
-repository. No single package call
-reproduces either complete empirical study.
+repository. No single package call reproduces either complete empirical
+study.
 
 Keep `output_dir = NULL` while inspecting an audit, and export to a
 dedicated directory when it is ready. By default, `csdg_export()` omits
@@ -195,14 +290,20 @@ when its release is explicitly approved.
 
 ------------------------------------------------------------------------
 
-## AutoIML compatibility examples
+## Legacy AutoIML workflow
+
+The examples in this section are not evaluated when this README is
+rendered. The `AutoIML` interface is the earlier workflow of the
+package; its gate identifiers (G0A to G7B, with combined G3 and G6) and
+its pass/warn/fail/skip labels are not the CSDG gate registry
+(`csdg_gate_registry()`) or the CSDG vocabulary.
 
 The earlier `AutoIML` interface remains available for compatibility. Its
 `GateResult` pass/warn/fail/skip labels are heuristic workflow
 diagnostics, not CSDG evidence roles or claim decisions. Printing a
 legacy `GateResult` emits a targeted deprecation warning. The examples
 below demonstrate that workflow; new analyses should start from the CSDG
-claim-card and audit interface shown above.
+interface shown above.
 
 ### Example 1 — Classification · decision support
 
@@ -419,7 +520,8 @@ export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
 ## AutoIML gate overview
 
 This table documents the legacy compatibility interface; it is not the
-CSDG applicability map returned by `csdg_gate_plan()`.
+CSDG applicability map returned by `csdg_gate_plan()` or the gate
+registry of `csdg_gate_registry()`.
 
 | Gate | Triggered when | Evidence checks |
 |----|----|----|

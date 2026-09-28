@@ -1,29 +1,56 @@
 #' Define CSDG analysis cards and configuration
 #'
-#' These constructors create explicit, serializable cards that define the claim, measurement,
-#' explanation semantics, and any claim-specific criteria before results are interpreted.
+#' These constructors record the claim, its scope, the measurement, and the explanation before results are
+#' interpreted (Steps 1 and 2 of the article), and the configuration of the diagnostics.
+#' The scope of a claim has six elements: quantity, model, procedure, data, meaning, and use.
 #' CSDG criteria have no universal substantive defaults and require a recorded source and rationale when they are
-#' used for adjudication.
+#' used to judge a property.
+#'
+#' `csdg_claim()` accepts each scope element under its name in the article (`quantity`, `model`, `procedure`,
+#' `data`, `meaning`, `use`) or under the legacy field name of versions up to 0.1.5 (`target`, `model_scope`,
+#' `explanation_design`, `analytic_distribution`, `semantics`, `scientific_use`); supplying both names with
+#' different values is an error. The card stores the elements in `scope` (in the order of the article) and, for
+#' compatibility, in the legacy fields.
 #'
 #' @param id Stable claim identifier.
-#' @param statement Inferential proposition to evaluate; sentence boundaries need not match proposition boundaries.
-#' @param claim_type One or more controlled claim types.
-#' @param target Prediction target or explanation target, including a horizon when relevant.
-#' @param semantics Intended interpretation of the claim: a fitted-model description, hypothetical model query,
-#'   causal claim, or recourse claim.
+#' @param statement The claim: the conclusion that the researcher intends to report, written as it would appear in
+#'   the article.
+#' @param claim_type One or more claim types: `"predictive_performance"`, `"calibration"`, `"global_explanation"`,
+#'   `"local_explanation"`, `"subgroup"`, `"model_generalization"`, `"setting_generalization"`, `"decision"`.
+#'   Together with the scope, they determine the gate plan ([csdg_gate_plan()]).
+#' @param quantity,target For `csdg_claim()`, the quantity: which quantity (estimand) does the claim interpret?
+#'   `target` is its legacy name. For `csdg_explanation()`, `target` is the explained model output (for example,
+#'   the predicted probability).
+#' @param semantics Deprecated (0.1.5): use `meaning`. Legacy values `"fitted_model_description"` and
+#'   `"hypothetical_model_query"` correspond to `meaning = "model_description"`, and `"causal"` and `"recourse"` to
+#'   `"causal_claim"`.
+#' @param meaning Meaning: model description, population claim, or causal claim (`"model_description"`,
+#'   `"population_claim"`, `"causal_claim"`; default `"model_description"`). A population claim uses the model to
+#'   learn how predictors relate to the outcome in the population that the sample represents; a causal claim is a
+#'   population claim about what would happen if a predictor changed. The meaning is never inferred from
+#'   `claim_level`.
 #' @param unit Unit of observation or inference.
-#' @param population Target population.
-#' @param analytic_distribution Distribution represented by the analysis data.
-#' @param model_scope Scope over fitted models.
-#' @param setting_scope Scope over cohorts, sites, countries, times, or settings.
-#' @param scientific_use Intended scientific use of the result.
-#' @param explanation_design Explanation design or comparison to which the claim is restricted.
-#' @param claim_level Inference level of the claim: functional, predictive, or substantive.
-#' @param use_claim Whether the claim additionally asserts adequacy for an audience, workflow, implementation, or use.
+#' @param population Population that the data element refers to.
+#' @param data,analytic_distribution Data: which sample, measures, and preprocessing? `analytic_distribution` is the
+#'   legacy name.
+#' @param model_scope Model: one fitted model, a learner, or several learners (`"fitted_model"`, `"learner"`,
+#'   `"several_models"`, or `"unspecified"`). A learner is an algorithm with fixed settings and preprocessing;
+#'   fitting it to data yields a fitted model. The dots alias `model` is accepted. Legacy values
+#'   (`"selected_model"`, `"cross_fitted_pipeline"`, `"near_equivalent_models"`, `"model_class"`) are mapped with
+#'   a deprecation warning.
+#' @param setting_scope Setting of the claim: `"analytic_sample"` (the sampled setting) or a description of other
+#'   cohorts, sites, countries, or times that the claim extends to.
+#' @param use,scientific_use Use: what will the claim be used for? `scientific_use` is the legacy name.
+#' @param procedure,explanation_design Procedure: how is the quantity estimated (estimator)?
+#'   `explanation_design` is the legacy name.
+#' @param claim_level Documentary level of the claim (`"functional"`, `"predictive"`, or `"substantive"`). It does
+#'   not affect the gate plan; use `meaning` for population and causal claims.
+#' @param use_claim Whether the claim asserts that intended users understand or benefit from the explanation (G7b).
 #' @param claim_version Stable version label for the claim.
-#' @param parent_claim_id Identifier of the parent claim when the current claim is a revision.
-#' @param revision_relation Legacy declared relationship to the parent claim, not a logical certification.
-#'   Use [csdg_claim_relation()] to distinguish proposition and context relations explicitly.
+#' @param parent_claim_id Identifier of the predecessor when the claim is a revision.
+#' @param revision_relation `"original"` or, for a revised claim, the relation of its scope to the predecessor's
+#'   scope (`"same"`, `"narrower"`, `"broader"`, `"incomparable"`). Use [csdg_claim_relation()] to record the
+#'   relation of each scope element and whether the revised claim follows from its predecessor.
 #' @param intended_users Intended audience or users.
 #' @param action Action informed by a decision claim.
 #' @param thresholds Prespecified decision or diagnostic thresholds.
@@ -32,7 +59,9 @@
 #' @param confirmatory Legacy documentary flag for prospective specification; it does not establish valid confirmation.
 #' @param provenance Optional named list with `origin`, `date` (YYYY-MM-DD), `time_basis`, `selection_basis`,
 #'   and character-vector `evidence_ids`.
-#'   Origin is `"specified_before_results"`, `"retrospective_exploratory"`, or `"independently_confirmed"`.
+#'   Origin is `"specified_before_results"` (prespecified: fixed before the relevant results were seen),
+#'   `"retrospective_exploratory"` (exploratory: written after the results were seen; the assessment is labeled
+#'   exploratory), or `"independently_confirmed"` (later tested on new data).
 #'   Independent confirmation requires evidence identifiers; metadata cannot establish independence by itself.
 #'   `NULL` means not recorded, and revisions do not inherit provenance automatically.
 #' @param notes Free-text notes.
@@ -96,7 +125,60 @@ NULL
 #' CSDG diagnostic functions
 #'
 #' These functions compute mixed-type dependence, calibration, decision curves, held-out permutation
-#' importance, local-surrogate fidelity, and selected-model subgroup diagnostics.
+#' feature importance (PFI), cross-fitted local fidelity of local surrogates, and subgroup diagnostics.
+#'
+#' `csdg_fold_pfi()` computes held-out marginal PFI in each resampling iteration: the increase in the chosen loss on
+#' the assessment rows when a feature group is permuted, averaged over `repetitions` permutations. If the resample
+#' refits the learner in each fold, the fold average estimates learner PFI (the learner's fits to training sets of
+#' the given size); the value of one fold describes that fitted model. `strata` restricts the permutation to rows
+#' with the same stratum value (for example, a conditional permutation given another item). Use
+#' [csdg_learner_pfi_interval()] for the corrected resampled interval of a learner average and
+#' [csdg_pfi_mc_difference()] for the Monte Carlo rule.
+#'
+#' @section Local surrogate:
+#' For one case, the package draws `n_perturb` perturbed points (default 500). In the default synthetic
+#' neighborhood (`neighborhood_method = "synthetic"`), each feature is perturbed independently of the others: a
+#' numeric feature is drawn from a normal distribution centered at the case value with standard deviation 0.25 times
+#' the feature's standard deviation in the background data, truncated to the background range (and rounded for
+#' integer features); a factor, logical, or character feature keeps the case value with probability 0.70 and is
+#' otherwise drawn from the background (factors and logicals with their background frequencies, character values
+#' uniformly over the observed values). The alternative `neighborhood_method = "empirical_knn"` resamples, with
+#' replacement, from the `empirical_neighbors` background rows nearest to the case (default: `n_perturb` rows) and
+#' fills missing values with the background median or mode. For held-out diagnostics
+#' (`csdg_oof_local_surrogate()`, [csdg_local_fidelity_audit()]), the background is the training data of the fold
+#' model that did not see the case; otherwise it is `background` or all task rows. Missing case values are filled
+#' with the background median or mode.
+#'
+#' The case is added to its perturbations, and the model's prediction is computed for all points, on the
+#' probability scale (`target_scale = "response"`) or on the log-odds scale (`"link"`, probabilities clipped to
+#' the interval from 1e-15 to 1 - 1e-15); for regression, on the outcome scale. The distance of a point to the case
+#' is the root mean square of per-feature distances: for a numeric feature, the difference divided by the background
+#' standard deviation; for other features, 0 if equal to the case value and 1 otherwise. Points are weighted with the
+#' Gaussian kernel \eqn{w = \exp(-d^2 / h^2)}, where \eqn{h} is `kernel_width` (default 0.75); the case has weight 1.
+#'
+#' The surrogate is a weighted ridge regression on the design matrix `model.matrix(~ .)` of all features (an
+#' intercept, numeric features, and R's default contrasts for factors and character features: treatment coding for
+#' unordered factors and orthogonal polynomial coding for ordered factors). Weights are rescaled to mean 1; each
+#' non-intercept column is centered and scaled by its weighted mean and weighted standard deviation, and columns
+#' without weighted variance are dropped (coefficient 0). The intercept is not penalized; every other standardized
+#' column receives the penalty \eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the
+#' number of points used for the fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
+#' \eqn{n_{eff} = (\sum w)^2 / \sum w^2} the Kish effective sample size of the weights. The coefficients solve
+#' \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
+#' fixed rule, not tuned.
+#'
+#' Fidelity is cross-fitted: the perturbed points are split at random into `crossfit_folds` folds of nearly equal
+#' size (default 5; `csdg_local_surrogate()` and `csdg_oof_local_surrogate()` always use 5); each fold is predicted
+#' by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
+#' by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
+#' Weighted \eqn{R^2} (relative to the kernel-weighted mean of the model's predictions), weighted RMSE, weighted
+#' MAE, and the maximum absolute error are computed over the perturbed points only. The error at the case itself
+#' (`target_case_absolute_error`) is computed from a separate surrogate fitted to the perturbed points without the
+#' case. Apparent metrics (`apparent_*`) and the reported coefficients come from one surrogate fitted to the case and
+#' all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
+#' and cross-fit seeds are separate ([csdg_local_fidelity_audit()]: default 20 perturbation seeds; cross-fit seeds
+#' default to the perturbation seed plus 100000), and kernel widths can be varied (`kernel_widths`, default 0.50,
+#' 0.75, 1.00; primary 0.75).
 #'
 #' @param data A data frame or data table.
 #' @param features Feature names.
@@ -110,7 +192,8 @@ NULL
 #' @param x A `CSDGResample` object.
 #' @param task An [mlr3::Task].
 #' @param feature_groups Named groups for block permutation.
-#' @param loss Prediction loss used for permutation importance.
+#' @param loss Prediction loss used for permutation importance: for regression `"rmse"` (default), `"mse"`
+#'   (squared error), or `"mae"`; for classification `"logloss"` (default), `"brier"`, or `"error"`.
 #' @param repetitions Permutation repetitions per fold and feature group.
 #' @param strata Optional within-stratum permutation variable.
 #' @param cluster Optional row-aligned cluster identifier used for coherent assessment-sample permutation.
@@ -125,10 +208,8 @@ NULL
 #' @param learner A trained or trainable [mlr3::Learner].
 #' @param cases Row ids or feature rows for local diagnostics.
 #' @param background Background data that defines the local neighborhood.
-#' @param n_perturb Number of synthetic neighborhood perturbations.
-#'
-#'   Local-surrogate fidelity is scored by deterministic cross-fitting over these perturbations.
-#' @param kernel_width Local weighting-kernel width.
+#' @param n_perturb Number of perturbed points per case (see the section "Local surrogate").
+#' @param kernel_width Width \eqn{h} of the Gaussian kernel (see the section "Local surrogate").
 #' @param target_scale For classification, either `"response"` for probability or `"link"` for logit scale.
 #' @param neighborhood_method Either `"synthetic"` or `"empirical_knn"` neighborhood construction.
 #' @param empirical_neighbors Number of nearest training rows eligible for empirical-neighbor resampling.
@@ -159,12 +240,10 @@ NULL
 #'   For regression, `calibration_in_the_large` is the mean observed-minus-predicted outcome, while
 #'   `calibration_intercept` and `calibration_slope` come from regressing observed outcomes on predictions.
 #'
-#'   For `csdg_local_surrogate()` and `csdg_oof_local_surrogate()`, `weighted_r2` and `weighted_rmse` are cross-fitted
-#'   scores over perturbations, and the original case is excluded from those aggregate perturbation scores.
-#'   `target_case_absolute_error` separately scores the original case using a surrogate fitted without that case.
-#'
-#'   The `apparent_weighted_r2` and `apparent_weighted_rmse` fields and returned coefficients describe a separate
-#'   full-neighborhood refit rather than cross-fitted performance.
+#'   For `csdg_local_surrogate()` and `csdg_oof_local_surrogate()`, `weighted_r2`, `weighted_rmse`, `weighted_mae`,
+#'   and `maximum_absolute_error` are cross-fitted over the perturbed points, `target_case_absolute_error` scores the
+#'   case with a surrogate fitted without it, and `apparent_weighted_r2`, `apparent_weighted_rmse`, and the returned
+#'   coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
 #' @name csdg_diagnostics
 NULL
 
@@ -205,20 +284,20 @@ NULL
 #' @name csdg_generalization
 NULL
 
-#' Build a claim-scoped diagnostic gate plan
-#'
-#' Maps a prespecified claim to Gates G0a through G7b and records why each gate is required or optional.
-#'
-#' @param claim A `CSDGClaim` object.
-#' @param measurement A `CSDGMeasurement` object.
-#' @param explanation A `CSDGExplanation` object or `NULL`.
-#' @return A `CSDGGatePlan` data table.
-#' @name csdg_gate_plan
-NULL
-
 #' Run a claim-scoped diagnostic audit
 #'
-#' Executes Gates G0a through G7b according to the claim-scoped gate plan.
+#' Derives the gate plan of the claim ([csdg_gate_plan()]) and computes the diagnostics of the gates in the plan:
+#' held-out performance (G1), dependence and observed support (G2), calibration (G3a), decision curves (G3b),
+#' cross-fitted local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
+#' (G6a), leave-one-setting-out refits (G6b), and subgroup results (G7a); G0a and G0b check the claim and
+#' measurement cards, and G7b records user evidence supplied in `evidence`.
+#' Required gates are computed; held-out performance is also computed when it is context for the claim (a model
+#' description) or when a required gate uses its fold models.
+#' Each gate result has a property status: `"supported"` or `"contradicted"` under a criterion with a recorded source
+#' and rationale, `"open"` if the criterion or evidence is missing, `"not_required"` if the gate was not run, or
+#' `"error"`. The audit cannot judge whether the procedure computes the quantity that the claim names, so G2 is
+#' `"open"` until the researcher records it with [csdg_evidence_record()]; [csdg_claim_report()] accepts such
+#' records.
 #'
 #' Individual gate errors are retained in the report card so that one failure does not erase other diagnostic
 #' evidence.
@@ -237,9 +316,10 @@ NULL
 #' @param pfi_strata Optional row-aligned strata within which PFI donors are permuted.
 #' @param pfi_cluster Optional row-aligned assessment-cluster identifiers.
 #' @param pfi_cluster_level_groups Optional feature-group names whose values are permuted coherently at cluster level.
-#' @param evidence Named external gate evidence.
+#' @param evidence Named external gate evidence (lists with `status`, `summary`, and optional criterion fields,
+#'   or `CSDGGateResult` objects), keyed by gate identifier; `audience_evidence` supplies user evidence for G7b.
 #' @param run_gates Optional gate ids to execute.
-#'   This controls computation but does not change claim-derived applicability or evidence roles.
+#'   This controls computation but does not change which gates the claim requires.
 #' @param output_dir Optional bundle-export directory.
 #' @param ... Explicit aliases or additional runner inputs accepted by `csdg_audit()`.
 #' @return A `CSDGResult` object.
@@ -248,12 +328,25 @@ NULL
 
 #' Report, export, and plot CSDG results
 #'
-#' Creates manuscript-facing report cards, diagnostic plots, and an atomic audit bundle containing cards, gate
-#' evidence, provenance, uncertainty boundaries, and an MD5 manifest.
-#' CSDG report cards keep applicability, evidence role, availability, result direction, criterion provenance,
-#' including distinct criterion source and rationale fields, materiality, adjudication basis, and claim consequence
-#' in separate fields.
-#' They never consume legacy `GateResult` statuses as CSDG claim decisions.
+#' `csdg_report_card()` lists the gates with their area, evidence question, the condition under which the claim
+#' requires them, whether they are required (`required`, `plan_role`), and the status of each required property
+#' (`"supported"`, `"contradicted"`, `"open"`, or `"error"`). A gate that the claim does not require is context
+#' (`evidence_role = "context"`): it is reported only and has no property status, so its `status` is `"context"` if
+#' it was run and `"not_required"` otherwise. The column `diagnostic_status` keeps the computed result of every gate
+#' (for a required gate it equals `status`); for a context gate it never changes the assessment.
+#' `csdg_claim_report()` applies the decision rule to the required properties: the `assessment` is `"not_met"` if at
+#' least one is contradicted; otherwise `"unresolved"` if at least one is open (an error counts as open, and a causal
+#' claim without a causal design is open); otherwise `"met"`. `decision_options` lists the decisions that the
+#' assessment permits: a met claim is retained; a claim that is not met or unresolved is revised or withheld.
+#' Records supplied in `evidence` replace the audit status of their gates, and established counterevidence and
+#' unresolved threats are applied as in [csdg_adjudicate_claim()]. A claim written after the results were seen
+#' (origin `"retrospective_exploratory"`) is labeled "(exploratory)".
+#' `csdg_export()` writes an atomic audit bundle containing cards, gate evidence, provenance, uncertainty
+#' boundaries, and an MD5 manifest. No aggregate score is computed.
+#' The columns `applicable`, `applicability`, `materiality`, `adjudication_basis`, and `claim_consequence` of the
+#' report card and `decision` (an alias of `assessment`), `decision_basis` (an alias of `assessment_basis`),
+#' `met_gates`, `not_met_gates`, and `unresolved_gates` of the claim report are deprecated aliases kept for one
+#' release for compatibility with versions up to 0.1.5, which stored the assessment under the name `decision`.
 #'
 #' @param x A `CSDGResult`, gate result, or supported evidence object.
 #' @param path Parent export directory.
@@ -265,6 +358,7 @@ NULL
 #' @param base_size Base text size in points for `csdg_plot()` output.
 #' @param style Either `"color"` for the default blue-red rendering or `"monochrome"` for an achromatic
 #'   print-oriented rendering with redundant shapes and line types.
+#' @param evidence Optional list of `CSDGEvidenceRecord` objects for `csdg_claim_report()`.
 #' @param ... Additional plotting arguments, which are currently unsupported.
 #' @return A report table, claim report, invisibly returned bundle path, or [ggplot2::ggplot] object.
 #' @name csdg_reporting

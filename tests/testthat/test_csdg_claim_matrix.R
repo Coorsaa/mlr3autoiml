@@ -15,10 +15,28 @@ test_that("claim matrices retain explicit judgments without an overall score", {
     names(matrix),
     c(
       "claim_order", "claim_id", "claim_version", "parent_claim_id", "revision_relation", "status",
-      "status_label", "claim", "evidence_needed", "conclusion", "derivation_scope"
+      "status_label", "decision", "claim", "evidence_needed", "conclusion", "derivation_scope"
     )
   )
   expect_false(any(grepl("score|total|count", names(matrix), ignore.case = TRUE)))
+  expect_true(all(is.na(matrix$decision)))
+})
+
+test_that("claim-matrix decisions follow the assessment", {
+  decided = csdg_claim_matrix(
+    claim = c("Original claim", "Revised claim", "Use claim"),
+    evidence_needed = c("G6a", "G2", "G3b"),
+    conclusion = c("Revised", "Retained", "Withheld"),
+    status = c("not_met", "met", "unresolved"),
+    decision = c("revise", "retain", "withhold"),
+    revision_relation = c("original", "narrower", "original")
+  )
+  expect_identical(decided$decision, c("revise", "retain", "withhold"))
+  expect_error(csdg_claim_matrix("Claim", "Evidence", "Conclusion", status = "met", decision = "withhold"),
+    "met claim is retained")
+  expect_error(csdg_claim_matrix("Claim", "Evidence", "Conclusion", status = "not_met", decision = "retain"),
+    "met claim is retained")
+  expect_error(csdg_claim_matrix("Claim", "Evidence", "Conclusion", status = "met", decision = "keep"), "decision")
 })
 
 test_that("claim matrices reject ambiguous schemas", {

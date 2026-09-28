@@ -9,37 +9,42 @@
 \code{mlr3autoiml} implements Claim-Scoped Diagnostic Gates (CSDG) for \link[mlr3:mlr3-package]{mlr3} tasks and
 learners.
 
-The CSDG workflow prespecifies claims, measurement and preprocessing semantics, explanation semantics, and
-claim-specific criteria before coordinating out-of-fold diagnostic evidence.
-Claims separate an inferential proposition from its six-coordinate context.
-Equal contexts do not establish semantic equivalence; explicit proposition relations remain declarations, not proofs.
-Variation records link the required property, observation, and relevance to a proposition.
-A legitimate change in estimand is not automatically a defeater, and documentary provenance does not remove
-the inferential consequences of outcome-dependent selection.
-A CSDG evidence record separates module applicability, one of four evidence roles, availability, result direction,
-criterion provenance, materiality, adjudication basis, and claim consequence.
-Claim cards distinguish exactly three inference levels, functional, predictive, and substantive, from the separate
-question of whether a proposition asserts adequacy for an audience, workflow, implementation, or use.
-CSDG does not produce an Interpretation Evidence Level, readiness grade, or aggregate score.
+CSDG decides whether the evidence supports a conclusion drawn from an explanation of a machine learning model.
+Its workflow has five steps. Step 1 writes the claim, the conclusion that the researcher intends to report
+(\code{\link[=csdg_claim]{csdg_claim()}}). Step 2 specifies its scope in six elements: quantity, model, procedure, data, meaning, and
+use. Step 3 derives the required properties from the 12 gates (\code{\link[=csdg_gate_registry]{csdg_gate_registry()}}, \code{\link[=csdg_gate_plan]{csdg_gate_plan()}}).
+Step 4 evaluates the evidence: each required property is supported, contradicted, or open, and established
+counterevidence, unresolved threats, and context are recorded separately (\code{\link[=csdg_evidence_record]{csdg_evidence_record()}}; diagnostics
+in \code{\link[=csdg_audit]{csdg_audit()}}). Step 5 applies a fixed decision rule (\code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}): a claim is not met if a
+required property is contradicted; otherwise unresolved if one is open; otherwise met. A met claim is retained;
+otherwise the claim is revised or withheld (\code{\link[=csdg_claim_revision]{csdg_claim_revision()}}, \code{\link[=csdg_claim_relation]{csdg_claim_relation()}}).
+Favorable results never offset a contradicted property, and no aggregate score is computed.
+The package records the claim and its scope, derives the gate plan, computes diagnostics, and applies the rule;
+the researcher sets the criteria, states the relevance of each observation, and enters established
+counterevidence and unresolved threats.
 
-The package also retains the established \link{AutoIML} workflow for compatibility with earlier analyses.
-Its \code{GateResult} pass/warn/fail/skip labels are legacy heuristic diagnostics and are not CSDG claim decisions.
+The package also retains the earlier \link{AutoIML} workflow for compatibility with earlier analyses.
+Its gate identifiers (G0A to G7B, with combined G3 and G6) and its pass/warn/fail/skip labels are legacy
+heuristic diagnostics; they are not the CSDG gate registry or vocabulary.
 
-Reusable package components implement claim records, evidence planning, resampling diagnostics, permutation
-importance, calibration, ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities,
-reporting, and provenance.
+Reusable package components implement claim records, gate plans, resampling diagnostics, held-out permutation
+feature importance with corrected resampled intervals, calibration, ALE bootstrap, local-fidelity audits,
+importance agreement, matched-setting utilities, reporting, and provenance.
 Study-specific sampling, outcome loops, exclusion schedules, and manuscript synthesis remain analysis scripts.
 }
 \seealso{
 \itemize{
 \item \code{\link[=csdg_audit]{csdg_audit()}} for the claim-scoped diagnostic workflow.
 \item \code{\link[=csdg_claim]{csdg_claim()}} for claim, measurement, explanation, and configuration cards.
-\item \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} for separate proposition and six-coordinate context comparisons.
-\item \code{\link[=csdg_evidence_record]{csdg_evidence_record()}} for orthogonal evidence records and non-compensatory adjudication.
+\item \code{\link[=csdg_gate_plan]{csdg_gate_plan()}} for the required properties of a claim.
+\item \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} for relations between a claim and its revision.
+\item \code{\link[=csdg_evidence_record]{csdg_evidence_record()}} and \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}} for evidence records and the decision rule.
+\item \code{\link[=csdg_learner_pfi_interval]{csdg_learner_pfi_interval()}} and \code{\link[=csdg_pfi_mc_difference]{csdg_pfi_mc_difference()}} for corrected resampled intervals and the
+Monte Carlo rule.
 \item \code{\link[=csdg_resolve_sources]{csdg_resolve_sources()}} for case-sensitive public-source and declared access checks.
-\item \link{AutoIML} for the established AutoIML orchestrator.
+\item \link{AutoIML} for the earlier AutoIML orchestrator.
 \item \code{\link[=autoiml]{autoiml()}} for a convenience wrapper.
-\item \code{\link[=report_card]{report_card()}} for audit trail summary.
+\item \code{\link[=report_card]{report_card()}} for the AutoIML audit trail summary.
 }
 }
 \author{

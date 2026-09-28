@@ -2,19 +2,18 @@
 % Please edit documentation in R/csdg_evidence_record.R
 \name{csdg_evidence_record}
 \alias{csdg_evidence_record}
-\title{Create an orthogonal CSDG evidence record}
+\title{Record evidence on a required property, counterevidence, an unresolved threat, or context}
 \usage{
 csdg_evidence_record(
   gate_id,
   applicable,
   role,
-  availability = if (applicable) "complete" else "not_applicable",
-  result_direction = if (applicable) "descriptive" else "not_evaluated",
+  availability = NULL,
+  result_direction = NULL,
   criterion = NULL,
   criterion_source = NULL,
   criterion_rationale = NULL,
-  materiality = if (role == "potential_defeater" && applicable) "not_materialized" else
-    "not_applicable",
+  materiality = NULL,
   adjudication_basis = NULL,
   claim_consequence = "none",
   rationale,
@@ -25,68 +24,118 @@ csdg_evidence_record(
   invariance_claimed = NA,
   required_property = NULL,
   observation = NULL,
-  relevance_to_proposition = NULL
+  relevance_to_proposition = NULL,
+  status = NULL
 )
 }
 \arguments{
-\item{gate_id}{CSDG module identifier.}
+\item{gate_id}{Gate of the required property: one of the 12 gate identifiers, or \code{"CD"} for the causal design that
+a causal claim requires (not a gate). For counterevidence and threats, the property they bear on.}
 
-\item{applicable}{Whether the module is applicable to the exact claim.}
+\item{applicable}{Whether the gate applies to the claim. A nonapplicable entry is reported as context.}
 
-\item{role}{One of the four CSDG evidence roles.}
+\item{role}{One of \code{"required_property"}, \code{"established_counterevidence"}, \code{"unresolved_threat"}, or \code{"context"}.}
 
-\item{availability}{Completion or availability state.}
+\item{availability}{Whether the evidence is \code{"complete"}, \code{"incomplete"}, \code{"unavailable"} (for example, after a
+computation error), or \code{"not_applicable"}. Defaults to \code{"complete"} (\code{"incomplete"} for an unresolved threat;
+\code{"not_applicable"} if \code{applicable = FALSE}).}
 
-\item{result_direction}{Direction of the observed evidence relative to the exact claim.}
+\item{result_direction}{Descriptive direction of the observation: \code{"supports"}, \code{"challenges"}, \code{"mixed"},
+\code{"descriptive"}, or \code{"not_evaluated"}. Defaults follow \code{status} (supported: supports; contradicted:
+challenges; open: not evaluated); it must agree with a supplied \code{status}.}
 
-\item{criterion}{Optional named list with \code{value} and \code{direction}.}
+\item{criterion}{Optional named list with \code{value} and \code{direction} (\code{"minimum"}, \code{"maximum"}, \code{"range"}, or
+\code{"qualitative"}).}
 
 \item{criterion_source}{Source of a supplied criterion.}
 
-\item{criterion_rationale}{Rationale linking a supplied criterion to the claim and intended use.}
+\item{criterion_rationale}{Rationale linking a supplied criterion to the claim and its use.}
 
-\item{materiality}{Whether a potential defeater has been materialized.}
+\item{materiality}{Deprecated documentary field of versions up to 0.1.5 (\code{"materialized"} for counterevidence);
+default \code{"not_applicable"}.}
 
-\item{adjudication_basis}{Transparent basis used to materialize a potential defeater.}
+\item{adjudication_basis}{Optional documentary basis for established counterevidence.}
 
-\item{claim_consequence}{Binding record-level constraint for the exact claim.}
+\item{claim_consequence}{Deprecated (0.1.5). If given together with \code{status}, it must agree with it; on an entry
+that is not a required property it is ignored.}
 
-\item{rationale}{Evidence-specific rationale.}
+\item{rationale}{Rationale of the entry.}
 
-\item{varied_component}{Optional nonempty character vector naming the varied components.}
+\item{varied_component}{Optional nonempty character vector naming what varied.}
 
-\item{held_constant}{Optional nonempty character vector naming what the comparison holds fixed.}
+\item{held_constant}{Optional nonempty character vector naming what was held fixed.}
 
-\item{same_estimand}{Whether the comparison retains the same estimand; \code{NA} or JSON \code{null} denotes missing metadata.}
+\item{same_estimand}{Whether the comparison keeps the same quantity; \code{NA} or JSON \code{null} means not recorded.}
 
-\item{same_estimand_rationale}{Reason for the estimand classification, required when variation is documented.}
+\item{same_estimand_rationale}{Reason for that classification, required when variation is documented.}
 
-\item{invariance_claimed}{Whether the proposition requires invariance over this variation.
-\code{NA} or \code{NULL} means not recorded.}
+\item{invariance_claimed}{Whether the claim asserts invariance over this variation. \code{NA} or \code{NULL} means not
+recorded.}
 
-\item{required_property}{Property that the exact proposition requires.}
+\item{required_property}{The property, in the words of the claim record.}
 
-\item{observation}{Diagnostic observation bearing on that property.}
+\item{observation}{The observation bearing on the property (for a threat: the plausible problem).}
 
-\item{relevance_to_proposition}{Substantive explanation linking that observation to the required property.}
+\item{relevance_to_proposition}{Why the observation bears on the property: what varied, what was held fixed, and
+why this matches the scope.}
+
+\item{status}{Status of a required property: \code{"supported"}, \code{"contradicted"}, or \code{"open"}. If \code{NULL}, it is
+derived from \code{availability} and \code{result_direction} (complete and supporting: supported; complete and
+challenging: contradicted; otherwise open). Only a required property has a status.}
 }
 \value{
-A \code{CSDGEvidenceRecord} list.
+A \code{CSDGEvidenceRecord} list. It stores \code{role}, \code{status}, the observation fields, and, for an entry created
+with a legacy role, \code{legacy_role}.
 }
 \description{
-Separates module applicability, evidence role, availability, observed result direction, criterion metadata,
-materiality, adjudication basis, and claim consequence.
-It records an analyst's evidence characterization and does not apply a universal threshold or aggregate score.
-Cross-field validation prevents an evidence role or observed direction from being paired with a contradictory
-claim consequence.
-The consequence is a binding constraint in \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}, not an independent overall verdict.
-\code{"unresolved"} prevents a \code{"met"} decision, and a justified revision prevents retaining the unchanged claim.
-\code{"retain_exact_claim"} cannot override an unmet requirement, a materialized defeater,
-or unresolved evidence elsewhere.
-\code{"none"} adds no constraint beyond the evidence role, availability, and observed direction.
-Sensitivity is relative to the proposition: changing an estimand is not automatically counterevidence.
-New variation records that constrain a claim require a property-observation-relevance chain.
-Changed or uncertain estimands additionally require an explicit invariance claim before they constrain a claim.
-Legacy records without these optional fields remain usable with \code{proposition_linkage = "not_recorded"}.
-A documented chain is not independently validated merely because its fields are complete.
+Creates one entry of a claim record (Step 4 of the article).
+Each entry has one of four roles:
+\itemize{
+\item \code{"required_property"}: a property that the claim requires, derived from a gate (see \code{\link[=csdg_gate_plan]{csdg_gate_plan()}}).
+Judged against its criterion, it has the \code{status} \code{"supported"}, \code{"contradicted"}, or \code{"open"}.
+It is contradicted if the evidence shows that it does not hold; it is open if the needed evidence is absent
+(for example, no criterion or no causal design), is inconclusive under the criterion, or faces an unresolved
+threat.
+\item \code{"established_counterevidence"}: a demonstrated problem, such as a coding error or leakage shown to affect the
+result. It bears on the required property named by \code{gate_id} and sets that property to contradicted.
+\item \code{"unresolved_threat"}: a specific and plausible but unquantified problem, such as predictor selection on the same
+data outside the cross-validation. It sets the threatened property (\code{gate_id}) to open unless that property is
+contradicted.
+\item \code{"context"}: everything else. It is reported but never changes the assessment.
+}
+
+For each required property, the record states the property, the criterion that decides whether it holds, the
+observation, and its relevance (\code{required_property}, \code{criterion}, \code{observation}, \code{relevance_to_proposition}).
+For repeated or alternative analyses, it also states what varied, what was held fixed, and whether the quantity
+stayed the same; a variation that contradicts a property with a changed or uncertain quantity must state that the
+claim asserts invariance over it.
+The package records these entries and applies the decision rule in \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}}; the researcher sets
+the criteria and states the relevance of each observation.
+A documented entry is not independently validated merely because its fields are complete.
+
+Versions up to 0.1.5 used the roles \code{"necessary_requirement"}, \code{"potential_defeater"}, \code{"graded_support"}, and
+\code{"descriptive_context"} and a \code{claim_consequence}. These are still accepted with a deprecation warning:
+\code{"necessary_requirement"} becomes a required property; a \code{"potential_defeater"} with \code{materiality = "materialized"} becomes established counterevidence, one that is not materialized but records the consequence
+\code{"unresolved"} becomes an unresolved threat, and any other becomes context; \code{"graded_support"} and
+\code{"descriptive_context"} become context. A consequence on a context entry is ignored with a warning; it no longer
+changes the assessment (in 0.1.5, an \code{"unresolved"} consequence on a \code{"graded_support"} record left the claim
+unresolved). See \code{inst/MIGRATION_0_1_6.md}.
+}
+\examples{
+csdg_evidence_record(
+  "G6a", TRUE, "required_property", status = "contradicted",
+  criterion = list(value = "strict ordering in both models", direction = "qualitative"),
+  criterion_source = "translated from the claim",
+  criterion_rationale = "The claim asserts the ordering in each model.",
+  rationale = "Model B reverses the ordering.",
+  required_property = "Item 1 has the larger marginal PFI in A and in B.",
+  observation = "PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B.",
+  relevance_to_proposition = "Only the model differs, and the claim covers both models."
+)
+csdg_evidence_record(
+  "G1", TRUE, "unresolved_threat",
+  rationale = "The optimism was not quantified; a nested analysis would resolve it.",
+  required_property = "Held-out performance is not inflated by predictor selection.",
+  observation = "Predictors were selected on the same data outside the cross-validation."
+)
 }

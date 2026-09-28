@@ -113,11 +113,9 @@ csdg_subgroup_metrics(
 
 \item{background}{Background data that defines the local neighborhood.}
 
-\item{n_perturb}{Number of synthetic neighborhood perturbations.
+\item{n_perturb}{Number of perturbed points per case (see the section "Local surrogate").}
 
-Local-surrogate fidelity is scored by deterministic cross-fitting over these perturbations.}
-
-\item{kernel_width}{Local weighting-kernel width.}
+\item{kernel_width}{Width \eqn{h} of the Gaussian kernel (see the section "Local surrogate").}
 
 \item{target_scale}{For classification, either \code{"response"} for probability or \code{"link"} for logit scale.}
 
@@ -135,7 +133,8 @@ Local-surrogate fidelity is scored by deterministic cross-fitting over these per
 
 \item{feature_groups}{Named groups for block permutation.}
 
-\item{loss}{Prediction loss used for permutation importance.}
+\item{loss}{Prediction loss used for permutation importance: for regression \code{"rmse"} (default), \code{"mse"}
+(squared error), or \code{"mae"}; for classification \code{"logloss"} (default), \code{"brier"}, or \code{"error"}.}
 
 \item{repetitions}{Permutation repetitions per fold and feature group.}
 
@@ -184,14 +183,68 @@ both coefficients.
 For regression, \code{calibration_in_the_large} is the mean observed-minus-predicted outcome, while
 \code{calibration_intercept} and \code{calibration_slope} come from regressing observed outcomes on predictions.
 
-For \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()}, \code{weighted_r2} and \code{weighted_rmse} are cross-fitted
-scores over perturbations, and the original case is excluded from those aggregate perturbation scores.
-\code{target_case_absolute_error} separately scores the original case using a surrogate fitted without that case.
-
-The \code{apparent_weighted_r2} and \code{apparent_weighted_rmse} fields and returned coefficients describe a separate
-full-neighborhood refit rather than cross-fitted performance.
+For \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()}, \code{weighted_r2}, \code{weighted_rmse}, \code{weighted_mae},
+and \code{maximum_absolute_error} are cross-fitted over the perturbed points, \code{target_case_absolute_error} scores the
+case with a surrogate fitted without it, and \code{apparent_weighted_r2}, \code{apparent_weighted_rmse}, and the returned
+coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
 }
 \description{
 These functions compute mixed-type dependence, calibration, decision curves, held-out permutation
-importance, local-surrogate fidelity, and selected-model subgroup diagnostics.
+feature importance (PFI), cross-fitted local fidelity of local surrogates, and subgroup diagnostics.
 }
+\details{
+\code{csdg_fold_pfi()} computes held-out marginal PFI in each resampling iteration: the increase in the chosen loss on
+the assessment rows when a feature group is permuted, averaged over \code{repetitions} permutations. If the resample
+refits the learner in each fold, the fold average estimates learner PFI (the learner's fits to training sets of
+the given size); the value of one fold describes that fitted model. \code{strata} restricts the permutation to rows
+with the same stratum value (for example, a conditional permutation given another item). Use
+\code{\link[=csdg_learner_pfi_interval]{csdg_learner_pfi_interval()}} for the corrected resampled interval of a learner average and
+\code{\link[=csdg_pfi_mc_difference]{csdg_pfi_mc_difference()}} for the Monte Carlo rule.
+}
+\section{Local surrogate}{
+
+For one case, the package draws \code{n_perturb} perturbed points (default 500). In the default synthetic
+neighborhood (\code{neighborhood_method = "synthetic"}), each feature is perturbed independently of the others: a
+numeric feature is drawn from a normal distribution centered at the case value with standard deviation 0.25 times
+the feature's standard deviation in the background data, truncated to the background range (and rounded for
+integer features); a factor, logical, or character feature keeps the case value with probability 0.70 and is
+otherwise drawn from the background (factors and logicals with their background frequencies, character values
+uniformly over the observed values). The alternative \code{neighborhood_method = "empirical_knn"} resamples, with
+replacement, from the \code{empirical_neighbors} background rows nearest to the case (default: \code{n_perturb} rows) and
+fills missing values with the background median or mode. For held-out diagnostics
+(\code{csdg_oof_local_surrogate()}, \code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}), the background is the training data of the fold
+model that did not see the case; otherwise it is \code{background} or all task rows. Missing case values are filled
+with the background median or mode.
+
+The case is added to its perturbations, and the model's prediction is computed for all points, on the
+probability scale (\code{target_scale = "response"}) or on the log-odds scale (\code{"link"}, probabilities clipped to
+the interval from 1e-15 to 1 - 1e-15); for regression, on the outcome scale. The distance of a point to the case
+is the root mean square of per-feature distances: for a numeric feature, the difference divided by the background
+standard deviation; for other features, 0 if equal to the case value and 1 otherwise. Points are weighted with the
+Gaussian kernel \eqn{w = \exp(-d^2 / h^2)}, where \eqn{h} is \code{kernel_width} (default 0.75); the case has weight 1.
+
+The surrogate is a weighted ridge regression on the design matrix \code{model.matrix(~ .)} of all features (an
+intercept, numeric features, and R's default contrasts for factors and character features: treatment coding for
+unordered factors and orthogonal polynomial coding for ordered factors). Weights are rescaled to mean 1; each
+non-intercept column is centered and scaled by its weighted mean and weighted standard deviation, and columns
+without weighted variance are dropped (coefficient 0). The intercept is not penalized; every other standardized
+column receives the penalty \eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the
+number of points used for the fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
+\eqn{n_{eff} = (\sum w)^2 / \sum w^2} the Kish effective sample size of the weights. The coefficients solve
+\eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
+fixed rule, not tuned.
+
+Fidelity is cross-fitted: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
+size (default 5; \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()} always use 5); each fold is predicted
+by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
+by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
+Weighted \eqn{R^2} (relative to the kernel-weighted mean of the model's predictions), weighted RMSE, weighted
+MAE, and the maximum absolute error are computed over the perturbed points only. The error at the case itself
+(\code{target_case_absolute_error}) is computed from a separate surrogate fitted to the perturbed points without the
+case. Apparent metrics (\verb{apparent_*}) and the reported coefficients come from one surrogate fitted to the case and
+all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
+and cross-fit seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds; cross-fit seeds
+default to the perturbation seed plus 100000), and kernel widths can be varied (\code{kernel_widths}, default 0.50,
+0.75, 1.00; primary 0.75).
+}
+

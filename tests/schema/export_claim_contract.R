@@ -1,4 +1,6 @@
 # Export deterministic claim-contract fixtures; no models or empirical inputs are used.
+# Cases 1-21 use the record format of versions up to 0.1.5 (accepted with deprecation warnings); cases 22-27 use
+# the roles and statuses of 0.1.6.
 # Usage: Rscript tests/schema/export_claim_contract.R --library LIBRARY OUTPUT_DIRECTORY
 #    or: Rscript tests/schema/export_claim_contract.R --source PACKAGE_ROOT OUTPUT_DIRECTORY
 
@@ -33,16 +35,36 @@ context = make_record(role = "descriptive_context", result_direction = "descript
 defeater = make_record(gate_id = "G4", role = "potential_defeater", result_direction = "mixed",
   materiality = "materialized", adjudication_basis = "substantive_adjudication", claim_consequence = "revise_claim")
 incomplete = make_record(availability = "incomplete", result_direction = "not_evaluated")
+property = function(gate_id) csdg_evidence_record(gate_id, TRUE, "required_property", status = "supported",
+  rationale = "The supplied observation supports the required property.")
+threat = csdg_evidence_record("G1", TRUE, "unresolved_threat",
+  rationale = "The optimism caused by predictor selection was not quantified.",
+  required_property = "Held-out performance is not inflated by predictor selection.",
+  observation = "Predictors were selected on the same data outside the cross-validation.")
+counterevidence = csdg_evidence_record("G2", TRUE, "established_counterevidence",
+  rationale = "A verified coding error changes the reported values.",
+  required_property = "The procedure computes the named quantity.",
+  observation = "Two items were swapped before the computation.",
+  relevance_to_proposition = "The swap changes which item each reported value refers to.")
+legacy_context = make_record(role = "graded_support", claim_consequence = "unresolved")
+fixture_claim = function(...) csdg_claim(id = "fixture", statement = "Fixture claim.", claim_type = "global_explanation",
+  quantity = "marginal PFI", procedure = "held-out permutation", data = "fixture data", use = "fixture", ...)
+fixture_measurement = csdg_measurement(outcome = "y", predictors = c("x1", "x2"))
+fixture_explanation = csdg_explanation(method_ids = "pfi")
+description_plan = csdg_gate_plan(fixture_claim(model = "several_models"), fixture_measurement, fixture_explanation)
+causal_plan = csdg_gate_plan(fixture_claim(meaning = "causal_claim"), fixture_measurement, fixture_explanation)
+causal_gates = causal_plan$gate_id[causal_plan$required]
 unavailable = make_record(availability = "unavailable", result_direction = "not_evaluated")
 cases = list()
-add_case = function(name, records, expected, claim_applicable = TRUE, legacy = FALSE) {
+add_case = function(name, records, expected, claim_applicable = TRUE, legacy = FALSE, plan = NULL) {
   decision = if (legacy) {
     csdg_adjudicate_claim(records)
   } else {
     csdg_adjudicate_claim(records, claim_applicable = claim_applicable,
-      applicability_rationale = if (claim_applicable) "The fixture proposition is within scope." else "Outside scope.")
+      applicability_rationale = if (claim_applicable) "The fixture proposition is within scope." else "Outside scope.",
+      plan = plan)
   }
-  stopifnot(identical(decision$decision, expected))
+  stopifnot(identical(decision$assessment, expected), identical(decision$decision, decision$assessment))
   list(name = name, expected_decision = expected, evidence = lapply(records, unclass), adjudication = unclass(decision))
 }
 cases = list(
@@ -66,11 +88,37 @@ cases = list(
   add_case("unresolved_and_support", list(pending, support), "unresolved"),
   add_case("blocker_and_unresolved", list(challenge, pending, support), "not_met"),
   add_case("reordered_blocker_and_unresolved", list(support, pending, challenge), "not_met"),
-  add_case("met_with_irrelevant_context", list(support, context, irrelevant), "met")
+  add_case("met_with_irrelevant_context", list(support, context, irrelevant), "met"),
+  add_case("unresolved_threat_on_required_g1", list(property("G1"), threat), "unresolved"),
+  add_case("counterevidence_with_supported_properties", list(property("G0a"), property("G2"), counterevidence),
+    "not_met"),
+  add_case("context_with_legacy_unresolved_consequence", list(property("G2"), legacy_context), "met"),
+  add_case("plan_required_gate_without_record", lapply(c("G0a", "G0b", "G2", "G5"), property), "unresolved",
+    plan = description_plan),
+  add_case("causal_claim_without_causal_design", lapply(causal_gates, property), "unresolved", plan = causal_plan),
+  add_case("causal_claim_with_causal_design", lapply(c(causal_gates, "CD"), property), "met", plan = causal_plan)
 )
+# Cards as csdg_export() writes them: sanitized with the default export settings (no models, no predictions).
+sanitize_result = getFromNamespace(".sanitize_result_for_export", "mlr3autoiml")
+card_to_list = getFromNamespace(".card_to_list", "mlr3autoiml")
+export_claim = fixture_claim(model = "learner", meaning = "model_description")
+sanitized = sanitize_result(
+  list(claim = export_claim, measurement = fixture_measurement, explanation = fixture_explanation,
+    config = csdg_config(), metadata = list(), plan = csdg_gate_plan(export_claim, fixture_measurement,
+      fixture_explanation), artifacts = list(), gates = list()),
+  include_models = FALSE, include_predictions = FALSE
+)
+exported_cards = list(
+  claim = card_to_list(sanitized$claim),
+  measurement = card_to_list(sanitized$measurement),
+  explanation = card_to_list(sanitized$explanation),
+  config = card_to_list(sanitized$config)
+)
+stopifnot(identical(exported_cards$claim$scope$model, "learner"))
 identity = list(package_version = as.character(packageVersion("mlr3autoiml")),
   loaded_package_path = getNamespaceInfo(asNamespace("mlr3autoiml"), "path"), mode = arguments[[1L]],
   r_version = as.character(getRversion()), empirical_execution = FALSE)
-write_json(list(identity = identity, cases = cases), file.path(output, "claim_contract_cases.json"))
+write_json(list(identity = identity, cases = cases, exported_cards = exported_cards),
+  file.path(output, "claim_contract_cases.json"))
 cat("Loaded package:", identity$package_version, "at", identity$loaded_package_path, "\n")
 cat("Exported", length(cases), "validated runtime cases; no empirical execution.\n")

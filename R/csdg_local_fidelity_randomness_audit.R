@@ -125,7 +125,9 @@
 #' The balanced grid separates marginal variation attributable to neighborhood generation, marginal variation
 #' attributable to surrogate fold assignment, and their interaction without treating any component as sampling or
 #' model-training uncertainty.
+#' The section "Local surrogate" states exactly what is fitted.
 #'
+#' @inheritSection csdg_diagnostics Local surrogate
 #' @param x A `CSDGResample` with stored fold models.
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param perturbation_seeds Vector or case-by-seed matrix containing at least two distinct perturbation seeds per case.

@@ -14,7 +14,8 @@ csdg_claim_matrix(
   parent_claim_id = NA_character_,
   revision_relation = "original",
   derivation_scope =
-    "User-supplied claim boundary; not an independently executed gate plan"
+    "User-supplied claim boundary; not an independently executed gate plan",
+  decision = NA_character_
 )
 }
 \arguments{
@@ -22,10 +23,11 @@ csdg_claim_matrix(
 
 \item{evidence_needed}{Character vector describing the evidence required for each claim.}
 
-\item{conclusion}{Character vector containing the conclusion permitted by the available evidence for each claim.}
+\item{conclusion}{Character vector containing the reported claim for each claim: the claim as retained, revised,
+or withheld.}
 
-\item{status}{Character vector containing one status per claim.
-Supported values are \code{"met"}, \code{"not_met"}, \code{"unresolved"}, and \code{"not_applicable"}.}
+\item{status}{Character vector containing the assessment of each claim:
+\code{"met"}, \code{"not_met"}, \code{"unresolved"}, or \code{"not_applicable"} (a claim placed outside the evaluation).}
 
 \item{claim_id}{Optional unique character identifiers.
 Deterministic identifiers are generated when this is \code{NULL}.}
@@ -36,15 +38,21 @@ Deterministic identifiers are generated when this is \code{NULL}.}
 identifying the stronger parent claim.}
 
 \item{revision_relation}{A scalar character string or one string per claim,
-describing the relation to the parent claim.}
+describing the relation of the scope to the parent claim (\code{"original"}, \code{"same"}, \code{"narrower"}, \code{"broader"}, or
+\code{"incomparable"}; the legacy value \code{"alternative_or_incomparable"} is accepted with a deprecation warning).}
 
 \item{derivation_scope}{A scalar character string, or one string per claim, stating how the judgments were derived.}
+
+\item{decision}{Optional decision after the assessment: \code{"retain"}, \code{"revise"}, or \code{"withhold"}, as a scalar or
+one value per claim (default \code{NA}, not recorded). A met claim is retained; a claim that is not met or
+unresolved is revised or withheld.}
 }
 \value{
 A \code{CSDGClaimMatrix} data table with one ordered row per claim and no aggregate score.
 }
 \description{
-Creates a validated, explicitly scoped claim matrix for reporting which conclusions the available evidence permits.
+Creates a validated, explicitly scoped claim matrix for reporting the assessment of each claim and what is
+reported.
 The function records user-supplied judgments and does not infer claim support,
 combine gates into a score, or rank claims.
 }

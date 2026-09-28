@@ -4,10 +4,21 @@
 csdg_report_card = function(x) {
   checkmate::assert_class(x, "CSDGResult")
   plan = data.table::copy(data.table::as.data.table(x$plan))
+  registry = .gate_registry()
+  for (column in c("gate_name", "area", "evidence_question", "required_if", "typical_diagnostic")) {
+    if (!column %in% names(plan)) {
+      plan = merge(plan, registry[, c("gate_id", column), with = FALSE], by = "gate_id", all.x = TRUE, sort = FALSE)
+    }
+  }
+  if (!"plan_role" %in% names(plan)) {
+    plan[, plan_role := data.table::fifelse(required, "required", "not_required")]
+  }
+  # Every required gate is a required property; a gate that the claim does not require is context.
+  plan[, evidence_role := data.table::fifelse(required, "required_property", "context")]
   rows = data.table::rbindlist(lapply(x$gates, function(gate) {
     data.table::data.table(
       gate_id = gate$gate_id,
-      status = gate$status,
+      status = .csdg_map_legacy(gate$status, .csdg_legacy_statuses, "Gate status", warn = FALSE),
       availability = gate$availability,
       result_direction = gate$result_direction,
       criterion = if (is.null(gate$criterion)) {
@@ -17,52 +28,124 @@ csdg_report_card = function(x) {
       },
       criterion_source = gate$criterion_source %||% NA_character_,
       criterion_rationale = gate$criterion_rationale %||% NA_character_,
-      materiality = gate$materiality,
-      adjudication_basis = gate$adjudication_basis %||% NA_character_,
-      claim_consequence = gate$claim_consequence,
       rationale = gate$rationale,
       summary = gate$summary,
       limitations = paste(gate$limitations, collapse = " | "),
       started_at = gate$started_at %||% NA_character_,
-      completed_at = gate$completed_at %||% NA_character_
+      completed_at = gate$completed_at %||% NA_character_,
+      materiality = gate$materiality %||% "not_applicable",
+      adjudication_basis = gate$adjudication_basis %||% NA_character_,
+      claim_consequence = gate$claim_consequence %||% "none"
     )
   }), fill = TRUE)
   out = merge(plan, rows, by = "gate_id", all.x = TRUE, sort = FALSE)
+  # A gate that the claim does not require is context: it is reported but has no property status. Its computed
+  # result is kept in `diagnostic_status`; `status` is "context" if the gate was run and "not_required" otherwise.
+  out[, diagnostic_status := data.table::fifelse(is.na(status), "not_required", status)]
+  out[, status := data.table::fifelse(
+    required %in% TRUE,
+    status,
+    data.table::fifelse(diagnostic_status == "not_required", "not_required", "context")
+  )]
   out[, gate_order__ := match(gate_id, .csdg_gate_ids)]
   data.table::setorder(out, gate_order__)
   out[, gate_order__ := NULL]
-  out
+  first = c(
+    "gate_id", "gate_name", "area", "evidence_question", "required_if", "required", "plan_role",
+    "evidence_role", "status", "diagnostic_status", "availability", "result_direction", "criterion",
+    "criterion_source", "criterion_rationale", "rationale", "summary", "limitations", "started_at", "completed_at"
+  )
+  data.table::setcolorder(out, c(intersect(first, names(out)), setdiff(names(out), first)))
+  out[]
 }
 
 #' @rdname csdg_reporting
 #' @export
-csdg_claim_report = function(x) {
+csdg_claim_report = function(x, evidence = NULL) {
   checkmate::assert_class(x, "CSDGResult")
+  if (!is.null(evidence)) {
+    checkmate::assert_list(evidence, .var.name = "evidence")
+    if (any(!vapply(evidence, inherits, logical(1L), what = "CSDGEvidenceRecord"))) {
+      .csdg_stop("Every element of `evidence` must be a CSDGEvidenceRecord.")
+    }
+  }
   card = csdg_report_card(x)
   required = card[required == TRUE]
+  supplied = evidence %||% list()
+  recorded = unique(unlist(lapply(supplied, function(record) {
+    if (isTRUE(record$applicable) && record$role %in% c("required_property", "established_counterevidence")) {
+      record$gate_id
+    }
+  })))
+  audit_records = lapply(seq_len(nrow(required)), function(index) {
+    row = required[index]
+    if (row$gate_id %in% recorded) return(NULL)
+    status = if (row$status %in% .csdg_property_statuses) row$status else "open"
+    csdg_evidence_record(
+      row$gate_id, TRUE, "required_property",
+      status = status,
+      availability = if (identical(status, "open")) {
+        if (identical(row$status, "error")) "unavailable" else "incomplete"
+      } else {
+        "complete"
+      },
+      rationale = paste0("Audit diagnostic (", row$status, "): ", row$summary)
+    )
+  })
+  audit_records = Filter(Negate(is.null), audit_records)
+  plan = data.table::copy(data.table::as.data.table(x$plan))
+  data.table::setattr(plan, "causal_design_required", identical(.csdg_claim_meaning(x$claim), "causal_claim"))
+  adjudication = csdg_adjudicate_claim(c(audit_records, supplied), claim_applicable = TRUE, plan = plan)
+  properties = adjudication$properties
+  collect = function(value) paste(properties$gate_id[properties$status == value], collapse = ", ")
+  origin = x$claim$provenance$origin %||% NA_character_
+  exploratory = identical(origin, "retrospective_exploratory")
+  scope = x$claim$scope %||% list(
+    quantity = x$claim$target, model = x$claim$model_scope, procedure = x$claim$explanation_design,
+    data = x$claim$analytic_distribution, meaning = .csdg_claim_meaning(x$claim), use = x$claim$scientific_use
+  )
+  scope_text = paste(vapply(.csdg_scope_elements, function(element) {
+    paste0(tools::toTitleCase(element), ": ", paste(scope[[element]] %||% "unspecified", collapse = " "))
+  }, character(1L)), collapse = " | ")
+  assessment = adjudication$assessment
+  assessment_basis = if (length(supplied)) {
+    "audit diagnostics under the configured criteria and supplied evidence records"
+  } else {
+    "audit diagnostics under the configured criteria"
+  }
   data.table::data.table(
     claim_id = x$claim$id,
     claim_version = x$claim$claim_version,
     parent_claim_id = x$claim$parent_claim_id %||% NA_character_,
     revision_relation = x$claim$revision_relation,
     claim_statement = x$claim$statement,
-    decision = "unresolved",
-    decision_basis = "requires_explicit_claim_adjudication",
-    required_gates = paste(required$gate_id, collapse = ", "),
-    met_gates = paste(required[status == "met", gate_id], collapse = ", "),
-    not_met_gates = paste(required[status == "not_met", gate_id], collapse = ", "),
-    unresolved_gates = paste(required[status == "unresolved", gate_id], collapse = ", "),
+    origin = origin,
+    assessment = assessment,
+    assessment_label = paste0(gsub("_", " ", assessment), if (exploratory) " (exploratory)" else ""),
+    exploratory = exploratory,
+    decision_options = paste(adjudication$decision_options, collapse = " or "),
+    required_gates = paste(properties$gate_id, collapse = ", "),
+    supported_gates = collect("supported"),
+    contradicted_gates = collect("contradicted"),
+    open_gates = collect("open"),
     error_gates = paste(required[status == "error", gate_id], collapse = ", "),
-    scope = paste(
-      "Model:", x$claim$model_scope,
-      "| Setting:", x$claim$setting_scope,
-      "| Population:", paste(x$claim$population %||% "unspecified", collapse = " ")
-    ),
+    counterevidence_gates = paste(adjudication$counterevidence_gate_ids, collapse = ", "),
+    threat_gates = paste(adjudication$threat_gate_ids, collapse = ", "),
+    assessment_basis = assessment_basis,
+    scope = scope_text,
     interpretation = paste(
-      "Gate states are evidence records, not an aggregate claim verdict.",
-      "The analyst must decide whether every necessary requirement is met and whether a potential defeater",
-      "has been materialized under a recorded claim-specific rule. A surviving revision is a new claim version."
-    )
+      "Decision rule: not met if a required property is contradicted; otherwise unresolved if one is open;",
+      "otherwise met. Favorable results never offset a contradicted property, and context never changes the",
+      "assessment. Properties that the audit cannot judge, such as whether the procedure computes the quantity",
+      "the claim names (G2), remain open until the researcher records them with csdg_evidence_record()."
+    ),
+    # Deprecated aliases kept for compatibility with versions up to 0.1.5: `decision` and `decision_basis` hold
+    # the assessment and its basis (the decision itself is retain, revise, or withhold; see `decision_options`).
+    decision = assessment,
+    decision_basis = assessment_basis,
+    met_gates = collect("supported"),
+    not_met_gates = collect("contradicted"),
+    unresolved_gates = collect("open")
   )
 }
 
@@ -91,22 +174,24 @@ csdg_claim_report = function(x) {
 
 .bundle_readme = function(result) {
   card = csdg_report_card(result)
+  report = csdg_claim_report(result)
   paste0(
     "# CSDG audit bundle\n\n",
     "Created: ", result$metadata$created_at, "\n\n",
     "Claim: **", result$claim$statement, "**\n\n",
     "Claim version: **", result$claim$claim_version, "**\n\n",
-    "## Gate status\n\n",
+    "Assessment from the audit diagnostics: **", report$assessment_label, "**\n\n",
+    "## Required properties and their status\n\n",
     paste0(
-      "- ", card$gate_id, " - ", card$gate_name, ": `", card$status, "` - ",
-      card$summary, collapse = "\n"
+      "- ", card$gate_id, " ", card$gate_name, " (", gsub("_", " ", card$evidence_role), "): `", card$status,
+      "` - ", card$summary, collapse = "\n"
     ),
-    "\n\n## Interpretation boundary\n\n",
-    "The report separates applicability, evidence role, availability, observed direction, criterion provenance, ",
-    "materiality, and claim consequence. These fields are not combined into an overall score or verdict. ",
-    "An unmet necessary requirement or explicitly materialized defeater cannot be compensated by favorable ",
-    "evidence elsewhere. A defensible replacement is recorded as a new, linked claim version. The records do not ",
-    "establish causal validity, population representativeness, clinical utility, fairness, or deployment readiness.\n"
+    "\n\n## Decision rule\n\n",
+    "A claim is not met if at least one required property is contradicted; otherwise it is unresolved if at least ",
+    "one is open; otherwise it is met. Favorable results never offset a contradicted property, and context never ",
+    "changes the assessment. No aggregate score is computed. A revised claim is recorded as a new, linked claim. ",
+    "The records do not establish causal validity, population representativeness, clinical utility, fairness, or ",
+    "deployment readiness.\n"
   )
 }
 
@@ -448,11 +533,15 @@ csdg_claim_report = function(x) {
     name = item_names[[index]]
     safe_scalar_description = name %in% c("weights", "clusters") &&
       test_string(out[[index]], min.chars = 1L)
+    # The scope element `model` of a claim (for example "fitted_model" or "learner") is a character
+    # description of the model scope, not a fitted model object, and must survive the export.
+    scope_model_description = identical(name, "model") && test_string(out[[index]], min.chars = 1L)
     remove = length(.export_private_field_names(name, generic_identifiers = !allow_generic_identifiers)) > 0L ||
       length(.export_private_container_names(name)) > 0L ||
       (!isTRUE(include_predictions) && length(.export_prediction_table_columns(name)) > 0L) ||
       name %in% c("task", "backend", "backends", "resampling") ||
-      (!isTRUE(include_models) && length(.export_model_container_names(name)) > 0L) ||
+      (!isTRUE(include_models) && !scope_model_description &&
+        length(.export_model_container_names(name)) > 0L) ||
       (!isTRUE(include_predictions) && length(.export_prediction_container_names(name)) > 0L) ||
       (!isTRUE(include_predictions) &&
         name %in% c(
@@ -483,9 +572,11 @@ csdg_claim_report = function(x) {
 
 .sanitize_export_plan = function(plan, include_models, include_predictions) {
   allowed = c(
-    "gate_id", "gate_name", "required", "applicable", "applicability", "trigger",
-    "required_components", "evidence_role", "execute"
+    "gate_id", "gate_name", "area", "evidence_question", "required_if", "required", "plan_role",
+    "evidence_role", "trigger", "typical_diagnostic", "required_components", "applicable", "applicability",
+    "execute"
   )
+  causal_design_required = isTRUE(attr(plan, "causal_design_required"))
   plan = copy(as.data.table(plan))
   plan = plan[, intersect(allowed, names(plan)), with = FALSE]
   sanitized = .sanitize_export_object(
@@ -496,7 +587,9 @@ csdg_claim_report = function(x) {
   if (is.null(sanitized)) {
     .csdg_stop("The gate plan contains a private or unsupported object and cannot be exported safely.")
   }
-  structure(sanitized, class = c("CSDGGatePlan", class(sanitized)))
+  sanitized = structure(sanitized, class = c("CSDGGatePlan", class(sanitized)))
+  data.table::setattr(sanitized, "causal_design_required", causal_design_required)
+  sanitized
 }
 
 .export_measure_ids = function(x) {

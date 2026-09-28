@@ -952,7 +952,9 @@ csdg_summarize_local_fidelity = function(
 #'
 #' Synthetic or empirical-neighbor neighborhoods, mixed-type distances, weighted ridge fitting, cross-fitting,
 #' relative and absolute errors, target-case error, coefficient stability, and support diagnostics are reported.
+#' The section "Local surrogate" states exactly what is fitted.
 #'
+#' @inheritSection csdg_diagnostics Local surrogate
 #' @param x A `CSDGResample` with stored fold models.
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param seeds Either a vector of at least two distinct perturbation seeds, reused for every case, or an integer-like

@@ -18,13 +18,13 @@
   if (!is.list(override)) {
     return(new_gate_result(
       gate_id,
-      status = "unresolved",
+      status = "open",
       summary = "Externally supplied evidence was recorded but not status-coded.",
       evidence = list(value = override),
       limitations = "The package did not compute or independently verify this evidence."
     ))
   }
-  status = override$status %||% "unresolved"
+  status = override$status %||% "open"
   summary = override$summary %||%
     "Externally supplied evidence was recorded; its provenance must be reviewed."
   evidence = override$evidence %||%
@@ -62,18 +62,13 @@
   if (!execute) {
     return(new_gate_result(
       gate_id,
-      status = if (applicable) "unresolved" else "not_applicable",
+      status = if (applicable) "open" else "not_required",
       summary = if (applicable) {
-        "The gate applies to the prespecified claim but was not executed in this call."
+        "The claim requires this gate, but its diagnostic was not run in this call."
       } else {
-        "The prespecified claim does not require this gate."
+        "The claim does not require this gate."
       },
       availability = if (applicable) "unavailable" else "not_applicable",
-      materiality = if (applicable && identical(evidence_role, "potential_defeater")) {
-        "not_materialized"
-      } else {
-        "not_applicable"
-      },
       started_at = started
     ))
   }
@@ -86,46 +81,40 @@
   if (is.null(result$started_at)) {
     result$started_at = started
   }
-  if (applicable &&
-      identical(evidence_role, "potential_defeater") &&
-      identical(result$materiality, "not_applicable")) {
-    result$materiality = "not_materialized"
-  }
   result
 }
 
 .evaluate_g0a = function(claim) {
   fields = c(
     statement = !identical(claim$statement, "Claim statement not yet supplied."),
-    target = !is.null(claim$target),
-    semantics = !is.null(claim$semantics),
+    quantity = !is.null(claim$target),
+    model = !is.null(claim$model_scope) && !identical(claim$model_scope, "unspecified"),
+    procedure = !is.null(claim$explanation_design),
+    data = !is.null(claim$analytic_distribution),
+    meaning = !is.null(claim$meaning %||% claim$semantics),
+    use = !is.null(claim$scientific_use),
     population = !is.null(claim$population),
-    analytic_distribution = !is.null(claim$analytic_distribution),
-    model_scope = !is.null(claim$model_scope),
     setting_scope = !is.null(claim$setting_scope),
-    scientific_use = !is.null(claim$scientific_use),
-    explanation_design = !is.null(claim$explanation_design),
-    claim_level = !is.null(claim$claim_level),
     use_claim = is.logical(claim$use_claim) && length(claim$use_claim) == 1L && !is.na(claim$use_claim),
     claim_version = !is.null(claim$claim_version),
     revision_relation = !is.null(claim$revision_relation)
   )
   missing = names(fields)[!fields]
   decision_missing = claim$completeness$decision_fields_missing
-  if ("decision" %in% claim$claim_type && length(decision_missing)) {
-    status = "not_met"
-  } else if (length(missing)) {
-    status = "unresolved"
+  # An incomplete claim or scope leaves the G0a property open (for example, a decision claim that names no
+  # decision); it does not contradict it.
+  status = if (length(missing) || ("decision" %in% claim$claim_type && length(decision_missing))) {
+    "open"
   } else {
-    status = "met"
+    "supported"
   }
   new_gate_result(
     "G0a",
     status = status,
-    summary = if (identical(status, "met")) {
+    summary = if (identical(status, "supported")) {
       paste(
-        "The versioned claim specifies its target, semantics, analytic distribution,",
-        "model and setting scope, scientific use, and explanation design."
+        "The versioned claim states its six scope elements (quantity, model, procedure, data, meaning, use),",
+        "population, and setting."
       )
     } else {
       paste(
@@ -146,8 +135,8 @@
       ),
       claim = .card_to_list(claim)
     ),
-    limitations = if (!identical(status, "met")) {
-      "Interpretation must remain provisional until the claim card is completed."
+    limitations = if (!identical(status, "supported")) {
+      "The G0a property remains open until the claim and its scope are stated."
     } else character()
   )
 }
@@ -163,17 +152,13 @@
   )
   missing = names(fields)[!fields]
   reviewed = measurement$verification$status != "not_checked"
-  status = if (!length(missing) && reviewed) {
-    "met"
-  } else if (length(missing) == length(fields)) {
-    "not_met"
-  } else {
-    "unresolved"
-  }
+  # Missing documentation leaves the property open; a documented mismatch between the claim and the data is
+  # recorded by the researcher as a contradicted property or as established counterevidence.
+  status = if (!length(missing) && reviewed) "supported" else "open"
   new_gate_result(
     "G0b",
     status = status,
-    summary = if (identical(status, "met")) {
+    summary = if (identical(status, "supported")) {
       "Measurement, sampling, missingness, and preprocessing are documented with a review artifact."
     } else {
       paste0(
@@ -294,8 +279,8 @@
 }
 
 .criteria_status = function(criteria) {
-  if (!nrow(criteria) || anyNA(criteria$passed)) return("unresolved")
-  if (any(!criteria$passed)) "not_met" else "met"
+  if (!nrow(criteria) || anyNA(criteria$passed)) return("open")
+  if (any(!criteria$passed)) "contradicted" else "supported"
 }
 
 .table_value = function(table, column) {
@@ -321,7 +306,13 @@
     evidence,
     run_gates) {
   plan = copy(csdg_gate_plan(claim, measurement, explanation))
-  plan[, execute := required]
+  # Required gates are computed; held-out performance (G1) is also computed when it is context for the claim or
+  # when a required gate uses its out-of-fold predictions and fold models. A gate that is not required is
+  # reported as context.
+  plan[, execute := required | plan_role == "context"]
+  if (any(plan[gate_id %in% c("G3a", "G3b", "G4", "G5", "G6a", "G7a"), execute])) {
+    plan[gate_id == "G1", execute := TRUE]
+  }
   if (!is.null(run_gates)) {
     unknown = setdiff(run_gates, .csdg_gate_ids)
     if (length(unknown)) {
@@ -431,12 +422,12 @@
     new_gate_result(
       "G1",
       status = status,
-      summary = if (identical(status, "unresolved")) {
-        "Held-out performance was computed, but claim-relevant adequacy criteria were not fully evaluated."
-      } else if (identical(status, "met")) {
-        "Held-out performance met all prespecified adequacy criteria."
+      summary = if (identical(status, "open")) {
+        "Held-out performance was computed; the property remains open without a complete criterion."
+      } else if (identical(status, "supported")) {
+        "Held-out performance is supported under all prespecified criteria."
       } else {
-        "Held-out performance did not meet at least one prespecified adequacy criterion."
+        "Held-out performance contradicts at least one prespecified criterion."
       },
       evidence = list(
         performance = perf,
@@ -473,11 +464,13 @@
     artifacts$dependence = dep
     new_gate_result(
       "G2",
-      status = "met",
-      summary = "Mixed-type dependence and observed feature support were characterized.",
+      status = "open",
+      summary = paste(
+        "Dependence and observed support were characterized; whether the procedure computes the quantity the",
+        "claim names requires the researcher's judgment (record it with csdg_evidence_record())."
+      ),
       evidence = dep,
       result_direction = "descriptive",
-      materiality = "not_materialized",
       limitations = dep$limitations
     )
   })
@@ -540,12 +533,12 @@
     new_gate_result(
       "G3a",
       status = status,
-      summary = if (identical(status, "met")) {
-        "Out-of-fold calibration met all prespecified claim-relevant criteria."
-      } else if (identical(status, "unresolved")) {
-        "Out-of-fold calibration was computed, but adequacy remains unresolved without claim-relevant criteria."
+      summary = if (identical(status, "supported")) {
+        "Out-of-fold calibration is supported under all prespecified criteria."
+      } else if (identical(status, "open")) {
+        "Out-of-fold calibration was computed; the property remains open without a criterion."
       } else {
-        "At least one prespecified calibration criterion was not met."
+        "Out-of-fold calibration contradicts at least one prespecified criterion."
       },
       evidence = list(
         calibration = cal,
@@ -591,18 +584,18 @@
       )
     }
     criteria = data.table::rbindlist(criteria, fill = TRUE)
-    status = if (length(missing_fields)) "not_met" else .criteria_status(criteria)
+    status = if (length(missing_fields)) "open" else .criteria_status(criteria)
     new_gate_result(
       "G3b",
       status = status,
       summary = if (length(missing_fields)) {
         sprintf("The decision claim is incomplete: %s.", paste(missing_fields, collapse = ", "))
-      } else if (identical(status, "met")) {
-        "Decision consequences met all prespecified claim-relevant criteria."
-      } else if (identical(status, "unresolved")) {
-        "Decision curves were computed, but utility adequacy remains unresolved without a use-linked criterion."
+      } else if (identical(status, "supported")) {
+        "Decision consequences are supported under all prespecified criteria."
+      } else if (identical(status, "open")) {
+        "Decision curves were computed; the property remains open without a criterion derived from the use."
       } else {
-        "At least one prespecified decision criterion was not met."
+        "Decision consequences contradict at least one prespecified criterion."
       },
       evidence = list(decision_curve = decision_curve, criteria = criteria),
       thresholds = config$decision,
@@ -622,8 +615,8 @@
     if (is.null(cases)) {
       return(new_gate_result(
         "G4",
-        status = "unresolved",
-        summary = "No prespecified local cases were supplied; local faithfulness was not evaluated.",
+        status = "open",
+        summary = "No prespecified local cases were supplied; local fidelity was not evaluated.",
         limitations = "Local explanations must be described as illustrative, not generally validated."
       ))
     }
@@ -706,32 +699,32 @@
     criteria = rbindlist(criterion_state$rows, fill = TRUE)
     criteria_status = .criteria_status(criteria)
     post_hoc = identical(explanation$case_selection, "post_hoc_communication")
-    status = if (identical(criteria_status, "not_met")) {
-      "not_met"
-    } else if (!held_out || post_hoc || identical(criteria_status, "unresolved")) {
-      "unresolved"
+    status = if (identical(criteria_status, "contradicted")) {
+      "contradicted"
+    } else if (!held_out || post_hoc || identical(criteria_status, "open")) {
+      "open"
     } else {
-      "met"
+      "supported"
     }
     new_gate_result(
       "G4",
       status = status,
       summary = if (!nrow(criteria)) {
         paste(
-          "Local fidelity was computed, but adequacy remains unresolved because no use-linked",
-          "relative or absolute error criterion was supplied."
+          "Local fidelity was computed; the property remains open because no relative or absolute",
+          "error criterion derived from the use was supplied."
         )
-      } else if (post_hoc && identical(criteria_status, "met")) {
+      } else if (post_hoc && identical(criteria_status, "supported")) {
         paste(
           "Held-out local fidelity was adequate for the selected communication cases,",
-          "but post hoc case selection does not establish general local faithfulness."
+          "but post hoc case selection does not establish local fidelity in general."
         )
       } else if (!held_out) {
         "Local surrogate fidelity was computed, but held-out case status could not be verified."
-      } else if (identical(criteria_status, "met")) {
-        "All evaluated held-out local neighborhoods met the supplied claim-relevant fidelity criteria."
+      } else if (identical(criteria_status, "supported")) {
+        "Local fidelity on held-out cases is supported under all supplied criteria."
       } else {
-        "At least one evaluated held-out local neighborhood did not meet a supplied claim-relevant criterion."
+        "Local fidelity on at least one held-out case contradicts a supplied criterion."
       },
       evidence = c(local, list(criteria = criteria)),
       thresholds = config$faithfulness[c(
@@ -811,7 +804,7 @@
     if (is.null(candidate_learners)) {
       return(new_gate_result(
         "G6a",
-        status = "unresolved",
+        status = "open",
         summary = "No prespecified candidate learners were supplied for model-multiplicity assessment.",
         limitations = "A selected-model explanation cannot be generalized to a model class without comparison models."
       ))
@@ -820,7 +813,7 @@
         is.null(config$generalization$rashomon_tolerance_relative)) {
       return(new_gate_result(
         "G6a",
-        status = "unresolved",
+        status = "open",
         summary = "Candidate learners were supplied, but no claim-relevant near-equivalence rule was declared.",
         limitations = "Model-multiplicity evidence requires a substantively justified predictive equivalence rule."
       ))
@@ -829,7 +822,7 @@
     if (is.null(tolerance_metadata)) {
       return(new_gate_result(
         "G6a",
-        status = "unresolved",
+        status = "open",
         summary = paste(
           "A near-equivalence tolerance was supplied without a recorded source and rationale;",
           "no accepted model set was constructed."
@@ -901,9 +894,9 @@
       )
     }
     status = if (!focal_present) {
-      "unresolved"
+      "open"
     } else if (!focal_accepted) {
-      "not_met"
+      "contradicted"
     } else {
       .criteria_status(agreement_criterion)
     }
@@ -950,7 +943,7 @@
     if (is.null(setting_group)) {
       return(new_gate_result(
         "G6b",
-        status = "unresolved",
+        status = "open",
         summary = "No observed-setting identifier was supplied for setting-boundary assessment.",
         limitations = "Observed-setting refits cannot establish performance in an unobserved setting."
       ))
@@ -982,12 +975,12 @@
     new_gate_result(
       "G6b",
       status = threshold_status$status,
-      summary = if (identical(threshold_status$status, "met")) {
-        "Observed-setting performance met the prespecified claim-relevant criterion."
-      } else if (identical(threshold_status$status, "not_met")) {
-        "Observed-setting performance did not meet the prespecified claim-relevant criterion."
+      summary = if (identical(threshold_status$status, "supported")) {
+        "Observed-setting performance is supported under the prespecified criterion."
+      } else if (identical(threshold_status$status, "contradicted")) {
+        "Observed-setting performance contradicts the prespecified criterion."
       } else {
-        "Observed-setting refits were computed, but setting adequacy remains unresolved without a criterion."
+        "Observed-setting refits were computed; the property remains open without a criterion."
       },
       evidence = list(setting_generalization = setting_evidence, setting_threshold = threshold_status),
       thresholds = list(
@@ -1011,7 +1004,7 @@
     if (is.null(subgroup)) {
       return(new_gate_result(
         "G7a",
-        status = "unresolved",
+        status = "open",
         summary = "Prespecified subgroup identifiers were not supplied.",
         limitations = "No subgroup or fairness conclusion should be inferred."
       ))
@@ -1045,21 +1038,21 @@
     criteria = data.table::rbindlist(criteria, fill = TRUE)
     insufficient_n = any(subgroup_evidence$metrics$below_minimum_n)
     status = if (insufficient_n || !nrow(criteria)) {
-      "unresolved"
+      "open"
     } else {
       .criteria_status(criteria)
     }
     new_gate_result(
       "G7a",
       status = status,
-      summary = if (identical(status, "met")) {
-        "Technical subgroup behavior met all prespecified claim-relevant criteria."
-      } else if (identical(status, "not_met")) {
-        "At least one prespecified technical subgroup criterion was not met."
+      summary = if (identical(status, "supported")) {
+        "Subgroup results are supported under all prespecified criteria."
+      } else if (identical(status, "contradicted")) {
+        "Subgroup results contradict at least one prespecified criterion."
       } else if (insufficient_n) {
         "At least one subgroup was below the prespecified minimum sample size."
       } else {
-        "Technical subgroup behavior was summarized, but adequacy remains unresolved without a criterion."
+        "Subgroup results were summarized; the property remains open without a criterion."
       },
       evidence = list(subgroup_audit = subgroup_evidence, criteria = criteria),
       thresholds = list(
@@ -1078,20 +1071,23 @@
     if (is.null(audience_evidence)) {
       return(new_gate_result(
         "G7b",
-        status = "unresolved",
-        summary = "Audience, workflow, implementation, utility, and harm evidence was not supplied.",
+        status = "open",
+        summary = "No evidence with the intended users was supplied.",
         limitations = "Model diagnostics do not substitute for evidence about people or work systems."
       ))
     }
-    supplied_status = audience_evidence$status %||% "unresolved"
-    if (!supplied_status %in% c("met", "not_met", "unresolved")) {
-      supplied_status = "unresolved"
+    supplied_status = audience_evidence$status %||% "open"
+    if (.is_scalar_string(supplied_status)) {
+      supplied_status = .csdg_map_legacy(supplied_status, .csdg_legacy_statuses, "Gate status")
+    }
+    if (!.is_scalar_string(supplied_status) || !supplied_status %in% .csdg_property_statuses) {
+      supplied_status = "open"
     }
     new_gate_result(
       "G7b",
       status = supplied_status,
       summary = audience_evidence$summary %||% paste(
-        "Audience and workflow evidence was recorded; its substantive adequacy remains an analyst judgment."
+        "User evidence was recorded; its substantive adequacy remains the researcher's judgment."
       ),
       evidence = list(audience_use_evidence = audience_evidence),
       limitations = c(

@@ -5,7 +5,7 @@ test_that("new typed metadata remain arrays in JSON exports, including singleton
   )
   claim = csdg_claim(provenance = provenance)
   record = csdg_evidence_record(
-    "G5", TRUE, "descriptive_context", rationale = "Different reference distributions answer different questions.",
+    "G5", TRUE, "context", rationale = "Different reference distributions answer different questions.",
     varied_component = "reference_distribution", held_constant = "fitted_model", same_estimand = FALSE,
     same_estimand_rationale = "The reference distribution defines the estimand."
   )
@@ -38,15 +38,17 @@ test_that("the claim-card schema admits exactly its required context coordinates
 })
 
 test_that("adjudication gate identifiers round trip as arrays and scope remains explicit", {
-  record = csdg_evidence_record("G2", TRUE, "necessary_requirement", result_direction = "supports",
-    claim_consequence = "unresolved", rationale = "A necessary property is supported but the claim remains unresolved.")
+  record = csdg_evidence_record("G2", TRUE, "required_property", status = "open", availability = "incomplete",
+    rationale = "The required property is open because the evidence is incomplete.")
   result = csdg_adjudicate_claim(list(record), claim_applicable = TRUE)
   path = tempfile(fileext = ".json")
   on.exit(unlink(path))
   .write_json(list(evidence = unclass(record), adjudication = unclass(result)), path)
   restored = jsonlite::read_json(path, simplifyVector = FALSE)
   expect_identical(restored$adjudication$unresolved_gate_ids, list("G2"))
+  expect_identical(restored$adjudication$open_gate_ids, list("G2"))
   expect_identical(restored$adjudication$blocking_gate_ids, list())
+  expect_identical(restored$adjudication$decision_options, list("revise", "withhold"))
   expect_identical(restored$adjudication$claim_applicable, TRUE)
   expect_identical(restored$adjudication$applicability_source, "explicit")
   arguments = restored$evidence[intersect(names(restored$evidence), names(formals(csdg_evidence_record)))]

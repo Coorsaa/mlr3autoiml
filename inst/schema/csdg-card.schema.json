@@ -22,6 +22,8 @@
         "use_claim",
         "claim_version",
         "revision_relation",
+        "meaning",
+        "scope",
         "coordinates"
       ],
       "properties": {
@@ -41,7 +43,7 @@
             "same",
             "narrower",
             "broader",
-            "alternative_or_incomparable"
+            "incomparable"
           ]
         },
         "coordinates": {
@@ -121,7 +123,7 @@
         "statement": {
           "type": "string",
           "minLength": 1,
-          "description": "The inferential proposition phi, distinct from the six-coordinate context."
+          "description": "The claim, as it would appear in the article."
         },
         "provenance": {
           "type": [
@@ -186,6 +188,41 @@
               }
             }
           ],
+          "additionalProperties": false
+        },
+        "meaning": {
+          "enum": [
+            "model_description",
+            "population_claim",
+            "causal_claim"
+          ]
+        },
+        "model_scope": {
+          "enum": [
+            "fitted_model",
+            "learner",
+            "several_models",
+            "unspecified"
+          ]
+        },
+        "scope": {
+          "type": "object",
+          "required": [
+            "quantity",
+            "model",
+            "procedure",
+            "data",
+            "meaning",
+            "use"
+          ],
+          "properties": {
+            "quantity": {},
+            "model": {},
+            "procedure": {},
+            "data": {},
+            "meaning": {},
+            "use": {}
+          },
           "additionalProperties": false
         }
       },

@@ -1,25 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.org/mlr3autoiml/csdg-report-card.schema.json",
-  "title": "CSDG report card row",
+  "title": "CSDG report card",
+  "description": "Rows of csdg_report_card(): one row per gate (mlr3autoiml 0.1.6). A required gate has a property status (or error); a gate that the claim does not require is context, with status 'context' if it was run and 'not_required' otherwise, and its computed result in diagnostic_status.",
   "type": "array",
   "items": {
     "type": "object",
     "required": [
       "gate_id",
+      "gate_name",
+      "area",
       "required",
-      "applicable",
+      "plan_role",
       "evidence_role",
+      "status",
       "availability",
       "result_direction",
       "criterion",
       "criterion_source",
       "criterion_rationale",
-      "materiality",
-      "adjudication_basis",
-      "claim_consequence",
       "rationale",
-      "status",
       "summary"
     ],
     "properties": {
@@ -39,18 +39,62 @@
           "G7b"
         ]
       },
+      "gate_name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "area": {
+        "enum": [
+          "Foundation of the claim",
+          "Predictions, explanations, and decisions",
+          "Extensions"
+        ]
+      },
+      "evidence_question": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "required_if": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
       "required": {
         "type": "boolean"
       },
-      "applicable": {
-        "type": "boolean"
+      "plan_role": {
+        "enum": [
+          "required",
+          "context",
+          "not_required"
+        ]
       },
       "evidence_role": {
         "enum": [
-          "necessary_requirement",
-          "potential_defeater",
-          "graded_support",
-          "descriptive_context"
+          "required_property",
+          "context"
+        ]
+      },
+      "status": {
+        "enum": [
+          "supported",
+          "contradicted",
+          "open",
+          "not_required",
+          "error",
+          "context"
+        ]
+      },
+      "diagnostic_status": {
+        "enum": [
+          "supported",
+          "contradicted",
+          "open",
+          "not_required",
+          "error"
         ]
       },
       "availability": {
@@ -74,12 +118,33 @@
         "type": "string"
       },
       "criterion_source": {
-        "type": ["string", "null"],
+        "type": [
+          "string",
+          "null"
+        ],
         "minLength": 1
       },
       "criterion_rationale": {
-        "type": ["string", "null"],
+        "type": [
+          "string",
+          "null"
+        ],
         "minLength": 1
+      },
+      "rationale": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "string"
+      },
+      "applicable": {
+        "type": "boolean"
+      },
+      "applicability": {
+        "enum": [
+          "applicable",
+          "not_applicable"
+        ]
       },
       "materiality": {
         "enum": [
@@ -89,16 +154,12 @@
         ]
       },
       "adjudication_basis": {
-        "enum": [
-          "prespecified_claim_specific_criterion",
-          "substantive_adjudication",
-          "claim_relevant_sensitivity",
-          "other_transparent_rule",
-          null
+        "type": [
+          "string",
+          "null"
         ]
       },
       "claim_consequence": {
-        "description": "Binding record-level constraint, not an aggregate gate score or an independent overall verdict.",
         "enum": [
           "none",
           "retain_exact_claim",
@@ -106,249 +167,211 @@
           "exact_claim_not_retained",
           "unresolved"
         ]
-      },
-      "rationale": {
-        "type": "string",
-        "minLength": 1
-      },
-      "status": {
-        "enum": [
-          "met",
-          "unresolved",
-          "not_met",
-          "not_applicable",
-          "error"
-        ]
-      },
-      "summary": {
-        "type": "string",
-        "minLength": 1
       }
     },
+    "additionalProperties": true,
     "allOf": [
       {
         "if": {
-          "properties": {"criterion": {"maxLength": 0}},
-          "required": ["criterion"]
-        },
-        "then": {
           "properties": {
-            "criterion_source": {"type": "null"},
-            "criterion_rationale": {"type": "null"}
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "criterion": {"minLength": 1},
-            "status": {"enum": ["met", "not_met"]}
-          },
-          "required": ["criterion", "status"]
-        },
-        "then": {
-          "properties": {
-            "criterion_source": {"type": "string", "minLength": 1},
-            "criterion_rationale": {"type": "string", "minLength": 1}
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {"criterion": {"minLength": 1}},
-          "required": ["criterion"]
-        },
-        "then": {
-          "anyOf": [
-            {
-              "properties": {
-                "criterion_source": {"type": "null"},
-                "criterion_rationale": {"type": "null"}
-              }
-            },
-            {
-              "properties": {
-                "criterion_source": {"type": "string", "minLength": 1},
-                "criterion_rationale": {"type": "string", "minLength": 1}
-              }
+            "criterion": {
+              "maxLength": 0
             }
+          },
+          "required": [
+            "criterion"
           ]
-        }
-      },
-      {
-        "if": {
-          "properties": {"applicable": {"const": true}},
-          "required": ["applicable"]
         },
         "then": {
-          "properties": {"availability": {"not": {"const": "not_applicable"}}}
-        }
-      },
-      {
-        "if": {
-          "properties": {"applicable": {"const": false}},
-          "required": ["applicable"]
-        },
-        "then": {
-          "properties": {"claim_consequence": {"const": "none"}}
-        }
-      },
-      {
-        "if": {
-          "properties": {"claim_consequence": {"const": "unresolved"}},
-          "required": ["claim_consequence"]
-        },
-        "then": {
-          "properties": {"applicable": {"const": true}},
-          "not": {
-            "properties": {
-              "evidence_role": {"const": "necessary_requirement"},
-              "availability": {"const": "complete"},
-              "result_direction": {"const": "challenges"}
+          "properties": {
+            "criterion_source": {
+              "type": "null"
             },
-            "required": ["evidence_role", "availability", "result_direction"]
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {"evidence_role": {"not": {"const": "potential_defeater"}}},
-          "required": ["evidence_role"]
-        },
-        "then": {
-          "properties": {"materiality": {"const": "not_applicable"}}
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "applicable": {"const": true},
-            "evidence_role": {"const": "potential_defeater"}
-          },
-          "required": ["applicable", "evidence_role"]
-        },
-        "then": {
-          "properties": {"materiality": {"enum": ["not_materialized", "materialized"]}}
-        }
-      },
-      {
-        "if": {
-          "properties": {"adjudication_basis": {"const": "prespecified_claim_specific_criterion"}},
-          "required": ["adjudication_basis"]
-        },
-        "then": {
-          "properties": {"criterion": {"minLength": 1}}
-        }
-      },
-      {
-        "if": {
-          "properties": {"materiality": {"const": "materialized"}},
-          "required": ["materiality"]
-        },
-        "then": {
-          "properties": {
-            "evidence_role": {"const": "potential_defeater"},
-            "availability": {"const": "complete"},
-            "result_direction": {"enum": ["challenges", "mixed"]},
-            "adjudication_basis": {"type": "string"},
-            "claim_consequence": {"enum": ["revise_claim", "exact_claim_not_retained"]}
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {"evidence_role": {"const": "descriptive_context"}},
-          "required": ["evidence_role"]
-        },
-        "then": {
-          "properties": {"claim_consequence": {"const": "none"}}
-        }
-      },
-      {
-        "if": {
-          "properties": {
-            "evidence_role": {"const": "potential_defeater"},
-            "materiality": {"const": "not_materialized"}
-          },
-          "required": ["evidence_role", "materiality"]
-        },
-        "then": {
-          "properties": {"claim_consequence": {"enum": ["none", "unresolved"]}}
-        }
-      },
-      {
-        "if": {
-          "properties": {"claim_consequence": {"const": "retain_exact_claim"}},
-          "required": ["claim_consequence"]
-        },
-        "then": {
-          "properties": {
-            "applicable": {"const": true},
-            "evidence_role": {"enum": ["necessary_requirement", "graded_support"]},
-            "availability": {"const": "complete"},
-            "result_direction": {"const": "supports"}
-          }
-        }
-      },
-      {
-        "if": {
-          "properties": {"claim_consequence": {"const": "exact_claim_not_retained"}},
-          "required": ["claim_consequence"]
-        },
-        "then": {
-          "properties": {
-            "applicable": {"const": true},
-            "availability": {"const": "complete"}
-          },
-          "anyOf": [
-            {
-              "properties": {
-                "evidence_role": {"const": "necessary_requirement"},
-                "result_direction": {"const": "challenges"}
-              },
-              "required": ["evidence_role", "result_direction"]
-            },
-            {
-              "properties": {
-                "evidence_role": {"const": "potential_defeater"},
-                "materiality": {"const": "materialized"},
-                "result_direction": {"enum": ["challenges", "mixed"]}
-              },
-              "required": ["evidence_role", "materiality", "result_direction"]
+            "criterion_rationale": {
+              "type": "null"
             }
-          ]
+          }
         }
       },
       {
         "if": {
-          "properties": {"claim_consequence": {"const": "revise_claim"}},
-          "required": ["claim_consequence"]
+          "properties": {
+            "criterion": {
+              "minLength": 1
+            },
+            "status": {
+              "enum": [
+                "supported",
+                "contradicted"
+              ]
+            }
+          },
+          "required": [
+            "criterion",
+            "status"
+          ]
         },
         "then": {
           "properties": {
-            "applicable": {"const": true},
-            "availability": {"const": "complete"}
-          },
-          "anyOf": [
-            {
-              "properties": {
-                "evidence_role": {"const": "necessary_requirement"},
-                "result_direction": {"enum": ["challenges", "mixed"]}
-              },
-              "required": ["evidence_role", "result_direction"]
+            "criterion_source": {
+              "type": "string",
+              "minLength": 1
             },
-            {
-              "properties": {
-                "evidence_role": {"const": "potential_defeater"},
-                "materiality": {"const": "materialized"},
-                "result_direction": {"enum": ["challenges", "mixed"]}
-              },
-              "required": ["evidence_role", "materiality", "result_direction"]
+            "criterion_rationale": {
+              "type": "string",
+              "minLength": 1
             }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "required": {
+              "const": true
+            }
+          },
+          "required": [
+            "required"
           ]
+        },
+        "then": {
+          "properties": {
+            "evidence_role": {
+              "const": "required_property"
+            },
+            "plan_role": {
+              "const": "required"
+            },
+            "status": {
+              "enum": [
+                "supported",
+                "contradicted",
+                "open",
+                "error"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "required": {
+              "const": false
+            }
+          },
+          "required": [
+            "required"
+          ]
+        },
+        "then": {
+          "properties": {
+            "evidence_role": {
+              "const": "context"
+            },
+            "plan_role": {
+              "enum": [
+                "context",
+                "not_required"
+              ]
+            },
+            "status": {
+              "enum": [
+                "context",
+                "not_required"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "supported"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "availability": {
+              "const": "complete"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "error"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "availability": {
+              "const": "unavailable"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "not_required"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "required": {
+              "const": false
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "status": {
+              "const": "context"
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "then": {
+          "properties": {
+            "required": {
+              "const": false
+            },
+            "evidence_role": {
+              "const": "context"
+            },
+            "diagnostic_status": {
+              "enum": [
+                "supported",
+                "contradicted",
+                "open",
+                "error"
+              ]
+            }
+          }
         }
       }
-    ],
-    "additionalProperties": true
+    ]
   }
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/csdg_claim_relation.R
 \name{csdg_claim_relation}
 \alias{csdg_claim_relation}
-\title{Document proposition and context relations between CSDG claims}
+\title{Record the relation between a revised claim and its predecessor}
 \usage{
 csdg_claim_relation(
   parent,
@@ -15,73 +15,79 @@ csdg_claim_relation(
 )
 }
 \arguments{
-\item{parent}{A \code{CSDGClaim} used as the reference claim.}
+\item{parent}{A \code{CSDGClaim}, the predecessor.}
 
-\item{claim}{A \code{CSDGClaim} being compared with \code{parent}.}
+\item{claim}{A \code{CSDGClaim}, the revised claim.}
 
-\item{coordinate_relations}{A uniquely named character vector with one of \code{"same"}, \code{"narrower"}, \code{"broader"},
-or \code{"alternative_or_incomparable"} for every claim coordinate.}
+\item{coordinate_relations}{A uniquely named character vector with one of \code{"same"}, \code{"narrower"}, \code{"broader"}, or
+\code{"incomparable"} for each scope element (\code{quantity}, \code{model}, \code{procedure}, \code{data}, \code{meaning}, \code{use}).
+The legacy names (\code{target}, \code{model_scope}, \code{explanation_design}, \code{analytic_distribution}, \code{semantics},
+\code{scientific_use}) and the value \code{"alternative_or_incomparable"} are accepted with a deprecation warning.}
 
-\item{rationale}{A nonempty explanation for the declared coordinate relations.}
+\item{rationale}{A nonempty explanation of the declared scope relations.}
 
-\item{proposition_relation}{Declared relation of the revised proposition to the parent: \code{"unchecked"}, \code{"same"},
-\code{"logical_weakening"}, \code{"logical_strengthening"}, or \code{"alternative_or_incomparable"}.
-A weakening means that the parent proposition entails the revised proposition under the stated assumptions.}
+\item{proposition_relation}{Whether the revised claim follows from its predecessor: \code{"unchecked"}, \code{"same"},
+\code{"logical_weakening"} (the predecessor implies the revised claim under the stated assumptions),
+\code{"logical_strengthening"}, or \code{"incomparable"}.}
 
-\item{proposition_rationale}{Explanation and assumptions for the proposition comparison.
+\item{proposition_rationale}{Argument and assumptions for the comparison of the claims.
 Required unless \code{proposition_relation = "unchecked"}.}
 
-\item{revision_kind}{Documentary distinction among \code{"unspecified"}, \code{"logical_weakening"},
-\code{"context_restriction"}, and \code{"estimand_change"}; it does not establish entailment.}
+\item{revision_kind}{\code{"unspecified"}, \code{"logical_weakening"} (weakening), \code{"restriction_without_entailment"}, or
+\code{"change_of_question"}.
+A weakening requires \code{proposition_relation = "logical_weakening"}; a restriction without entailment requires a
+narrower scope and cannot be declared the same claim or a weakening; a change of question cannot be declared the
+same claim or a weakening. The legacy values \code{"context_restriction"} and \code{"scope_restriction"} (both now
+\code{"restriction_without_entailment"}) and \code{"estimand_change"} (now \code{"change_of_question"}) are accepted with a
+deprecation warning.}
 }
 \value{
-A \code{CSDGClaimRelation} list with separate semantic and context relations, proposition statements,
-declarations, and a six-row coordinate table.
-\code{semantic_status} is \code{"unchecked"} or \code{"declared_not_verified"}, not a claim-support decision.
+A \code{CSDGClaimRelation} list with \code{relation} (from the comparison of the claims), \code{scope_relation}
+(implied by the scope elements), the claim statements, the declarations, and the table \code{scope} with columns
+\code{element}, \code{parent_value}, \code{claim_value}, and \code{relation}. \code{context_relation} and \code{coordinates} (with legacy
+element names) are kept for compatibility.
+\code{semantic_status} is \code{"unchecked"} or \code{"declared_not_verified"}; it is not an assessment.
 }
 \description{
-Records a declared relation between two complete CSDG claim objects.
-Every comparison covers target, model scope, explanation semantics, analytic distribution and measurement
-context, intended use, and explanation design.
-A claim is a proposition (\code{statement}) together with its six-coordinate context.
-Equal contexts do not establish equal propositions, and a smaller population does not generally imply a weaker
-claim about a marginal mean.
-The function records declarations, not logical proofs or empirical validation.
-Without an explicit proposition comparison, \code{relation} is \code{"unchecked"}; the former context aggregate remains
-available as \code{context_relation}.
+When a claim is revised, the record compares the new claim with its predecessor in two separate ways.
+For each of the six scope elements (quantity, model, procedure, data, meaning, use), the researcher declares
+whether the new scope is the same, narrower, broader, or incomparable; whether the revised claim follows from its
+predecessor is declared separately, with a rationale (\code{proposition_relation}).
+A narrower scope need not yield a weaker claim: restricting "the mean is positive" to a subgroup with a negative
+mean yields a claim that does not follow from the original.
+The record distinguishes the three kinds of revision of the article: a weakening (\code{"logical_weakening"}), in which
+the revised claim follows from its predecessor; a restriction without entailment
+(\code{"restriction_without_entailment"}), in which the scope narrows but the revised claim does not follow from its
+predecessor and needs its own evidence; and a change of question (\code{"change_of_question"}), in which the quantity
+or the meaning changes.
+The function stores these declarations and rationales; it does not prove them.
+Without an explicit comparison of the claims, \code{relation} is \code{"unchecked"}; the relation implied by the scope
+elements is returned as \code{scope_relation}.
 }
 \examples{
-broad = csdg_claim(
-  id = "C0",
-  statement = "Person-specific explanations support follow-up use.",
-  target = "person-specific prediction",
-  model_scope = "selected_model",
-  semantics = "fitted_model_description",
-  analytic_distribution = "analytic sample",
-  scientific_use = "individual follow-up",
-  explanation_design = "local surrogate"
+both = csdg_claim(
+  id = "both_models",
+  statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
+  claim_type = "global_explanation",
+  quantity = "marginal PFI with squared error",
+  model = "several_models",
+  procedure = "each item permuted independently",
+  data = "Z standard normal; item 1 = item 2 = outcome = Z",
+  meaning = "model_description",
+  use = "scientific description"
 )
-global = csdg_claim_revision(
-  broad,
-  id = "C3",
-  statement = "Held-out marginal PFI describes the selected model.",
-  claim_version = "C3",
-  revision_relation = "alternative_or_incomparable",
-  target = "global loss increase",
-  scientific_use = "global description",
-  explanation_design = "held-out marginal PFI"
+model_a = csdg_claim_revision(
+  both, id = "model_a", claim_version = "C1", revision_relation = "narrower",
+  statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
+  model = "fitted_model"
 )
 csdg_claim_relation(
-  broad,
-  global,
-  coordinate_relations = c(
-    target = "alternative_or_incomparable",
-    model_scope = "same",
-    semantics = "same",
-    analytic_distribution = "same",
-    scientific_use = "alternative_or_incomparable",
-    explanation_design = "alternative_or_incomparable"
-  ),
-  rationale = "The target, use, and explanation design change the scientific question."
+  both, model_a,
+  coordinate_relations = c(quantity = "same", model = "narrower", procedure = "same", data = "same",
+    meaning = "same", use = "same"),
+  rationale = "The claim about models A and B is restricted to model A.",
+  proposition_relation = "logical_weakening",
+  proposition_rationale = "A universal claim over {A, B} implies the claim for A.",
+  revision_kind = "logical_weakening"
 )
 }

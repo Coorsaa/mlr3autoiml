@@ -20,18 +20,20 @@ new_gate_result = function(
     started_at = NULL,
     completed_at = .now_utc()) {
   .assert_choice(gate_id, .csdg_gate_ids, "gate_id")
-  .assert_choice(status, .csdg_statuses, "status")
+  .assert_scalar_string(status, "status")
+  status = .csdg_map_legacy(status, .csdg_legacy_statuses, "Gate status")
+  .assert_choice(status, .csdg_gate_statuses, "status")
   .assert_scalar_string(summary, "summary")
   availability = availability %||% switch(
     status,
     error = "unavailable",
-    not_applicable = "not_applicable",
+    not_required = "not_applicable",
     "complete"
   )
   result_direction = result_direction %||% switch(
     status,
-    met = "supports",
-    not_met = "challenges",
+    supported = "supports",
+    contradicted = "challenges",
     "not_evaluated"
   )
   criteria_table = if (is.list(evidence)) evidence$criteria %||% NULL else NULL
@@ -69,7 +71,7 @@ new_gate_result = function(
     .csdg_stop("Criterion provenance requires both `criterion_source` and `criterion_rationale`.")
   }
   if (!is.null(criterion) &&
-      status %in% c("met", "not_met") &&
+      status %in% c("supported", "contradicted") &&
       (is.null(criterion_source) || is.null(criterion_rationale))) {
     .csdg_stop("A criterion used to adjudicate a gate requires a recorded source and rationale.")
   }
@@ -151,7 +153,8 @@ print.CSDGClaim = function(x, ...) {
   cat("<CSDGClaim>", x$id, "\n")
   cat("  Statement:", x$statement, "\n")
   cat("  Types:", paste(x$claim_type, collapse = ", "), "\n")
-  cat("  Model scope:", x$model_scope, "\n")
+  cat("  Model:", x$model_scope, "\n")
+  cat("  Meaning:", x$meaning %||% "model_description", "\n")
   invisible(x)
 }
 
@@ -159,8 +162,10 @@ print.CSDGClaim = function(x, ...) {
 #' @noRd
 print.CSDGClaimRelation = function(x, ...) {
   cat("<CSDGClaimRelation>", x$parent_claim_id, "->", x$claim_id, "\n")
-  cat("  Relation:", x$relation, "\n")
-  print(x$coordinates, ...)
+  cat("  Claim relation:", x$relation, "\n")
+  cat("  Scope relation:", x$scope_relation %||% x$context_relation, "\n")
+  cat("  Revision kind:", x$revision_kind, "\n")
+  print(x$scope %||% x$coordinates, ...)
   invisible(x)
 }
 
@@ -168,16 +173,26 @@ print.CSDGClaimRelation = function(x, ...) {
 #' @noRd
 print.CSDGEvidenceRecord = function(x, ...) {
   cat("<CSDGEvidenceRecord>", x$gate_id, "\n")
-  cat("  Role:", x$role, "\n")
-  cat("  Availability:", x$availability, "\n")
-  cat("  Result direction:", x$result_direction, "\n")
+  cat("  Role:", gsub("_", " ", x$role), "\n")
+  if (!is.null(x$status)) cat("  Status:", x$status, "\n")
+  if (!isTRUE(x$applicable)) cat("  Not applicable to the claim (context)\n")
+  if (!is.null(x$required_property)) cat("  Property:", x$required_property, "\n")
+  if (!is.null(x$observation)) cat("  Observation:", x$observation, "\n")
   invisible(x)
 }
 
 #' @export
 #' @noRd
 print.CSDGClaimAdjudication = function(x, ...) {
-  cat("<CSDGClaimAdjudication>", x$decision, "\n")
+  assessment = x$assessment %||% x$decision
+  cat("<CSDGClaimAdjudication>\n")
+  cat("  Assessment:", gsub("_", " ", assessment, fixed = TRUE), "\n")
+  if (length(x$decision_options)) cat("  Decision options:", paste(x$decision_options, collapse = " or "), "\n")
+  if (is.data.frame(x$properties) && nrow(x$properties)) {
+    cat("  Required properties:\n")
+    cat(paste0("   ", x$properties$gate_id, ": ", x$properties$status, " (", x$properties$source, ")"),
+      sep = "\n")
+  }
   cat("\n ", x$rationale, "\n")
   invisible(x)
 }
@@ -214,7 +229,12 @@ print.CSDGConfig = function(x, ...) {
 #' @export
 #' @noRd
 print.CSDGGatePlan = function(x, ...) {
-  print(data.table::as.data.table(x), ...)
+  columns = intersect(c("gate_id", "gate_name", "required", "plan_role", "trigger"), names(x))
+  print(data.table::as.data.table(x)[, columns, with = FALSE], ...)
+  if (isTRUE(attr(x, "causal_design_required"))) {
+    cat("Causal design required (not a gate): a causal claim requires a design with stated identification",
+      "assumptions.\n")
+  }
   invisible(x)
 }
 

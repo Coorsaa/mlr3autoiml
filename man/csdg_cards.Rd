@@ -14,11 +14,11 @@ csdg_claim(
   statement = NULL,
   claim_type = "predictive_performance",
   target = NULL,
-  semantics = "fitted_model_description",
+  semantics = NULL,
   unit = NULL,
   population = NULL,
   analytic_distribution = NULL,
-  model_scope = "selected_model",
+  model_scope = "fitted_model",
   setting_scope = "analytic_sample",
   scientific_use = NULL,
   explanation_design = NULL,
@@ -35,6 +35,11 @@ csdg_claim(
   confirmatory = FALSE,
   notes = NULL,
   provenance = NULL,
+  quantity = NULL,
+  procedure = NULL,
+  data = NULL,
+  meaning = NULL,
+  use = NULL,
   ...
 )
 
@@ -89,39 +94,42 @@ csdg_config(
 \arguments{
 \item{id}{Stable claim identifier.}
 
-\item{statement}{Inferential proposition to evaluate; sentence boundaries need not match proposition boundaries.}
+\item{statement}{The claim: the conclusion that the researcher intends to report, written as it would appear in
+the article.}
 
-\item{claim_type}{One or more controlled claim types.}
+\item{claim_type}{One or more claim types: \code{"predictive_performance"}, \code{"calibration"}, \code{"global_explanation"},
+\code{"local_explanation"}, \code{"subgroup"}, \code{"model_generalization"}, \code{"setting_generalization"}, \code{"decision"}.
+Together with the scope, they determine the gate plan (\code{\link[=csdg_gate_plan]{csdg_gate_plan()}}).}
 
-\item{target}{Prediction target or explanation target, including a horizon when relevant.}
-
-\item{semantics}{Intended interpretation of the claim: a fitted-model description, hypothetical model query,
-causal claim, or recourse claim.}
+\item{semantics}{Deprecated (0.1.5): use \code{meaning}. Legacy values \code{"fitted_model_description"} and
+\code{"hypothetical_model_query"} correspond to \code{meaning = "model_description"}, and \code{"causal"} and \code{"recourse"} to
+\code{"causal_claim"}.}
 
 \item{unit}{Unit of observation or inference.}
 
-\item{population}{Target population.}
+\item{population}{Population that the data element refers to.}
 
-\item{analytic_distribution}{Distribution represented by the analysis data.}
+\item{model_scope}{Model: one fitted model, a learner, or several learners (\code{"fitted_model"}, \code{"learner"},
+\code{"several_models"}, or \code{"unspecified"}). A learner is an algorithm with fixed settings and preprocessing;
+fitting it to data yields a fitted model. The dots alias \code{model} is accepted. Legacy values
+(\code{"selected_model"}, \code{"cross_fitted_pipeline"}, \code{"near_equivalent_models"}, \code{"model_class"}) are mapped with
+a deprecation warning.}
 
-\item{model_scope}{Scope over fitted models.}
+\item{setting_scope}{Setting of the claim: \code{"analytic_sample"} (the sampled setting) or a description of other
+cohorts, sites, countries, or times that the claim extends to.}
 
-\item{setting_scope}{Scope over cohorts, sites, countries, times, or settings.}
+\item{claim_level}{Documentary level of the claim (\code{"functional"}, \code{"predictive"}, or \code{"substantive"}). It does
+not affect the gate plan; use \code{meaning} for population and causal claims.}
 
-\item{scientific_use}{Intended scientific use of the result.}
-
-\item{explanation_design}{Explanation design or comparison to which the claim is restricted.}
-
-\item{claim_level}{Inference level of the claim: functional, predictive, or substantive.}
-
-\item{use_claim}{Whether the claim additionally asserts adequacy for an audience, workflow, implementation, or use.}
+\item{use_claim}{Whether the claim asserts that intended users understand or benefit from the explanation (G7b).}
 
 \item{claim_version}{Stable version label for the claim.}
 
-\item{parent_claim_id}{Identifier of the parent claim when the current claim is a revision.}
+\item{parent_claim_id}{Identifier of the predecessor when the claim is a revision.}
 
-\item{revision_relation}{Legacy declared relationship to the parent claim, not a logical certification.
-Use \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} to distinguish proposition and context relations explicitly.}
+\item{revision_relation}{\code{"original"} or, for a revised claim, the relation of its scope to the predecessor's
+scope (\code{"same"}, \code{"narrower"}, \code{"broader"}, \code{"incomparable"}). Use \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} to record the
+relation of each scope element and whether the revised claim follows from its predecessor.}
 
 \item{intended_users}{Intended audience or users.}
 
@@ -139,9 +147,29 @@ Use \code{\link[=csdg_claim_relation]{csdg_claim_relation()}} to distinguish pro
 
 \item{provenance}{Optional named list with \code{origin}, \code{date} (YYYY-MM-DD), \code{time_basis}, \code{selection_basis},
 and character-vector \code{evidence_ids}.
-Origin is \code{"specified_before_results"}, \code{"retrospective_exploratory"}, or \code{"independently_confirmed"}.
+Origin is \code{"specified_before_results"} (prespecified: fixed before the relevant results were seen),
+\code{"retrospective_exploratory"} (exploratory: written after the results were seen; the assessment is labeled
+exploratory), or \code{"independently_confirmed"} (later tested on new data).
 Independent confirmation requires evidence identifiers; metadata cannot establish independence by itself.
 \code{NULL} means not recorded, and revisions do not inherit provenance automatically.}
+
+\item{quantity, target}{For \code{csdg_claim()}, the quantity: which quantity (estimand) does the claim interpret?
+\code{target} is its legacy name. For \code{csdg_explanation()}, \code{target} is the explained model output (for example,
+the predicted probability).}
+
+\item{procedure, explanation_design}{Procedure: how is the quantity estimated (estimator)?
+\code{explanation_design} is the legacy name.}
+
+\item{data, analytic_distribution}{Data: which sample, measures, and preprocessing? \code{analytic_distribution} is the
+legacy name.}
+
+\item{meaning}{Meaning: model description, population claim, or causal claim (\code{"model_description"},
+\code{"population_claim"}, \code{"causal_claim"}; default \code{"model_description"}). A population claim uses the model to
+learn how predictors relate to the outcome in the population that the sample represents; a causal claim is a
+population claim about what would happen if a predictor changed. The meaning is never inferred from
+\code{claim_level}.}
+
+\item{use, scientific_use}{Use: what will the claim be used for? \code{scientific_use} is the legacy name.}
 
 \item{...}{Explicit documented aliases for card constructors.
 
@@ -199,8 +227,16 @@ Every entry must contain nonempty \code{source} and \code{rationale} fields.}
 A \code{CSDGClaim}, \code{CSDGMeasurement}, \code{CSDGExplanation}, or \code{CSDGConfig} object.
 }
 \description{
-These constructors create explicit, serializable cards that define the claim, measurement,
-explanation semantics, and any claim-specific criteria before results are interpreted.
+These constructors record the claim, its scope, the measurement, and the explanation before results are
+interpreted (Steps 1 and 2 of the article), and the configuration of the diagnostics.
+The scope of a claim has six elements: quantity, model, procedure, data, meaning, and use.
 CSDG criteria have no universal substantive defaults and require a recorded source and rationale when they are
-used for adjudication.
+used to judge a property.
+}
+\details{
+\code{csdg_claim()} accepts each scope element under its name in the article (\code{quantity}, \code{model}, \code{procedure},
+\code{data}, \code{meaning}, \code{use}) or under the legacy field name of versions up to 0.1.5 (\code{target}, \code{model_scope},
+\code{explanation_design}, \code{analytic_distribution}, \code{semantics}, \code{scientific_use}); supplying both names with
+different values is an error. The card stores the elements in \code{scope} (in the order of the article) and, for
+compatibility, in the legacy fields.
 }

@@ -1,6 +1,44 @@
-# mlr3autoiml (development version)
+# mlr3autoiml 0.1.6
 
-* Documentation fixes in the README and the vignette.
+This release aligns the package with the vocabulary and rules of the accompanying article. Old labels and argument
+values still work with a deprecation warning (class `mlr3autoiml_deprecated`, once per session); see
+`inst/MIGRATION_0_1_6.md`.
+
+* Vocabulary: gate names and areas as in Table 3 of the article (G0a Specification, G0b Measurement and data,
+  G1 Predictive performance, G2 Procedure, G3a Calibration, G3b Decisions, G4 Local fidelity, G5 Stability,
+  G6a Models, G6b Settings, G7a Subgroups, G7b Users); property status supported / contradicted / open; assessment
+  met / not met / unresolved; decision retain / revise / withhold; scope elements quantity, model, procedure, data,
+  meaning, and use (`csdg_claim()` accepts these names; the old field names remain aliases); meaning values
+  `model_description`, `population_claim`, `causal_claim`; model values `fitted_model`, `learner`,
+  `several_models`; scope relation `incomparable`; revision kinds `logical_weakening` (weakening),
+  `restriction_without_entailment`, and `change_of_question`; origin codes are documented with the article's
+  terms (prespecified, exploratory, later tested on new data).
+* Evidence roles: `required_property`, `established_counterevidence`, the new `unresolved_threat` (a plausible but
+  unquantified threat that sets the threatened property to open unless it is contradicted), and `context`.
+  `csdg_evidence_record()` gains `status`. Gate results and report cards use property statuses; a gate that the
+  claim does not require is context and has no property status (report-card status `"context"` if it was run,
+  otherwise `"not_required"`; new column `diagnostic_status`; labeled "Context" by `csdg_plot()`).
+* `csdg_gate_plan()` derives the required gates from the scope as in Table 3: G1 is no longer required for model
+  descriptions (it is context for explanation claims and is still computed by the audit); G2 and G5 are required
+  properties of every explanation claim; G3a is no longer implied by decision claims; G4 is required only for
+  local explanations with a local surrogate; G6a is also required for population claims; G7a only for subgroup
+  claims; G7b for use claims and decisions based on explanations; causal claims require a causal design (not a
+  gate). New columns `area`, `evidence_question`, `required_if`, `plan_role`, `typical_diagnostic`.
+* `csdg_adjudicate_claim()` ignores consequences on context records. This fixes the 0.1.5 behavior in which an
+  `"unresolved"` consequence on a `graded_support` record left an otherwise met claim unresolved. It gains `plan`
+  (required gates without evidence and a missing causal design are open) and returns `assessment`,
+  `decision_options` (retain, or revise and withhold), and a `properties` table. The field `decision`, which held
+  the assessment, is kept as a deprecated alias of `assessment`; `csdg_claim_report()` likewise gains
+  `assessment_basis` and keeps `decision` and `decision_basis` as deprecated aliases.
+* `csdg_claim_report()` applies the decision rule to the required properties of an audit (and optional evidence
+  records) instead of always reporting `"unresolved"`; the audit reports G2 as open until the researcher records
+  whether the procedure computes the named quantity. An incomplete claim leaves G0a open instead of contradicting it.
+* New `csdg_gate_registry()`, `csdg_learner_pfi_interval()` (corrected resampled t interval of Nadeau and Bengio,
+  2003), and `csdg_pfi_mc_difference()` (Monte Carlo rule for differences between PFI means); `csdg_fold_pfi()`
+  accepts the squared-error loss `"mse"`. `csdg_claim_matrix()` gains an optional `decision`.
+* The documentation states exactly what the local surrogate fits (section "Local surrogate" in
+  `?csdg_diagnostics`).
+* The README and the vignette are rewritten around the numerical example of the article.
 
 # mlr3autoiml 0.1.5
 

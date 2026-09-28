@@ -26,12 +26,23 @@ test_that("audit continues after nonrequired gates and exports cleanly", {
     "criterion_source", "criterion_rationale", "materiality", "adjudication_basis", "claim_consequence",
     "rationale"
   ) %in% names(card)))
-  expect_setequal(unique(card$evidence_role), mlr3autoiml:::.csdg_evidence_roles)
-  expect_equal(card[gate_id == "G6a", status], "not_applicable")
+  expect_setequal(unique(card$evidence_role), c("required_property", "context"))
+  expect_true(all(c("area", "evidence_question", "required_if", "plan_role") %in% names(card)))
+  expect_equal(card[gate_id == "G6a", status], "not_required")
   expect_identical(card[gate_id == "G2", result_direction], "descriptive")
-  expect_identical(card[gate_id == "G2", materiality], "not_materialized")
+  expect_identical(card[gate_id == "G2", status], "open")
+  expect_identical(card[gate_id == "G2", gate_name], "Procedure")
   expect_true(all(nzchar(card$started_at)))
   expect_true(all(nzchar(card$completed_at)))
+  expect_true(all(card[evidence_role == "context", status] %in% c("context", "not_required")))
+  expect_identical(card[required == TRUE, status], card[required == TRUE, diagnostic_status])
+  claim_report = csdg_claim_report(result)
+  expect_true(claim_report$assessment %in% c("met", "not_met", "unresolved"))
+  expect_true(all(strsplit(claim_report$decision_options, " or ", fixed = TRUE)[[1L]] %in%
+    c("retain", "revise", "withhold")))
+  # Deprecated aliases of versions up to 0.1.5.
+  expect_identical(claim_report$decision, claim_report$assessment)
+  expect_identical(claim_report$decision_basis, claim_report$assessment_basis)
 
   parent = tempfile("csdg-export-")
   dir.create(parent)
@@ -61,6 +72,18 @@ test_that("audit continues after nonrequired gates and exports cleanly", {
     first_character = substr(trimws(readLines(card_paths[[card_name]], warn = FALSE)[[1L]]), 1L, 1L)
     expect_identical(first_character, "{", info = card_name)
   }
+  # The scope element `model` is a description, not a fitted model, and survives the default export.
+  expect_named(
+    cards$claim$scope,
+    unlist(schema[["$defs"]]$claim$properties$scope$required, use.names = FALSE),
+    ignore.order = TRUE
+  )
+  expect_identical(cards$claim$scope$model, result$claim$scope$model)
+  expect_identical(readRDS(file.path(path, "csdg_result.rds"))$claim$scope$model, result$claim$scope$model)
+  expect_identical(
+    utils::read.csv(file.path(path, "claim_report.csv"))$scope,
+    csdg_claim_report(result)$scope
+  )
   cards_path = file.path(path, "cards", "cards.json")
   expect_true(file.exists(cards_path))
   cards_document = jsonlite::read_json(cards_path, simplifyVector = FALSE)
@@ -72,48 +95,77 @@ test_that("audit continues after nonrequired gates and exports cleanly", {
   expect_false(file.exists(file.path(path, "stale.txt")))
 })
 
+test_that("context gates are reported without a property status and the export keeps the model scope", {
+  skip_if_not_installed("rpart")
+  fx = make_classif_fixture(n = 90L)
+  claim = csdg_claim(
+    id = "description", statement = "The learner relies on the first predictor.",
+    claim_type = "global_explanation", quantity = "held-out marginal PFI", model = "learner",
+    procedure = "3-fold cross-validation", data = "synthetic analytic sample", meaning = "model_description",
+    use = "methodological illustration"
+  )
+  result = csdg_audit(
+    fx$task, fx$learner, claim, make_cards(fx$task)$measurement, csdg_explanation(method_ids = "pfi"),
+    config = csdg_config(
+      seed = 21L,
+      resampling = list(folds = 3L, repeats = 1L),
+      stability = list(pfi_repetitions = 2L, top_k = 2L, min_top_k_overlap = 0)
+    )
+  )
+  card = csdg_report_card(result)
+  expect_false(card[gate_id == "G1", required])
+  expect_identical(card[gate_id == "G1", evidence_role], "context")
+  expect_identical(card[gate_id == "G1", status], "context")
+  expect_true(card[gate_id == "G1", diagnostic_status] %in% c("supported", "contradicted", "open", "error"))
+  expect_false(any(card[required == FALSE, status] %in% mlr3autoiml:::.csdg_property_statuses))
+  if (requireNamespace("ggplot2", quietly = TRUE)) {
+    status_plot = csdg_plot(result)
+    expect_identical(as.character(status_plot$data[gate_id == "G1", status_label]), "Context")
+  }
+
+  path = csdg_export(result, tempfile("csdg-context-parent-"), prefix = "context")
+  exported_claim = jsonlite::read_json(file.path(path, "cards", "claim.json"), simplifyVector = FALSE)
+  expect_identical(exported_claim$scope$model, "learner")
+  expect_identical(readRDS(file.path(path, "csdg_result.rds"))$claim$scope$model, "learner")
+  exported_report = utils::read.csv(file.path(path, "claim_report.csv"))
+  expect_match(exported_report$scope, "Model: learner", fixed = TRUE)
+  expect_identical(utils::read.csv(file.path(path, "report_card.csv"))$status, card$status)
+})
+
 test_that("report-card schema matches the claim-scoped gate and evidence-state contracts", {
   schema_path = system.file("schema", "csdg-report-card.schema.json", package = "mlr3autoiml")
   schema = jsonlite::read_json(schema_path, simplifyVector = TRUE)
   expect_identical(schema$items$properties$gate_id$enum, mlr3autoiml:::.csdg_gate_ids)
   expect_identical(
     schema$items$properties$status$enum,
-    c("met", "unresolved", "not_met", "not_applicable", "error")
+    mlr3autoiml:::.csdg_report_statuses
   )
-  expect_identical(schema$items$properties$evidence_role$enum, mlr3autoiml:::.csdg_evidence_roles)
+  expect_identical(schema$items$properties$diagnostic_status$enum, mlr3autoiml:::.csdg_gate_statuses)
+  expect_identical(schema$items$properties$evidence_role$enum, c("required_property", "context"))
   expect_true("criterion" %in% schema$items$required)
   expect_identical(schema$items$properties$criterion$type, "string")
   expect_true("criterion_rationale" %in% schema$items$required)
 })
 
-test_that("report-card schema rejects contradictory evidence states", {
+test_that("report-card schema ties statuses to required properties", {
   schema_path = system.file("schema", "csdg-report-card.schema.json", package = "mlr3autoiml")
   schema = jsonlite::read_json(schema_path, simplifyVector = FALSE)
   rules = schema$items$allOf
-  condition_const = function(rule, field) {
+  condition = function(rule, field) {
     node = rule[["if"]]$properties[[field]]
-    if (is.null(node) || is.null(node$const)) NA_character_ else as.character(node$const)
+    if (is.null(node) || is.null(node$const)) NA else node$const
   }
-
-  consequences = vapply(rules, condition_const, character(1L), field = "claim_consequence")
-  expect_setequal(
-    consequences[!is.na(consequences)],
-    c("retain_exact_claim", "exact_claim_not_retained", "revise_claim", "unresolved")
-  )
-  descriptive = which(vapply(rules, condition_const, character(1L), field = "evidence_role") ==
-    "descriptive_context")
-  expect_length(descriptive, 1L)
-  expect_identical(rules[[descriptive]]$then$properties$claim_consequence$const, "none")
-
-  not_materialized = which(vapply(rules, function(rule) {
-    identical(rule[["if"]]$properties$evidence_role$const, "potential_defeater") &&
-      identical(rule[["if"]]$properties$materiality$const, "not_materialized")
-  }, logical(1L)))
-  expect_length(not_materialized, 1L)
-  expect_setequal(
-    unlist(rules[[not_materialized]]$then$properties$claim_consequence$enum, use.names = FALSE),
-    c("none", "unresolved")
-  )
+  required_rule = which(vapply(rules, function(rule) isTRUE(condition(rule, "required")), logical(1L)))
+  expect_length(required_rule, 1L)
+  expect_identical(rules[[required_rule]]$then$properties$evidence_role$const, "required_property")
+  not_required_rule = which(vapply(rules, function(rule) identical(condition(rule, "required"), FALSE), logical(1L)))
+  expect_identical(rules[[not_required_rule]]$then$properties$evidence_role$const, "context")
+  expect_setequal(unlist(rules[[not_required_rule]]$then$properties$status$enum), c("context", "not_required"))
+  context_rule = which(vapply(rules, function(rule) identical(condition(rule, "status"), "context"), logical(1L)))
+  expect_length(context_rule, 1L)
+  expect_false(rules[[context_rule]]$then$properties$required$const)
+  supported_rule = which(vapply(rules, function(rule) identical(condition(rule, "status"), "supported"), logical(1L)))
+  expect_identical(rules[[supported_rule]]$then$properties$availability$const, "complete")
 })
 
 test_that("legacy gate statuses are quarantined from CSDG gate results", {
@@ -128,7 +180,7 @@ test_that("legacy gate statuses are quarantined from CSDG gate results", {
   converted = .override_gate("G1", legacy)
 
   expect_s3_class(converted, "CSDGGateResult")
-  expect_identical(converted$status, "unresolved")
+  expect_identical(converted$status, "open")
   expect_error(
     new_gate_result("G1", status = "pass", summary = "Invalid CSDG status"),
     "status"
@@ -138,15 +190,13 @@ test_that("legacy gate statuses are quarantined from CSDG gate results", {
 
 test_that("external CSDG evidence preserves criterion provenance as separate fields", {
   converted = .override_gate("G2", list(
-    status = "not_met",
-    summary = "The supplied claim-specific fidelity criterion was not met.",
+    status = "contradicted",
+    summary = "The supplied claim-specific fidelity criterion contradicts the property.",
     criterion = list(value = 0.02, direction = "maximum"),
     criterion_source = "Prospective use protocol",
     criterion_rationale = "Maximum absolute error permitted for the declared individual-level use.",
     result_direction = "challenges",
-    materiality = "materialized",
     adjudication_basis = "prespecified_claim_specific_criterion",
-    claim_consequence = "exact_claim_not_retained",
     rationale = "Observed error exceeded the declared maximum."
   ))
 
@@ -158,7 +208,7 @@ test_that("external CSDG evidence preserves criterion provenance as separate fie
   expect_false("criterion_rationale" %in% names(converted$evidence))
   expect_error(
     .override_gate("G2", list(
-      status = "not_met",
+      status = "contradicted",
       criterion = list(value = 0.02, direction = "maximum"),
       criterion_source = "Prospective use protocol"
     )),
@@ -202,8 +252,8 @@ test_that("audit retains dependent artifacts and rejects unknown arguments", {
 
   expect_s3_class(result$artifacts$oof, "CSDGResample")
   expect_true(all(c("performance", "calibration", "pfi") %in% names(result$artifacts)))
-  expect_equal(result$gates$G1$status, "met")
-  expect_equal(result$gates$G3a$status, "met")
+  expect_equal(result$gates$G1$status, "supported")
+  expect_equal(result$gates$G3a$status, "supported")
   expect_identical(result$gates$G1$criterion_source, "Prospective test protocol")
   expect_identical(
     result$gates$G1$criterion_rationale,
@@ -243,8 +293,8 @@ test_that("claim-required gates remain unresolved without adequacy criteria", {
       stability = list(pfi_repetitions = 1L)
     )
   )
-  expect_equal(result$gates$G1$status, "unresolved")
-  expect_equal(result$gates$G3a$status, "unresolved")
+  expect_equal(result$gates$G1$status, "open")
+  expect_equal(result$gates$G3a$status, "open")
 })
 
 test_that("an unqualified numerical cutoff cannot adjudicate a CSDG module", {
@@ -265,12 +315,11 @@ test_that("an unqualified numerical cutoff cannot adjudicate a CSDG module", {
     run_gates = c("G0a", "G0b", "G1")
   )
 
-  expect_identical(result$gates$G1$status, "unresolved")
+  expect_identical(result$gates$G1$status, "open")
   expect_false(result$gates$G1$evidence$criteria$criterion_complete)
   expect_true(is.na(result$gates$G1$evidence$criteria$passed))
-  expect_identical(result$gates$G2$status, "unresolved")
+  expect_identical(result$gates$G2$status, "open")
   expect_identical(result$gates$G2$availability, "unavailable")
-  expect_identical(result$gates$G2$materiality, "not_materialized")
 })
 
 test_that("explicit gate execution does not change claim-derived applicability", {
@@ -285,7 +334,7 @@ test_that("explicit gate execution does not change claim-derived applicability",
     unit = "row",
     population = "synthetic population",
     analytic_distribution = "synthetic analytic sample",
-    model_scope = "cross_fitted_pipeline",
+    model_scope = "learner",
     setting_scope = "analytic_sample",
     scientific_use = "Characterize held-out prediction only",
     explanation_design = "No explanation claim"
@@ -301,7 +350,7 @@ test_that("explicit gate execution does not change claim-derived applicability",
 
   expect_false(result$plan[gate_id == "G3a", required])
   expect_true(result$plan[gate_id == "G3a", execute])
-  expect_false(result$gates$G3a$status == "not_applicable")
+  expect_false(result$gates$G3a$status == "not_required")
 })
 
 test_that("model generalization cannot pass when the focal learner is outside tolerance", {
@@ -326,7 +375,7 @@ test_that("model generalization cannot pass when the focal learner is outside to
     unit = "row",
     population = "synthetic population",
     analytic_distribution = "balanced deterministic fixture",
-    model_scope = "near_equivalent_models",
+    model_scope = "several_models",
     setting_scope = "analytic_sample",
     scientific_use = "Model-multiplicity evaluation",
     explanation_design = "Held-out PFI across accepted learners"
@@ -363,7 +412,7 @@ test_that("model generalization cannot pass when the focal learner is outside to
     candidate_learners = list(decision_tree = candidate)
   )
 
-  expect_equal(result$gates$G6a$status, "not_met")
+  expect_equal(result$gates$G6a$status, "contradicted")
   expect_false(result$gates$G6a$diagnostics$focal_accepted)
   expect_match(result$gates$G6a$summary, "focal learner was outside")
   expect_true(any(

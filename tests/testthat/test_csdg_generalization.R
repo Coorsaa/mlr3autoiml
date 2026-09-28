@@ -16,8 +16,9 @@ test_that("directional transport thresholds are not conflated", {
     criterion_source = "Prospective analysis protocol",
     criterion_rationale = "Maximum prediction error required for the declared comparison."
   )
-  expect_equal(high$status, "met")
-  expect_equal(low$status, "not_met")
+  expect_equal(high$status, "supported")
+  expect_equal(high$legacy_status, "met")
+  expect_equal(low$status, "contradicted")
 })
 
 test_that("all-missing transport scores are incomplete", {
@@ -29,7 +30,7 @@ test_that("all-missing transport scores are incomplete", {
     criterion_source = "Prospective analysis protocol",
     criterion_rationale = "Minimum discrimination required for the declared comparison."
   )
-  expect_equal(out$status, "unresolved")
+  expect_equal(out$status, "open")
   expect_true(is.na(out$passed))
   expect_match(out$reason, "No finite")
 })
@@ -42,7 +43,7 @@ test_that("transport thresholds without provenance do not adjudicate", {
     minimum_transport_score = .68
   )
 
-  expect_identical(out$status, "unresolved")
+  expect_identical(out$status, "open")
   expect_false(out$criterion_complete)
   expect_match(out$reason, "source or rationale")
 })

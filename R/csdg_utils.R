@@ -3,12 +3,63 @@
   if (is.null(x) || length(x) == 0L) y else x
 }
 
-.csdg_statuses = c(
-  "met", "not_met", "unresolved", "not_applicable", "error"
-)
+# Vocabulary of the article (version 0.1.6). Property status: supported, contradicted, or open.
+.csdg_property_statuses = c("supported", "contradicted", "open")
 
+# Status values of gate results and report-card rows; "not_required" marks a gate that the claim does not require
+# and that was not run, and "error" a computation that failed.
+.csdg_gate_statuses = c(.csdg_property_statuses, "not_required", "error")
+.csdg_statuses = .csdg_gate_statuses
+
+# Status values of report-card rows: a gate that the claim does not require but that was run is "context"; it is
+# reported only and has no property status (its computed result is kept in `diagnostic_status`).
+.csdg_report_statuses = c(.csdg_gate_statuses, "context")
+
+# Assessment of a claim; "not_applicable" is reserved for a claim placed outside the evaluation.
 .csdg_claim_decisions = c("met", "not_met", "unresolved", "not_applicable")
 
+# Decision after the assessment.
+.csdg_claim_actions = c("retain", "revise", "withhold")
+
+.csdg_evidence_roles = c("required_property", "established_counterevidence", "unresolved_threat", "context")
+
+# Scope elements in the order of Table 2 of the article.
+.csdg_scope_elements = c("quantity", "model", "procedure", "data", "meaning", "use")
+
+# Stored claim-card fields that hold the scope elements (legacy field names, kept for export compatibility).
+.csdg_scope_fields = c(
+  quantity = "target",
+  model = "model_scope",
+  procedure = "explanation_design",
+  data = "analytic_distribution",
+  meaning = "meaning",
+  use = "scientific_use"
+)
+
+.csdg_meanings = c("model_description", "population_claim", "causal_claim")
+
+.csdg_model_scopes = c("fitted_model", "learner", "several_models", "unspecified")
+
+.csdg_scope_relations = c("same", "narrower", "broader", "incomparable")
+.csdg_claim_relations = .csdg_scope_relations
+
+# Kinds of revision (Supplement A of the article): weakening, restriction without entailment, change of question.
+.csdg_revision_kinds = c("unspecified", "logical_weakening", "restriction_without_entailment", "change_of_question")
+
+.csdg_proposition_relations = c("unchecked", "same", "logical_weakening", "logical_strengthening", "incomparable")
+
+.csdg_gate_status_labels = c(
+  supported = "Supported",
+  contradicted = "Contradicted",
+  open = "Open",
+  not_required = "Not required",
+  context = "Context",
+  error = "Error"
+)
+
+.csdg_gate_areas = c("Foundation of the claim", "Predictions, explanations, and decisions", "Extensions")
+
+# Legacy scope-element names of versions up to 0.1.5 (stored in the `coordinates` field of a claim card).
 .csdg_claim_coordinates = c(
   "target",
   "model_scope",
@@ -18,16 +69,50 @@
   "explanation_design"
 )
 
-.csdg_claim_relations = c("same", "narrower", "broader", "alternative_or_incomparable")
+.csdg_gate_ids = c("G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b")
 
-.csdg_evidence_roles = c(
-  "necessary_requirement",
-  "potential_defeater",
-  "graded_support",
-  "descriptive_context"
+# Requirement identifiers: the 12 gates plus the causal design ("CD"), which is not a gate but is required by a
+# causal claim.
+.csdg_requirement_ids = c(.csdg_gate_ids, "CD")
+
+# Legacy value maps (old value -> new value).
+.csdg_legacy_statuses = c(
+  met = "supported",
+  not_met = "contradicted",
+  unresolved = "open",
+  not_applicable = "not_required"
 )
 
-.csdg_gate_ids = c("G0a", "G0b", "G1", "G2", "G3a", "G3b", "G4", "G5", "G6a", "G6b", "G7a", "G7b")
+.csdg_legacy_model_scopes = c(
+  selected_model = "fitted_model",
+  cross_fitted_pipeline = "learner",
+  near_equivalent_models = "several_models",
+  model_class = "several_models"
+)
+
+.csdg_legacy_semantics = c(
+  fitted_model_description = "model_description",
+  hypothetical_model_query = "model_description",
+  causal = "causal_claim",
+  recourse = "causal_claim"
+)
+
+.csdg_legacy_coordinates = c(
+  target = "quantity",
+  model_scope = "model",
+  explanation_design = "procedure",
+  analytic_distribution = "data",
+  semantics = "meaning",
+  scientific_use = "use"
+)
+
+.csdg_legacy_relations = c(alternative_or_incomparable = "incomparable")
+
+.csdg_legacy_revision_kinds = c(
+  context_restriction = "restriction_without_entailment",
+  scope_restriction = "restriction_without_entailment",
+  estimand_change = "change_of_question"
+)
 
 .csdg_stop = function(..., call. = FALSE) {
   stop(sprintf(...), call. = call.)
@@ -39,6 +124,46 @@
 
 .csdg_note = function(...) {
   message(sprintf(...))
+}
+
+.csdg_deprecation_state = new.env(parent = emptyenv())
+
+# Emit a classed deprecation warning once per session and identifier.
+.csdg_warn_once = function(id, message) {
+  if (isTRUE(.csdg_deprecation_state[[id]])) {
+    return(invisible(FALSE))
+  }
+  assign(id, TRUE, envir = .csdg_deprecation_state)
+  warning(structure(
+    list(message = message, call = NULL),
+    class = c("mlr3autoiml_deprecated", "deprecatedWarning", "warning", "condition")
+  ))
+  invisible(TRUE)
+}
+
+.csdg_deprecate = function(old, new, what, id = paste(what, old)) {
+  .csdg_warn_once(
+    id,
+    sprintf("%s \"%s\" is deprecated since mlr3autoiml 0.1.6; use \"%s\".", what, old, new)
+  )
+}
+
+.csdg_reset_deprecations = function() {
+  rm(list = ls(.csdg_deprecation_state, all.names = TRUE), envir = .csdg_deprecation_state)
+  invisible(TRUE)
+}
+
+# Map a legacy value to its 0.1.6 value, with a deprecation warning; current values pass unchanged.
+.csdg_map_legacy = function(x, map, what, warn = TRUE) {
+  if (is.null(x)) return(x)
+  hit = !is.na(x) & x %in% names(map)
+  if (any(hit)) {
+    if (warn) {
+      for (value in unique(x[hit])) .csdg_deprecate(value, map[[value]], what)
+    }
+    x[hit] = unname(map[x[hit]])
+  }
+  x
 }
 
 .is_scalar_string = function(x, allow_na = FALSE) {
@@ -375,6 +500,7 @@
     ok = is.finite(y) & is.finite(p)
     if (!any(ok)) return(NA_real_)
     if (identical(loss, "rmse")) return(sqrt(mean((y[ok] - p[ok])^2)))
+    if (identical(loss, "mse")) return(mean((y[ok] - p[ok])^2))
     if (identical(loss, "mae")) return(mean(abs(y[ok] - p[ok])))
     .csdg_stop("Unsupported regression loss: %s.", loss)
   }
@@ -458,7 +584,11 @@
 
 .csdg_json_arrays = function(x) {
   if (!is.list(x) || is.data.frame(x)) return(x)
-  vector_fields = c("evidence_ids", "varied_component", "held_constant", "blocking_gate_ids", "unresolved_gate_ids")
+  vector_fields = c(
+    "evidence_ids", "varied_component", "held_constant", "blocking_gate_ids", "unresolved_gate_ids",
+    "contradicted_gate_ids", "open_gate_ids", "counterevidence_gate_ids", "threat_gate_ids", "context_gate_ids",
+    "decision_options"
+  )
   for (i in seq_along(x)) {
     if (is.null(x[[i]])) next
     field = if (is.null(names(x))) "" else names(x)[[i]]
@@ -549,5 +679,5 @@
 }
 
 .status_rank = function(status) {
-  match(status, c("error", "not_met", "unresolved", "met", "not_applicable"))
+  match(status, c("error", "contradicted", "open", "supported", "not_required"))
 }

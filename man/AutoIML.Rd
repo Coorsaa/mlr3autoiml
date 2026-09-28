@@ -16,6 +16,9 @@ AutoIML: Gate-based AutoML/IML workflow
 \code{\link[mlr3:mlr3-package]{mlr3}} tasks and learners. It produces a reproducible
 audit trail and data-/task-dependent interpretability artifacts.
 
+This is the earlier AutoIML workflow, kept for compatibility. Its gate identifiers and pass/warn/fail/skip labels
+are not the CSDG gate registry (\code{\link[=csdg_gate_registry]{csdg_gate_registry()}}) or its vocabulary; use \code{\link[=csdg_audit]{csdg_audit()}} for CSDG.
+
 Run the workflow with \verb{$run()}; inspect results with \verb{$overview()} and
 \verb{$report_card()}; retrieve non-plot tables via \verb{$tables()}; and generate
 ggplot2 outputs via \verb{$plot(type=...)}.

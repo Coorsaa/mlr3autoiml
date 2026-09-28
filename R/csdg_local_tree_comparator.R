@@ -43,7 +43,12 @@
 #' locality weights, perturbation seeds, and cross-fit partitions used by [csdg_local_fidelity_audit()].
 #' The result helps distinguish limitations of an additive ridge surrogate from limitations shared by a nonlinear
 #' local approximation under the declared neighborhood design.
+#' The tree is fitted with `rpart::rpart(method = "anova")` to the same points, kernel weights, and cross-fit folds as
+#' the ridge surrogate (section "Local surrogate"), using the non-intercept columns of the same design matrix as
+#' predictors; the default control is `rpart::rpart.control(minsplit = 20, minbucket = 7, cp = 0.001,
+#' maxdepth = 6, xval = 0)`.
 #'
+#' @inheritSection csdg_diagnostics Local surrogate
 #' @param x A `CSDGResample` with stored fold models.
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param seeds Either a vector of at least two perturbation seeds or a case-by-replicate matrix.
@@ -56,7 +61,7 @@
 #' @param empirical_neighbors Number of nearest training rows eligible for empirical-neighbor resampling.
 #' @param case_labels Optional unique pseudonymous labels in the same order as `cases`.
 #' @param case_metadata Optional data frame copied to the replicate and case summaries.
-#' @param control Optional `rpart.control` object.
+#' @param control Optional `rpart.control` object; the default is given in the description.
 #'
 #' @return A list with replicate-level and case-level fidelity metrics, variable-importance stability, method metadata,
 #'   and limitations.

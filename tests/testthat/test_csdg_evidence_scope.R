@@ -1,6 +1,6 @@
 scope_evidence = function(...) {
   arguments = list(
-    gate_id = "G4", applicable = TRUE, role = "potential_defeater", result_direction = "descriptive",
+    gate_id = "G4", applicable = TRUE, role = "context", result_direction = "descriptive",
     rationale = "A comparison is recorded without an automatic negative judgment.",
     varied_component = "output_scale", held_constant = c("model", "cases", "weights"),
     same_estimand = FALSE, same_estimand_rationale = "The response-scale and logit-scale targets differ.",
@@ -11,37 +11,33 @@ scope_evidence = function(...) {
 
 scope_chain = function() {
   list(
-    required_property = "The proposition explicitly requires invariance over the declared comparison.",
+    required_property = "The claim explicitly requires invariance over the declared comparison.",
     observation = "The diagnostic contrast changes across variants.",
     relevance_to_proposition = "The observed difference contradicts the particular asserted invariant property."
   )
 }
 
-test_that("legitimate changes in estimand do not materialize defeaters", {
+test_that("legitimate changes of the quantity are context, not counterevidence", {
   for (component in c("output_scale", "reference_distribution", "model", "population")) {
     record = scope_evidence(varied_component = component)
-    expect_identical(record$materiality, "not_materialized")
-    expect_identical(record$claim_consequence, "none")
+    expect_identical(record$role, "context")
+    expect_null(record$status)
     expect_false(record$same_estimand)
     expect_identical(record$variation_status, "documented_not_verified")
     expect_identical(record$proposition_linkage, "not_recorded")
   }
-  arguments = c(list(
-    materiality = "materialized", result_direction = "challenges",
-    adjudication_basis = "claim_relevant_sensitivity", claim_consequence = "exact_claim_not_retained"
-  ), scope_chain())
+  arguments = c(list(role = "established_counterevidence", result_direction = "challenges"), scope_chain())
   expect_error(do.call(scope_evidence, arguments), "claimed invariance")
   arguments$invariance_claimed = TRUE
   record = do.call(scope_evidence, arguments)
   expect_identical(record$proposition_linkage, "documented_not_verified")
-  expect_identical(csdg_adjudicate_claim(list(record))$decision, "not_met")
+  expect_identical(csdg_adjudicate_claim(list(record))$assessment, "not_met")
 })
 
-test_that("same-target numerical variation requires a complete relevance chain", {
+test_that("same-quantity numerical variation requires a complete relevance chain", {
   arguments = list(
     varied_component = "seed", same_estimand = TRUE, same_estimand_rationale = "Only Monte Carlo draws change.",
-    materiality = "materialized", result_direction = "challenges", adjudication_basis = "substantive_adjudication",
-    claim_consequence = "exact_claim_not_retained"
+    role = "required_property", status = "contradicted", result_direction = "challenges"
   )
   expect_error(do.call(scope_evidence, arguments), "property-observation-relevance")
   record = do.call(scope_evidence, c(arguments, scope_chain()))
@@ -50,20 +46,20 @@ test_that("same-target numerical variation requires a complete relevance chain",
   expect_error(csdg_adjudicate_claim(list(record)), "claimed invariance")
 })
 
-test_that("missing variation metadata is not silently interpreted as same estimand", {
+test_that("missing variation metadata is not silently interpreted as the same quantity", {
   expect_error(scope_evidence(same_estimand_rationale = NULL), "same_estimand_rationale")
   record = scope_evidence(same_estimand = NA, same_estimand_rationale = "The target correspondence is uncertain.")
   expect_true(is.na(record$same_estimand))
   expect_error(scope_evidence(required_property = "A property without its diagnostic connection."), "full")
   expect_error(scope_evidence(same_estimand = "unknown"), "logical")
-  legacy = csdg_evidence_record("G4", TRUE, "potential_defeater", rationale = "Historical characterization.")
-  expect_identical(legacy$variation_status, "not_recorded")
-  expect_identical(legacy$proposition_linkage, "not_recorded")
-  expect_identical(csdg_adjudicate_claim(list(legacy))$proposition_linkage, "not_recorded_for_all_evidence")
+  plain = csdg_evidence_record("G4", TRUE, "context", rationale = "Historical characterization.")
+  expect_identical(plain$variation_status, "not_recorded")
+  expect_identical(plain$proposition_linkage, "not_recorded")
+  expect_identical(csdg_adjudicate_claim(list(plain))$proposition_linkage, "not_recorded_for_all_evidence")
 })
 
-test_that("estimand changes cannot bypass the guard through necessary requirements", {
-  arguments = c(list(role = "necessary_requirement", result_direction = "challenges",
-    claim_consequence = "exact_claim_not_retained"), scope_chain())
+test_that("changes of the quantity cannot bypass the guard through required properties", {
+  arguments = c(list(role = "required_property", status = "contradicted", result_direction = "challenges"),
+    scope_chain())
   expect_error(do.call(scope_evidence, arguments), "claimed invariance")
 })

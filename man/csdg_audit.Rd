@@ -54,10 +54,11 @@ csdg_audit(
 
 \item{pfi_cluster_level_groups}{Optional feature-group names whose values are permuted coherently at cluster level.}
 
-\item{evidence}{Named external gate evidence.}
+\item{evidence}{Named external gate evidence (lists with \code{status}, \code{summary}, and optional criterion fields,
+or \code{CSDGGateResult} objects), keyed by gate identifier; \code{audience_evidence} supplies user evidence for G7b.}
 
 \item{run_gates}{Optional gate ids to execute.
-This controls computation but does not change claim-derived applicability or evidence roles.}
+This controls computation but does not change which gates the claim requires.}
 
 \item{output_dir}{Optional bundle-export directory.}
 
@@ -67,7 +68,18 @@ This controls computation but does not change claim-derived applicability or evi
 A \code{CSDGResult} object.
 }
 \description{
-Executes Gates G0a through G7b according to the claim-scoped gate plan.
+Derives the gate plan of the claim (\code{\link[=csdg_gate_plan]{csdg_gate_plan()}}) and computes the diagnostics of the gates in the plan:
+held-out performance (G1), dependence and observed support (G2), calibration (G3a), decision curves (G3b),
+cross-fitted local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
+(G6a), leave-one-setting-out refits (G6b), and subgroup results (G7a); G0a and G0b check the claim and
+measurement cards, and G7b records user evidence supplied in \code{evidence}.
+Required gates are computed; held-out performance is also computed when it is context for the claim (a model
+description) or when a required gate uses its fold models.
+Each gate result has a property status: \code{"supported"} or \code{"contradicted"} under a criterion with a recorded source
+and rationale, \code{"open"} if the criterion or evidence is missing, \code{"not_required"} if the gate was not run, or
+\code{"error"}. The audit cannot judge whether the procedure computes the quantity that the claim names, so G2 is
+\code{"open"} until the researcher records it with \code{\link[=csdg_evidence_record]{csdg_evidence_record()}}; \code{\link[=csdg_claim_report]{csdg_claim_report()}} accepts such
+records.
 }
 \details{
 Individual gate errors are retained in the report card so that one failure does not erase other diagnostic

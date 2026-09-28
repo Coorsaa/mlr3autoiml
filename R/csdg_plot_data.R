@@ -1376,33 +1376,49 @@
 }
 
 .csdg_plot_data_gate_status = function(x, title, subtitle, base_size, options) {
-  source = .csdg_plot_data_table(x, c("report_card", "gates"), "Gate-status plot data")
+  source = data.table::copy(.csdg_plot_data_table(x, c("report_card", "gates"), "Gate-status plot data"))
   .csdg_plot_data_columns(source, c("gate_id", "status"), "Gate-status plot data")
+  # Current statuses and, for stored report cards of versions up to 0.1.5, the legacy statuses (mapped to the
+  # labels of the article without a warning).
   status_labels = c(
-    met = "Met",
-    unresolved = "Unresolved",
-    not_met = "Not met",
-    not_applicable = "Not applicable",
+    supported = "Supported",
+    contradicted = "Contradicted",
+    open = "Open",
+    not_required = "Not required",
+    context = "Context",
     error = "Error",
+    met = "Supported",
+    unresolved = "Open",
+    not_met = "Contradicted",
+    not_applicable = "Not required",
     pass = "Pass",
     warn = "Warn",
     fail = "Fail",
     skip = "Skip"
   )
   status_keys = c(
+    supported = "pass",
+    contradicted = "fail",
+    open = "warn",
+    not_required = "skip",
+    context = "skip",
+    error = "error",
     met = "pass",
     unresolved = "warn",
     not_met = "fail",
     not_applicable = "skip",
-    error = "error",
     pass = "pass",
     warn = "warn",
     fail = "fail",
     skip = "skip"
   )
+  source[, status := as.character(status)]
+  # A gate reported as context has no property status; it is labeled "Context" whatever its computed result.
+  if ("evidence_role" %in% names(source)) {
+    source[evidence_role %in% "context" & status %in% c(.csdg_property_statuses, "error"), status := "context"]
+  }
   source[, `:=`(
     gate_id = as.character(gate_id),
-    status = as.character(status),
     status_label = unname(status_labels[as.character(status)]),
     status_key = unname(status_keys[as.character(status)])
   )]

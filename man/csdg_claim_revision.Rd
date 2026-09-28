@@ -2,7 +2,7 @@
 % Please edit documentation in R/csdg_cards.R
 \name{csdg_claim_revision}
 \alias{csdg_claim_revision}
-\title{Revise an interpretation claim explicitly}
+\title{Revise a claim explicitly}
 \usage{
 csdg_claim_revision(
   claim,
@@ -22,35 +22,43 @@ csdg_claim_revision(
 
 \item{claim_version}{Version label for the revised claim.}
 
-\item{revision_relation}{One of \code{"same"}, \code{"narrower"}, \code{"broader"}, or
-\code{"alternative_or_incomparable"}.}
+\item{revision_relation}{Relation of the revised scope to the predecessor's scope: \code{"same"}, \code{"narrower"},
+\code{"broader"}, or \code{"incomparable"}. The legacy value \code{"alternative_or_incomparable"} is accepted with a
+deprecation warning.}
 
-\item{...}{Named claim-card fields that replace fields inherited from \code{claim}.}
+\item{...}{Named claim-card fields that replace fields inherited from \code{claim}, for example \code{model = "fitted_model"} or \code{quantity = "..."}.}
 }
 \value{
 A \code{CSDGClaim} linked to \code{claim} through \code{parent_claim_id}.
 }
 \description{
 Creates a new claim card linked to an earlier claim.
-The function records the analyst's declared relation and does not infer that the revision is supported or maximal.
+A revised claim is a new claim with its own record and assessment, linked to its predecessor.
+The function records the declared relation of the scope and does not infer that the revision is supported.
 A revision requires a new identifier.
-Provenance and the legacy \code{confirmatory} flag are not inherited: provide new documentary metadata explicitly.
+Provenance and the legacy \code{confirmatory} flag are not inherited: provide new documentary metadata explicitly;
+a claim written after the results were seen is exploratory.
 Recording a revision does not remove the inferential consequences of outcome-dependent selection.
 }
 \examples{
 original = csdg_claim(
-  id = "claim_original",
-  statement = "The explanation applies to every model and setting.",
-  target = "prediction",
-  population = "analytic sample",
-  analytic_distribution = "observed rows"
+  id = "both_models",
+  statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
+  claim_type = "global_explanation",
+  quantity = "marginal PFI with squared error",
+  model = "several_models",
+  procedure = "each item permuted independently of the other item and the outcome",
+  data = "Z standard normal; item 1 = item 2 = outcome = Z",
+  meaning = "model_description",
+  use = "scientific description"
 )
 revised = csdg_claim_revision(
   original,
-  id = "claim_revised",
+  id = "model_a",
   claim_version = "C1",
   revision_relation = "narrower",
-  statement = "The explanation describes the selected model in the analytic sample."
+  statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
+  model = "fitted_model"
 )
 revised
 }

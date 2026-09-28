@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.5.9000
+Version: 0.1.6
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -9,17 +9,20 @@ Authors@R: c(
     person("Bernd", "Bischl", role = "aut"),
     person("Sven", "Hilbert", role = "aut")
   )
-Description: Implements Claim-Scoped Diagnostic Gates (CSDG) for planning,
-    executing, documenting, and exporting diagnostics for interpretable
-    machine-learning analyses. The package integrates with the 'mlr3'
-    ecosystem and separates predictive performance, measurement and
-    preprocessing review, proposition and six-coordinate context comparison, orthogonal evidence
-    roles, non-compensatory claim adjudication, dependence and support,
-    calibration, local faithfulness, explanation stability, model and setting
-    generalization, and subgroup auditing. The existing AutoIML workflow
-    remains available for compatibility. Legacy pass/warn/fail labels are
-    quarantined from CSDG claim decisions. CSDG applies no aggregate score,
-    readiness grade, or universal substantive threshold.
+Description: Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for
+    deciding whether evidence supports a conclusion drawn from an explanation
+    of a machine learning model. Users write the claim, specify its scope
+    (quantity, model, procedure, data, meaning, and use), derive the
+    properties it requires from a catalog of 12 gates, evaluate each property
+    as supported, contradicted, or open, and apply a fixed decision rule under
+    which a claim is met, not met, or unresolved. The package integrates with
+    the 'mlr3' ecosystem and computes diagnostics such as held-out permutation
+    feature importance, corrected resampled intervals, calibration,
+    cross-fitted local fidelity of local surrogates, stability, and
+    comparisons across models, settings, and subgroups. Favorable evidence
+    never offsets a contradicted property, and no aggregate score is
+    computed. The earlier 'AutoIML' workflow remains available for
+    compatibility.
 License: LGPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

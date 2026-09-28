@@ -609,7 +609,7 @@ csdg_oof_local_surrogate = function(
       if (identical(selection, "post_hoc_communication")) {
         paste(
           "Cases selected after inspecting out-of-fold results are communication examples",
-          "and cannot establish general local faithfulness."
+          "and cannot establish local fidelity in general."
         )
       }
     )

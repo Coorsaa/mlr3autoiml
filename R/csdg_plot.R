@@ -80,18 +80,20 @@ csdg_plot = function(
   report_status_colors = if (monochrome) {
     c(
       error = "#111111",
-      not_met = "#111111",
-      unresolved = "#111111",
-      met = "#111111",
-      not_applicable = "#111111"
+      contradicted = "#111111",
+      open = "#111111",
+      supported = "#111111",
+      context = "#111111",
+      not_required = "#111111"
     )
   } else {
     c(
       error = palette$status[["error"]],
-      not_met = palette$status[["fail"]],
-      unresolved = palette$status[["warn"]],
-      met = palette$status[["pass"]],
-      not_applicable = palette$status[["skip"]]
+      contradicted = palette$status[["fail"]],
+      open = palette$status[["warn"]],
+      supported = palette$status[["pass"]],
+      context = palette$status[["skip"]],
+      not_required = palette$status[["skip"]]
     )
   }
   label_scale = base_size / 11
@@ -103,10 +105,10 @@ csdg_plot = function(
           paste(gate_id, gate_name, sep = " - "),
           levels = rev(paste(gate_id, gate_name, sep = " - "))
         ),
-        status_label = tools::toTitleCase(gsub("_", " ", status)),
+        status_label = unname(.csdg_gate_status_labels[as.character(status)]),
         status = factor(
           status,
-          levels = c("error", "not_met", "unresolved", "met", "not_applicable")
+          levels = c("error", "contradicted", "open", "supported", "context", "not_required")
         )
       )]
       return(
@@ -121,15 +123,16 @@ csdg_plot = function(
           ggplot2::scale_color_manual(values = report_status_colors) +
           ggplot2::scale_shape_manual(values = c(
             error = unname(.autoiml_status_shapes[["error"]]),
-            not_met = unname(.autoiml_status_shapes[["fail"]]),
-            unresolved = unname(.autoiml_status_shapes[["warn"]]),
-            met = unname(.autoiml_status_shapes[["pass"]]),
-            not_applicable = unname(.autoiml_status_shapes[["skip"]])
+            contradicted = unname(.autoiml_status_shapes[["fail"]]),
+            open = unname(.autoiml_status_shapes[["warn"]]),
+            supported = unname(.autoiml_status_shapes[["pass"]]),
+            context = 5L,
+            not_required = unname(.autoiml_status_shapes[["skip"]])
           )) +
           ggplot2::scale_x_continuous(limits = c(-0.015, 0.20), breaks = NULL) +
           ggplot2::labs(
             x = NULL, y = NULL,
-            title = "Claim-scoped diagnostic report card"
+            title = "Gates of the claim: status of required properties and context"
           ) +
           .csdg_plot_theme(base_size) +
           ggplot2::theme(panel.grid = ggplot2::element_blank())

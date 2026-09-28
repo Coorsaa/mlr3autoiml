@@ -561,6 +561,25 @@ test_that("gate-status plots support single reports and multi-study matrices", {
     rev(as.character(levels(single_plot$data$gate_label__))),
     c("G2 - Structure", "G1 - Performance", "G0a - Claim")
   )
+  # Stored report cards of versions up to 0.1.5 use legacy statuses; they are shown with the current labels.
+  expect_setequal(single_plot$data$status_label, c("Supported", "Open", "Not required"))
+  current = data.table::data.table(
+    gate_id = c("G0a", "G1", "G2", "G5"),
+    gate_name = c("Specification", "Predictive performance", "Procedure", "Stability"),
+    status = c("supported", "open", "contradicted", "not_required")
+  )
+  current_plot = csdg_plot_data(current, type = "gate_status")
+  expect_setequal(current_plot$data$status_label, c("Supported", "Open", "Contradicted", "Not required"))
+  # A context gate has no property status and is labeled "Context", whatever its computed result.
+  with_context = data.table::copy(current)
+  with_context[, evidence_role := c("required_property", "context", "required_property", "context")]
+  context_plot = csdg_plot_data(with_context, type = "gate_status")
+  expect_identical(context_plot$data[gate_id == "G1", status_label], "Context")
+  expect_identical(context_plot$data[gate_id == "G5", status_label], "Not required")
+  expect_identical(with_context[gate_id == "G1", status], "open")
+  report_style = data.table::copy(current)
+  report_style[gate_id == "G1", status := "context"]
+  expect_identical(csdg_plot_data(report_style, type = "gate_status")$data[gate_id == "G1", status_label], "Context")
 
   matrix = data.table::CJ(study = c("SHILD", "PISA"), gate_id = c("G1", "G2"))
   matrix[, status := c("met", "unresolved", "not_met", "error")]

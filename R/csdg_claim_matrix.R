@@ -28,23 +28,29 @@
 #' Build a claim-by-evidence matrix
 #'
 #' @description
-#' Creates a validated, explicitly scoped claim matrix for reporting which conclusions the available evidence permits.
+#' Creates a validated, explicitly scoped claim matrix for reporting the assessment of each claim and what is
+#' reported.
 #' The function records user-supplied judgments and does not infer claim support,
 #' combine gates into a score, or rank claims.
 #'
 #' @param claim Character vector containing the claims under review.
 #' @param evidence_needed Character vector describing the evidence required for each claim.
-#' @param conclusion Character vector containing the conclusion permitted by the available evidence for each claim.
-#' @param status Character vector containing one status per claim.
-#'   Supported values are `"met"`, `"not_met"`, `"unresolved"`, and `"not_applicable"`.
+#' @param conclusion Character vector containing the reported claim for each claim: the claim as retained, revised,
+#'   or withheld.
+#' @param status Character vector containing the assessment of each claim:
+#'   `"met"`, `"not_met"`, `"unresolved"`, or `"not_applicable"` (a claim placed outside the evaluation).
 #' @param claim_id Optional unique character identifiers.
 #'   Deterministic identifiers are generated when this is `NULL`.
 #' @param claim_version A scalar character string or one string per claim, such as `"C0"` or `"C1"`.
 #' @param parent_claim_id A scalar character string, one string per claim, or `NA`,
 #'   identifying the stronger parent claim.
 #' @param revision_relation A scalar character string or one string per claim,
-#'   describing the relation to the parent claim.
+#'   describing the relation of the scope to the parent claim (`"original"`, `"same"`, `"narrower"`, `"broader"`, or
+#'   `"incomparable"`; the legacy value `"alternative_or_incomparable"` is accepted with a deprecation warning).
 #' @param derivation_scope A scalar character string, or one string per claim, stating how the judgments were derived.
+#' @param decision Optional decision after the assessment: `"retain"`, `"revise"`, or `"withhold"`, as a scalar or
+#'   one value per claim (default `NA`, not recorded). A met claim is retained; a claim that is not met or
+#'   unresolved is revised or withheld.
 #'
 #' @return A `CSDGClaimMatrix` data table with one ordered row per claim and no aggregate score.
 #' @examples
@@ -68,7 +74,8 @@ csdg_claim_matrix = function(
     claim_version = "C0",
     parent_claim_id = NA_character_,
     revision_relation = "original",
-    derivation_scope = "User-supplied claim boundary; not an independently executed gate plan") {
+    derivation_scope = "User-supplied claim boundary; not an independently executed gate plan",
+    decision = NA_character_) {
   assert_character(claim, any.missing = FALSE, min.len = 1L, min.chars = 1L, .var.name = "claim")
   assert_character(
     evidence_needed,
@@ -137,12 +144,29 @@ csdg_claim_matrix = function(
     min.chars = 1L,
     .var.name = "revision_relation"
   )
+  revision_relation = .csdg_map_legacy(revision_relation, .csdg_legacy_relations, "Revision relation")
   assert_subset(
     revision_relation,
-    c("original", .csdg_claim_relations),
+    c("original", .csdg_scope_relations),
     empty.ok = FALSE,
     .var.name = "revision_relation"
   )
+  assert_character(decision, min.len = 1L, .var.name = "decision")
+  if (!length(decision) %in% c(1L, n_claims)) {
+    .csdg_stop("`decision` must have length 1 or %d; got %d.", n_claims, length(decision))
+  }
+  decision = rep_len(decision, n_claims)
+  assert_subset(decision[!is.na(decision)], .csdg_claim_actions, .var.name = "decision")
+  inconsistent = !is.na(decision) & (
+    (status == "met" & decision != "retain") |
+      (status %in% c("not_met", "unresolved") & decision == "retain") |
+      (status == "not_applicable")
+  )
+  if (any(inconsistent)) {
+    .csdg_stop(
+      "A met claim is retained, a claim that is not met or unresolved is revised or withheld, and a claim outside the evaluation has no decision."
+    )
+  }
 
   assert_character(
     derivation_scope,
@@ -165,6 +189,7 @@ csdg_claim_matrix = function(
     revision_relation = revision_relation,
     status = status,
     status_label = status_label,
+    decision = decision,
     claim = claim,
     evidence_needed = evidence_needed,
     conclusion = conclusion,
@@ -205,7 +230,7 @@ csdg_plot_claim_matrix = function(
     title = "Claim-by-evidence matrix",
     subtitle = paste(
       "User-supplied claim judgments; not inferred by the package.",
-      "Statuses are categorical and are not combined into an overall score."
+      "Assessments are categorical and are not combined into an overall score."
     ),
     claim_width = 34L,
     evidence_width = 22L,
@@ -323,7 +348,7 @@ csdg_plot_claim_matrix = function(
       "text",
       x = c(0.07, 0.15, 0.46, 0.66),
       y = header_y,
-      label = c("Status", "Claim", "Evidence needed", "Permissible conclusion"),
+      label = c("Assessment", "Claim", "Evidence needed", "Reported claim"),
       hjust = c(0.5, 0, 0, 0),
       fontface = "bold",
       size = base_size * 3.5 / 12
