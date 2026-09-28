@@ -14,15 +14,55 @@ knitr::opts_chunk$set(
   message   = FALSE,
   warning   = FALSE
 )
+if (identical(Sys.getenv("CSDG_README_DOCUMENTATION_ONLY"), "true")) {
+  knitr::opts_chunk$set(eval = FALSE)
+}
 ```
 
 # mlr3autoiml
 
-`mlr3autoiml` is an **auditing and automation layer** for interpretable machine
-learning (IML) on top of the **mlr3 ecosystem**. It implements a **gate-based
-workflow** (G0A/G0B → G1 → G2 → G3 → G4 → G5 → G6 → G7A/G7B) and assigns
-**claim-scoped Interpretation Evidence Levels (IEL-0…3)** that scope the
-strength of permissible interpretive claims.
+Start with **[the complete claim-to-evidence walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**.
+After installing this local revision, open `vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`.
+It runs the same three-claim example as the paper, a small mlr3 audit, and an export/read-back check.
+The local revision delivery also includes a standalone rendered HTML version.
+
+`mlr3autoiml` 0.1.5 primarily implements **claim-scoped diagnostic gates
+(CSDG)** for interpretable machine-learning analyses in the **mlr3 ecosystem**.
+A CSDG audit records the intended claim, measurement and preprocessing choices,
+explanation semantics, gate-specific evidence, and the limits of the resulting
+interpretation. Module availability, evidence role, result direction, criterion provenance, materiality, and claim
+consequence are separate fields. CSDG does not calculate an aggregate score, readiness grade, or Interpretation
+Evidence Level, and it does not certify causal validity, fairness, or deployment readiness.
+Claims use exactly three inference levels (`functional`, `predictive`, and `substantive`). A separate `use_claim`
+flag records whether the proposition additionally asserts adequacy for an audience, workflow, implementation, or use.
+
+The claim-scoped interface distinguishes calibration from utility (G3a/G3b), model multiplicity from setting
+transport (G6a/G6b), and technical subgroup behavior from audience and workflow evidence (G7a/G7b). The earlier
+combined gate names below belong only to the retained `AutoIML` compatibility interface.
+
+The claim object is `C = (phi, kappa)`: `statement` records the proposition, while `kappa = (T, M, S, D, U, Q)` records
+target, model scope, explanation semantics, analytic distribution and measurement context, intended use, and explanation
+design. Matching contexts cannot establish matching propositions. `csdg_claim_relation()` separates the declared
+context comparison from an explicit proposition comparison; without the latter, `relation` is `unchecked`.
+Neither a declaration nor a complete record is a logical proof. Evidence roles
+are exactly `necessary_requirement`, `potential_defeater`, `graded_support`, and `descriptive_context`.
+`csdg_evidence_record()` keeps those roles distinct from completion and results, and `csdg_adjudicate_claim()` applies
+conditional non-compensation without adding evidence into a score.
+
+Claim applicability is declared independently of the supplied modules. An in-scope claim with no relevant evidence
+is unresolved, not out of scope. Recorded consequences constrain adjudication; unresolved evidence cannot silently
+become a favorable decision. See [the 0.1.4 contract migration note](inst/MIGRATION_0_1_4.md).
+
+Sensitivity records distinguish the varied component, what stays fixed, whether the estimand is unchanged, and whether
+the proposition claims invariance. A legitimate change in question is not automatically counterevidence. New
+claim-constraining variation requires a required-property, observation, and proposition-relevance chain; changed or
+uncertain estimands additionally require explicitly claimed invariance. Legacy records remain readable with linkage
+marked `not_recorded`, not retrospectively validated. Claim provenance can record prior specification, exploratory
+revision, or independently confirmed evidence; these are documentary origins, not interpretation levels.
+
+`csdg_resolve_sources()` verifies case-exact public paths and declared protected or external references without opening
+protected records or fetching external resources. Availability and checksum agreement do not prove evidentiary support.
+See [migration notes](inst/MIGRATION_0_1_2.md) for interface examples and the explicit context-only compatibility change.
 
 Core dependencies: `mlr3`, `mlr3measures`, `mlr3misc`, `data.table`,
 `checkmate`, `R6`. Optional integrations (pipelines, SHAP, iml, plotting)
@@ -30,17 +70,124 @@ activate when the corresponding packages are available.
 
 ## Installation
 
+Install the current version from GitHub:
+
 ```{r install, eval = FALSE}
-# install.packages("remotes")
-remotes::install_github("coorsaa/mlr3autoiml")
+remotes::install_github("coorsaa/mlr3autoiml", build_vignettes = TRUE)
+library(mlr3autoiml)
+vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")
 ```
+
+Released versions are tagged. Version 0.1.0 produced the primary analyses of the accompanying article; install a
+tagged version with, for example, `remotes::install_github("coorsaa/mlr3autoiml@v0.1.5")`.
+
+## CSDG quick start
+
+Declare the question, estimand, and scope before evaluating the diagnostic results, rather than prescribing a desired
+positive finding. Exploratory revisions are legitimate when their selection basis remains explicit.
+This example requests descriptive held-out performance, calibration, and global permutation-importance evidence for
+one selected model in the analytic sample. Because it supplies no use-linked adequacy criterion, the corresponding
+adequacy questions remain unresolved.
+
+Prediction-based triage requires appropriate prediction, calibration, use, and consequence evidence, not automatically
+causal effects of every predictor. Advice to change a predictor to improve an outcome requires an intervention argument.
+
+```{r csdg-quick-start, eval = FALSE}
+library(mlr3)
+library(mlr3autoiml)
+library(mlr3learners)
+
+task = tsk("german_credit")
+learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
+
+claim = csdg_claim(
+  id = "credit_risk_description",
+  statement = paste(
+    "Held-out predictive performance, calibration, and global permutation importance",
+    "are described for the selected model in the analytic sample."
+  ),
+  claim_type = c("predictive_performance", "calibration", "global_explanation"),
+  target = "credit risk",
+  unit = "credit application",
+  population = "applications represented by the analytic sample",
+  analytic_distribution = "the observed German credit example data",
+  model_scope = "selected_model",
+  setting_scope = "analytic_sample",
+  scientific_use = "descriptive model audit",
+  explanation_design = "held-out marginal permutation importance"
+)
+
+measurement = csdg_measurement(
+  outcome = task$target_names,
+  predictors = task$feature_names,
+  data_source = "mlr3 German credit example task",
+  sample_definition = "all rows in the example task",
+  unit = "credit application",
+  missingness = "no missing values in the supplied task",
+  preprocessing = "the complete learner is refitted within every training split",
+  verification = list(status = "not_checked")
+)
+
+explanation = csdg_explanation(
+  method_ids = "pfi",
+  scope = "global",
+  target = "positive-class probability"
+)
+
+audit = csdg_audit(
+  task = task,
+  learner = learner,
+  claim = claim,
+  measurement = measurement,
+  explanation = explanation,
+  config = csdg_config(
+    seed = 42L,
+    resampling = list(folds = 3L, repeats = 1L),
+    stability = list(pfi_repetitions = 3L)
+  )
+)
+
+csdg_report_card(audit)
+csdg_claim_report(audit)
+bundle = csdg_export(audit, path = "csdg-output")
+```
+
+When a numerical criterion is appropriate, supply both the value and its provenance. For example,
+`performance = list(maximum_primary_score = value)` must be accompanied by
+`criteria = list(performance.maximum_primary_score = list(source = source, rationale = rationale))`.
+Without both strings, the diagnostic remains descriptive and the module decision is `unresolved`.
+
+`csdg_rashomon()` is likewise descriptive by default. It returns candidate performance without an accepted set unless
+an absolute or relative tolerance and its source and rationale are supplied explicitly.
+
+## Package and study-script boundary
+
+The package owns reusable claim and evidence records, gate planning, resampling, permutation importance, calibration,
+ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities, plotting, reporting, and
+provenance. Study-specific equal-country sampling, plausible-value loops, SHILD and PISA orchestration, country
+exclusion schedules, matched-control scheduling, and manuscript synthesis remain in the analysis scripts. No single
+package call reproduces either complete empirical study.
+
+Keep `output_dir = NULL` while inspecting an audit, and export to a dedicated
+directory when it is ready. By default, `csdg_export()` omits fitted models and
+observation-level predictions. This is not a privacy or licensing clearance:
+review the generated bundle before sharing it, and set `include_models = TRUE`
+or `include_predictions = TRUE` only when its release is explicitly approved.
 
 ---
 
-## Example 1 — Classification · decision support
+## AutoIML compatibility examples
+
+The earlier `AutoIML` interface remains available for compatibility.
+Its `GateResult` pass/warn/fail/skip labels are heuristic workflow diagnostics, not CSDG evidence roles or claim
+decisions. Printing a legacy `GateResult` emits a targeted deprecation warning.
+The examples below demonstrate that workflow; new analyses should start from
+the CSDG claim-card and audit interface shown above.
+
+### Example 1 — Classification · decision support
 
 **Task:** `german_credit` (1 000 rows, 20 mixed-type features, binary
-`credit_risk`). Full gate path including G3 calibration + decision utility and
+`credit_risk`). Full compatibility-gate path including combined G3 calibration and decision utility and
 G7A subgroup audit.
 
 ```{r classif-setup}
@@ -97,15 +244,11 @@ Gate 0B derives task- and pipeline-level notes for missingness and scoring autom
 and only asks for comparability or reliability evidence when the measurement type makes those claims material.
 
 ```{r classif-run, results = "hide"}
-res = auto$run()
+auto$run()
 ```
 
 ```{r classif-report}
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-```
-
-```{r classif-iel, echo=FALSE, results='asis'}
-cat(sprintf('\n**IEL (overall):** %s\n\n', res$iel$overall))
 ```
 
 With the operative claim card,
@@ -129,7 +272,15 @@ auto$plot("g2_hstats", top_n = 3L)
 auto$plot("g2_ale_2d", feature1 = "amount", feature2 = "duration", class_label = task$positive)
 ```
 
-When Gate 2 regionalization is enabled (`auto$ctx$structure$regionalize = TRUE`) and the interaction screen finds materially heterogeneous effects, the GADGET-style views decompose the global effect into interpretable regions and show the split rules that produced those regions. If no such regions are found, the paper-aligned Gate 2 evidence remains the global effect plot, the interaction screen, and the top 2D ALE surface. Optional `pint_enabled = TRUE` adds a permutation-based interaction screen before regionalization.
+When Gate 2 regionalization is enabled
+(`auto$ctx$structure$regionalize = TRUE`) and the interaction screen finds
+materially heterogeneous effects, the GADGET-style views decompose the global
+effect into interpretable regions and show the split rules that produced those
+regions.
+If no such regions are found, the paper-aligned Gate 2 evidence remains the
+global effect plot, the interaction screen, and the top 2D ALE surface.
+Optional `pint_enabled = TRUE` adds a permutation-based interaction screen
+before regionalization.
 
 ```{r classif-g2-gadget, eval = FALSE}
 if (!is.null(auto$result$gate_results$G2$artifacts$gadget_regions) &&
@@ -146,7 +297,7 @@ export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_cred
 
 ---
 
-## Example 2 — Regression · global insight
+### Example 2 — Regression · global insight
 
 **Task:** `california_housing` (20 433 complete cases from the 20 640-row benchmark,
 8 numeric + 1 factor feature, continuous `median_house_value`).
@@ -212,15 +363,11 @@ auto$ctx$structure$max_features = 8L
 ```
 
 ```{r regr-run, results = "hide"}
-res = auto$run()
+auto$run()
 ```
 
 ```{r regr-report}
 knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-```
-
-```{r regr-iel, echo=FALSE, results='asis'}
-cat(sprintf('\n**IEL (overall):** %s\n\n', res$iel$overall))
 ```
 
 The effect plots focus on the housing variables that dominate the model story:
@@ -247,7 +394,10 @@ export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
 
 ---
 
-## Gate overview
+## AutoIML gate overview
+
+This table documents the legacy compatibility interface; it is not the CSDG applicability map returned by
+`csdg_gate_plan()`.
 
 | Gate | Triggered when | Evidence checks |
 |------|---------------|-----------------|
@@ -262,16 +412,14 @@ export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
 | G7A  | `sensitive_features` set | Subgroup performance + calibration audit |
 | G7B  | user-facing + high-stakes | Human-factors (task-based evaluation) evidence |
 
-IELs (0–3) are assigned per claim scope (global / local / decision).
-The overall IEL is the minimum across all requested scopes.
+## AutoIML compatibility status
 
-## Status
-
-The package follows a claim-first, gate-based architecture with explicit
-semantics, claim-scoped IELs, and evidence-driven gate planning. Default runs
-use the `high_resolution` profile; `quick_start = TRUE` is available for rapid
-prototyping. IEL-3 requires G6 evidence across all scopes and, for decision
-claims, a passed G7A subgroup audit.
+The compatibility workflow uses a claim-first, gate-based architecture with
+explicit semantics, direct gate evidence, and claim-dependent gate planning.
+Default compatibility runs use the `high_resolution` profile;
+`quick_start = TRUE` is available for rapid prototyping. Report cards and
+guides retain the individual gate results and their claim-specific restrictions
+instead of reducing them to a summary evidence score.
 
 ## License
 

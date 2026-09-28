@@ -3,7 +3,15 @@
 
 # mlr3autoiml
 
-`mlr3autoiml` 0.1.4 primarily implements **claim-scoped diagnostic gates
+Start with **[the complete claim-to-evidence
+walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**. After
+installing this local revision, open
+`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`. It
+runs the same three-claim example as the paper, a small mlr3 audit, and
+an export/read-back check. The local revision delivery also includes a
+standalone rendered HTML version.
+
+`mlr3autoiml` 0.1.5 primarily implements **claim-scoped diagnostic gates
 (CSDG)** for interpretable machine-learning analyses in the **mlr3
 ecosystem**. A CSDG audit records the intended claim, measurement and
 preprocessing choices, explanation semantics, gate-specific evidence,
@@ -68,10 +76,16 @@ plotting) activate when the corresponding packages are available.
 
 ## Installation
 
+Install the current version from GitHub:
+
 ``` r
-# install.packages("remotes")
-remotes::install_github("coorsaa/mlr3autoiml")
+remotes::install_github("coorsaa/mlr3autoiml", build_vignettes = TRUE)
+library(mlr3autoiml)
+vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")
 ```
+
+Released versions are tagged. Version 0.1.0 produced the primary analyses of the accompanying article; install a
+tagged version with, for example, `remotes::install_github("coorsaa/mlr3autoiml@v0.1.5")`.
 
 ## CSDG quick start
 

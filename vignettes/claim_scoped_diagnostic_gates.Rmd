@@ -1,191 +1,483 @@
 ---
-title: "Claim-Scoped Diagnostic Gates"
+title: "From a claim to evidence: a complete CSDG walkthrough"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Claim-Scoped Diagnostic Gates}
+  %\VignetteIndexEntry{From a claim to evidence: a complete CSDG walkthrough}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", warning = TRUE)
 ```
 
-## Why claims come first
+This guide implements the five steps of the accompanying paper:
+**write the claim, specify the scope, derive the required properties, evaluate the evidence, and decide and report**.
+The input is a conclusion a researcher wants to report, the claim.
+The output is the assessment of that claim (met, not met, or unresolved), the argument behind it, and what can be
+reported. The researcher chooses the required properties; the package records them and applies the
+decision rule. It does not discover all relevant properties or judge their scientific adequacy.
 
-An explanation method does not determine what its output can support. A global
-importance ranking for one fitted model, for example, does not by itself show
-that the ranking survives across resamples, near-equivalent models, cohorts,
-or plausible setting shifts. CSDG therefore starts from an explicit claim and
-assigns diagnostic gates to that claim.
+All code below runs on generated data. No SHILD or PISA files are needed.
+The first example is the numerical example of Section 2.6 of the paper.
+A short fitted-model example then connects the record to `mlr3`, followed by an export and read-back check.
 
-```{r cards}
-library(mlr3)
+```{r package, warning = FALSE}
 library(mlr3autoiml)
+library(data.table)
+library(mlr3)
+library(mlr3learners)
+packageVersion("mlr3autoiml")
+```
 
-claim = csdg_claim(
-  id = "example_global_pattern",
-  statement = paste(
-    "The selected pipeline predicts the observed binary outcome adequately",
-    "and supports a stable global importance description in the analytic sample."
-  ),
-  claim_type = c(
-    "predictive_performance", "calibration", "global_explanation"
-  ),
-  target = "binary outcome at the observed assessment",
-  unit = "participant",
-  population = "the worked-example population",
-  analytic_distribution = "the generated analytic sample",
-  model_scope = "selected_model",
-  setting_scope = "analytic_sample"
+<style>
+pre, pre code, pre > code.sourceCode { white-space: pre-wrap; overflow-wrap: anywhere; }
+pre > code.sourceCode { display: block; }
+pre > code.sourceCode > span { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+table { width: 100%; table-layout: auto; }
+th, td { overflow-wrap: anywhere; vertical-align: top; }
+</style>
+
+## 1. Write the claim
+
+Two predictors carry identical information: let `Z` be standard normal and set `X1 = X2 = Y = Z`.
+Model A returns predictor 1 and model B returns predictor 2, for every input; both predict the outcome without error.
+The claim is: **both models rely more on predictor 1 than on predictor 2**. Its scope measures reliance by marginal
+permutation feature importance (PFI) with squared error. The claim describes two explicitly defined prediction
+functions, not the causal importance of an item. The record also notes that the claim was written before the values
+were computed.
+
+```{r claim}
+claim_both = csdg_claim(
+  id = "both_models",
+  statement = "Both models rely more on predictor 1 than on predictor 2.",
+  claim_type = c("global_explanation", "model_generalization"),
+  target = "increase in mean squared prediction error under marginal permutation",
+  semantics = "hypothetical_model_query",
+  unit = "generated observation",
+  population = "Z standard normal; X1 = X2 = Y = Z",
+  analytic_distribution = "the specified standard-normal population",
+  model_scope = "near_equivalent_models",
+  scientific_use = "describe the two specified prediction functions",
+  explanation_design = "compare fA(x) = x1 and fB(x) = x2 under the same marginal permutation",
+  claim_level = "functional",
+  notes = "Two constructed equally accurate functions; no empirical model-selection claim.",
+  provenance = list(origin = "specified_before_results", date = "2026-09-26",
+    time_basis = "tutorial construction date", selection_basis = "written before the PFI values were computed",
+    evidence_ids = character())
 )
+claim_both$statement
+```
 
+## 2. Specify the scope
+
+The call above records the six scope elements of the paper: the quantity (`target`), the model (`model_scope`),
+the procedure (`explanation_design`), the data (`analytic_distribution`), the meaning (`semantics`), and the use
+(`scientific_use`). The meaning `hypothetical_model_query` marks a model description under perturbed inputs:
+marginal permutation evaluates the models at inputs where the two predictors differ, which never occur in the data.
+The measurement and explanation records add details of the data and the procedure.
+
+```{r scope}
 measurement = csdg_measurement(
-  outcome = "y",
-  predictors = c("x1", "x2", "group"),
-  data_source = "generated worked example",
-  sample_definition = "all generated rows",
-  unit = "participant",
-  outcome_scale = "binary factor, positive class 1",
-  missingness = "no missing values",
-  preprocessing = "rpart pipeline refitted within each training split",
-  verification = list(
-    status = "author_reviewed",
-    artifact = "vignette source"
-  )
+  outcome = "y", predictors = c("x1", "x2"),
+  data_source = "specified synthetic distribution",
+  sample_definition = "all generated observations; no exclusions",
+  unit = "generated observation", outcome_scale = "continuous, variance one",
+  missingness = "none", preprocessing = "none"
 )
-
 explanation = csdg_explanation(
-  method_ids = "pfi",
-  scope = "global",
-  target = "positive-class predicted probability",
-  perturbation = list(
-    type = "marginal",
-    distribution = "held-out analytic-sample folds"
-  )
+  method_ids = "pfi", scope = "global", target = "mean squared prediction error",
+  perturbation = list(type = "marginal", distribution = "independent standard-normal copy")
 )
-
-csdg_gate_plan(claim, measurement, explanation)
 ```
 
-## Fit and diagnose a complete pipeline
+## 3. Derive the required properties
 
-Every learned preprocessing operation should be embedded in the learner so
-that it is refitted inside each training split. The small example below has no
-missingness or learned preprocessing, but the same rule applies to a graph
-learner containing imputation, encoding, selection, and tuning.
+A gate is a generic evidence question; applied to a claim, it becomes a required property.
+Following Table 3 of the paper, the claim requires the specification and measurement gates (G0a, G0b), the procedure
+gate (G2) because it interprets PFI values, the stability gate (G5) because it compares them, and the models gate
+(G6a) because it covers two models. Calibration and local fidelity are not required.
 
-```{r audit}
+The package suggests a plan for the declared claim type. The plan is a starting point, not a verdict, and its default
+roles are weaker than the paper's: it proposes G2 as possible counterevidence and G5 as context, and it adds
+predictive performance (G1). We therefore align the plan with the paper before recording evidence.
+
+```{r selection}
+plan = csdg_gate_plan(claim_both, measurement, explanation)
+plan[gate_id == "G1", `:=`(applicable = FALSE, evidence_role = "descriptive_context")]
+plan[gate_id %in% c("G2", "G5"), evidence_role := "necessary_requirement"]
+knitr::kable(plan[applicable == TRUE, c("gate_id", "gate_name", "evidence_role"), with = FALSE])
+```
+
+G1 is not required because the claim describes two functions that predict without error by construction; it is not
+a population claim and does not use predicted values. The software labels of some gates differ from the names
+in the paper (for example, G6a is labeled "Model multiplicity" here and "Models" in the paper).
+
+## 4. Evaluate the evidence
+
+For each required property, the record states the property, the observation, and its relevance: why the observation
+bears on the claim; decisive properties also record their criterion. Shuffling the used predictor replaces the prediction `Z` with an independent draw `Znew`, so the
+expected squared error rises from 0 to `E[(Z - Znew)^2] = Var(Z) + Var(Znew) = 2`, because the two are independent
+with mean 0 and variance 1; shuffling the unused predictor changes nothing.
+These are exact population values. The following Monte Carlo calculation illustrates them with both functions fixed.
+
+```{r compute}
+set.seed(260926)
+n = 10000L
+z = rnorm(n)
+znew = rnorm(n)
+f_a = function(x1, x2) x1
+f_b = function(x1, x2) x2
+mse = function(prediction) mean((z - prediction)^2)
+observed = data.frame(
+  model = c("A", "B"),
+  predictor_1 = c(mse(f_a(znew, z)), mse(f_b(znew, z))),
+  predictor_2 = c(mse(f_a(z, znew)), mse(f_b(z, znew))))
+knitr::kable(observed, digits = 4,
+  caption = "Finite Monte Carlo estimates; the exact population rows are (2, 0) and (0, 2).")
+stopifnot(observed$predictor_1[1L] > observed$predictor_2[1L],
+  observed$predictor_1[2L] < observed$predictor_2[2L])
+```
+
+The foundation, procedure, and stability properties are supported: the scope is complete, the population is defined
+exactly, marginal permutation computes the named quantity, and exact values cannot change when recomputed.
+
+```{r evidence-supported}
+supported = function(gate_id, property, observation, relevance, criterion = NULL, criterion_rationale = NULL) {
+  csdg_evidence_record(
+    gate_id, TRUE, "necessary_requirement", result_direction = "supports",
+    claim_consequence = "retain_exact_claim", rationale = observation,
+    criterion = criterion, criterion_source = if (!is.null(criterion)) "translated from the claim",
+    criterion_rationale = criterion_rationale,
+    required_property = property, observation = observation, relevance_to_proposition = relevance
+  )
+}
+foundation = list(
+  supported("G0a", "The claim and all six scope elements are stated.",
+    "csdg_claim() records all six elements.", "They fix the quantity, the models, and the procedure."),
+  supported("G0b", "The data match what the claim says.",
+    "The population is defined exactly; there is no measurement error or preprocessing.",
+    "The claim names no construct and no other population."),
+  supported("G2", "Marginal permutation computes the PFI named in the claim.",
+    "Squared-error loss and marginal permutation; both functions are defined for all inputs.",
+    "The claim describes A and B as functions, so the unrealistic permuted inputs are part of what it describes."),
+  supported("G5", "The ordering persists when the quantity is computed again.",
+    "The values are exact population values.", "Exact values cannot change when recomputed.")
+)
+```
+
+The decisive property is contradicted: only the model differs between the two computations, the claim covers both
+models, and model B reverses the ordering. The software records this as `challenges`. The label records the
+researcher's argument; it is not inferred by the software from the numbers.
+
+```{r evidence-both}
+evidence_g6a = csdg_evidence_record(
+  "G6a", TRUE, "necessary_requirement", result_direction = "challenges",
+  claim_consequence = "revise_claim",
+  criterion = list(value = "strict ordering in both models", direction = "qualitative"),
+  criterion_source = "translated from the claim",
+  criterion_rationale = "The claim asserts the ordering in each of the two models.",
+  rationale = "The exact values are (2, 0) in A and (0, 2) in B; the stated ordering fails in B.",
+  varied_component = "prediction function: A versus B",
+  held_constant = c("population", "squared-error loss", "marginal permutation"),
+  same_estimand = FALSE,
+  same_estimand_rationale = "Each function has its own PFI; the claim explicitly covers both.",
+  invariance_claimed = TRUE,
+  required_property = "Predictor 1 has the larger marginal PFI in each of the two models.",
+  observation = "Exact population values: A = (2, 0); B = (0, 2).",
+  relevance_to_proposition = "Only the model differs, and the claim covers model B, which reverses the ordering."
+)
+evidence_both = c(foundation, list(evidence_g6a))
+decision_both = csdg_adjudicate_claim(evidence_both, claim_applicable = TRUE)
+decision_both$decision
+stopifnot(identical(decision_both$decision, "not_met"))
+```
+
+Other versions of PFI answer other questions. Conditional PFI replaces predictor 1 with a draw from its distribution
+given predictor 2; because the predictors are identical, the draw equals the original value, so conditional PFI is 0.
+Grouped PFI shuffles both predictors together and gives 2 for either function.
+These values do not contradict the marginal values; they answer different questions.
+
+## 5. Decide and report
+
+The original claim is not met, so it is revised. The revised claim, **model A relies more on predictor 1 than on
+predictor 2**, is a new claim with its own record and assessment. It follows logically from the original claim, but
+because the original claim is not met, it needs its own evidence, which the values for model A supply. The record notes that the revision was chosen
+after the original comparison had been examined.
+
+```{r revised-claim}
+claim_a = csdg_claim_revision(
+  claim_both, id = "model_a",
+  statement = "Model A relies more on predictor 1 than on predictor 2.",
+  claim_version = "revised", revision_relation = "narrower",
+  claim_type = "global_explanation", model_scope = "selected_model",
+  explanation_design = "fA(x) = x1; marginal permutation; squared-error loss",
+  provenance = list(origin = "retrospective_exploratory", date = "2026-09-26",
+    time_basis = "tutorial construction date",
+    selection_basis = "restriction motivated by the two-model comparison", evidence_ids = "both_models_G6a")
+)
+evidence_a = c(foundation[c(1L, 2L, 4L)], list(supported("G2",
+  "The computation is marginal PFI with squared error in model A, and it yields the larger value for predictor 1.",
+  "Exact values in A: 2 versus 0.",
+  paste("The computation uses the model, perturbation, and loss named in the claim;",
+    "the claim describes A as a function, so the unrealistic permuted inputs are part of what it describes."),
+  criterion = list(value = "strict ordering of the exact values", direction = "qualitative"),
+  criterion_rationale = "The claim asserts that model A relies more on predictor 1 than on predictor 2.")))
+decision_a = csdg_adjudicate_claim(evidence_a, claim_applicable = TRUE)
+decision_a$decision
+stopifnot(identical(decision_a$decision, "met"))
+relation = csdg_claim_relation(
+  claim_both, claim_a,
+  coordinate_relations = c(target = "same", model_scope = "narrower", semantics = "same",
+    analytic_distribution = "same", scientific_use = "same", explanation_design = "narrower"),
+  rationale = "The claim about A and B is restricted to A under the same loss and distribution.",
+  proposition_relation = "logical_weakening",
+  proposition_rationale = "If the ordering holds in both A and B, it holds in A. This implication does not assert the premise.",
+  revision_kind = "logical_weakening"
+)
+relation$proposition_relation
+```
+
+The package stores this reasoning; it does not prove the implication.
+
+The vignette adds a third claim that the paper does not discuss, to show an unresolved assessment:
+**the explanations can guide decisions about individual cases**. It interprets the PFI explanation (G2) and requires evidence
+that acting on the explanation improves such decisions (G3b), judged against a criterion derived from the decision.
+Neither the decision nor the criterion is specified, so its scope is incomplete (G0a open), and G3b is open. G2 is
+open as well: without a specified decision, it is unknown which quantity the decision needs and whether it concerns
+only realistic inputs, where A and B coincide. All three gaps are missing evidence, not contrary evidence, so the claim
+is unresolved.
+
+```{r unresolved-use}
+claim_use = csdg_claim(
+  id = "individual_decisions",
+  statement = "The explanations can guide decisions about individual cases.",
+  claim_type = "decision", use_claim = TRUE,
+  target = "adequacy for an individual decision", claim_level = "functional",
+  scientific_use = "individual use has not yet been specified"
+)
+open_g0a = csdg_evidence_record(
+  "G0a", TRUE, "necessary_requirement", availability = "incomplete",
+  result_direction = "not_evaluated", claim_consequence = "unresolved",
+  rationale = "The decision and its criterion are not specified.",
+  required_property = "The claim and all six scope elements are stated.",
+  observation = "The use element names no decision.",
+  relevance_to_proposition = "Without the use, the required decision evidence cannot be defined."
+)
+open_g2 = csdg_evidence_record(
+  "G2", TRUE, "necessary_requirement", availability = "incomplete",
+  result_direction = "not_evaluated", claim_consequence = "unresolved",
+  rationale = "The use is not specified.",
+  required_property = "The procedure computes the quantity that the decision needs.",
+  observation = "Marginal permutation evaluates the models at inputs where x1 and x2 differ.",
+  relevance_to_proposition = "Whether these unrealistic inputs matter depends on the decision, which is not specified."
+)
+evidence_use = c(list(open_g0a, open_g2), foundation[2L], list(csdg_evidence_record(
+  "G3b", TRUE, "necessary_requirement", availability = "unavailable",
+  result_direction = "not_evaluated", claim_consequence = "unresolved",
+  rationale = "No criterion derived from a decision and no evidence on decisions are available.",
+  required_property = "Acting on the explanation improves decisions about individuals.",
+  observation = "No criterion derived from a decision and no evidence on decisions.",
+  relevance_to_proposition = "PFI values describe the models, not the consequences of decisions."
+)))
+decision_use = csdg_adjudicate_claim(evidence_use, claim_applicable = TRUE)
+stopifnot(identical(decision_use$decision, "unresolved"))
+reported_claims = c(
+  "Not retained; replaced by the revised claim.",
+  claim_a$statement,
+  "Suitability for decisions about individual cases has not been established."
+)
+knitr::kable(data.frame(
+  claim_id = c(claim_both$id, claim_a$id, claim_use$id),
+  decision = c(decision_both$decision, decision_a$decision, decision_use$decision),
+  action = c("revise", "retain", "withhold"), reported = reported_claims))
+```
+
+`met` holds relative to the listed required properties. It is not a certificate that every relevant property was
+identified.
+
+## Required properties, counterevidence, and context
+
+Evidence on required properties decides the assessment (role `necessary_requirement`).
+Counterevidence, such as an established coding error, counts against the claim once it is shown to affect the result
+(role `potential_defeater` with materiality `materialized`).
+Everything else is context: it is reported but never decides the claim (roles `graded_support` and
+`descriptive_context`, both of which the paper calls context). In the package, leave `claim_consequence` at its
+default for context records: a `graded_support` record with `claim_consequence = "unresolved"` leaves the claim
+unresolved. A record list without any required property also leaves the claim unresolved.
+A gate can be irrelevant to a claim that is otherwise in scope; a computation error makes evidence unavailable,
+which leaves the claim unresolved rather than not met.
+
+```{r status-boundaries}
+irrelevant = csdg_evidence_record(
+  "G4", FALSE, "descriptive_context",
+  rationale = "Local-surrogate fidelity is not required by the global claim about A."
+)
+stopifnot(csdg_adjudicate_claim(c(evidence_a, list(irrelevant)))$decision == "met",
+  csdg_adjudicate_claim(list(irrelevant))$decision == "unresolved")
+# A deliberately simulated computation failure is an unavailable result, not counterevidence.
+computation = tryCatch(stop("Illustrative computation error"), error = conditionMessage)
+failed_evidence = csdg_evidence_record(
+  "G2", TRUE, "necessary_requirement", availability = "unavailable",
+  result_direction = "not_evaluated", rationale = computation
+)
+stopifnot(csdg_adjudicate_claim(list(failed_evidence))$decision == "unresolved")
+```
+
+A whole claim is `not_applicable` only if it is explicitly placed outside the evaluation with a rationale.
+
+## Connect the record to a fitted mlr3 workflow
+
+This separate example generates 180 observations, fits a small classification tree in each of three folds,
+and computes held-out PFI. Each fold's model is fitted without the observations used to evaluate it, and the reported
+values average over the fold-specific fits of the learner. The claim describes the learner's reliance on held-out data,
+so it is declared at the functional level and, following Table 3 of the paper, does not require G1. The audit is
+nevertheless asked to run the cross-validation listed under G1 (`run_gates`), because the stability diagnostic (G5)
+uses its stored fold models.
+
+```{r mlr3-audit}
 set.seed(42)
-n = 180
-dat = data.frame(
-  x1 = rnorm(n),
-  x2 = rnorm(n),
-  group = factor(sample(letters[1:3], n, replace = TRUE))
-)
-eta = 0.8 * dat$x1 - 0.5 * dat$x2 + 0.3 * (dat$group == "b")
-dat$y = factor(rbinom(n, 1, plogis(eta)), levels = c(0, 1))
-
+dat = data.frame(x1 = rnorm(180), x2 = rnorm(180))
+dat$y = factor(rbinom(180, 1, plogis(dat$x1 - 0.5 * dat$x2)), levels = c(0, 1))
 task = as_task_classif(dat, target = "y", positive = "1")
-learner = lrn("classif.rpart", predict_type = "prob")
-
-config = csdg_config(
-  seed = 42L,
-  resampling = list(folds = 3L, repeats = 1L),
-  stability = list(
-    pfi_repetitions = 2L,
-    top_k = 2L,
-    min_top_k_overlap = 0.25
-  )
+learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 3L)
+mlr_claim = csdg_claim(
+  id = "tree_learner",
+  statement = "The tree learner relies on both predictors.",
+  claim_type = "global_explanation", target = "held-out log-loss increase under marginal permutation",
+  unit = "generated observation", population = "the generated sample",
+  analytic_distribution = "180 synthetic rows", model_scope = "cross_fitted_pipeline",
+  semantics = "hypothetical_model_query",
+  scientific_use = "describe the learner", claim_level = "functional",
+  explanation_design = "three folds; 20 marginal permutations per predictor and fold"
 )
-
-result = csdg_audit(
-  task = task,
-  learner = learner,
-  claim = claim,
-  measurement = measurement,
-  explanation = explanation,
-  config = config
+mlr_measurement = csdg_measurement(
+  outcome = "y", predictors = c("x1", "x2"), data_source = "generated here",
+  sample_definition = "all 180 rows", unit = "generated observation",
+  outcome_scale = "binary factor", missingness = "none", preprocessing = "none"
 )
-
-csdg_report_card(result)
-csdg_claim_report(result)
+mlr_explanation = csdg_explanation(
+  method_ids = "pfi", scope = "global", target = "held-out log loss",
+  perturbation = list(type = "marginal", distribution = "assessment rows in each fold")
+)
+config = csdg_config(seed = 42L, resampling = list(folds = 3L, repeats = 1L),
+  stability = list(pfi_repetitions = 20L, top_k = 2L))
+audit = csdg_audit(task, learner, mlr_claim, mlr_measurement, mlr_explanation, config = config,
+  run_gates = c("G0a", "G0b", "G1", "G2", "G5"))
+report_card = csdg_report_card(audit)
+stopifnot(!any(report_card$status == "error"))
+knitr::kable(report_card[, c("gate_id", "status", "summary"), with = FALSE])
+pfi = audit$artifacts$pfi$summary
+knitr::kable(pfi[, c("feature_group", "mean_importance", "positive_fraction"), with = FALSE], digits = 4)
 ```
 
-## Adding model-refit uncertainty to ALE curves
+The report card uses the software's own labels for the diagnostics that the audit ran. G0b shows as unresolved
+because no preprocessing check was passed to the audit, G1 and G5 because no criterion was passed, and gates outside the
+software's plan show as `not_applicable`. These labels are not the supported, contradicted, or open status of a
+required property. The high-level claim report deliberately leaves the assessment to explicit records, so a
+successful audit alone never makes a claim met.
 
-A one-dimensional ALE curve from a final full-sample fit describes one fitted model.
-When the claim also requires evidence that the curve persists across resampled analytic data, use
-`csdg_ale_bootstrap()` with the independent sampling unit and the complete learner pipeline.
-The returned percentile intervals are pointwise, not simultaneous, and remain conditional on the fixed learner
-specification and analysis design.
+```{r claim-report}
+claim_report = csdg_claim_report(audit)
+knitr::kable(claim_report[, c("claim_id", "decision", "decision_basis"), with = FALSE])
+stopifnot(all(claim_report$decision == "unresolved"))
+```
 
-```{r ale-bootstrap, eval=FALSE, purl=FALSE}
-fitted_learner = learner$clone(deep = TRUE)
-fitted_learner$train(task)
+The explicit assessment uses the audit's output and supplies what the audit lacked. The claim requires G0a, G0b, G2,
+and G5; the researcher documents that the generated data involve no preprocessing (G0b), and the criterion for G5,
+positive PFI in every fold beyond twice its Monte Carlo standard error, translates "relies on" into numbers and follows the paper's rule. The two predictors are independent, so permuted inputs are
+realistic.
 
-ale_intervals = csdg_ale_bootstrap(
-  task = task,
-  learner = fitted_learner,
-  features = c("x1", "x2"),
-  sample_n = 180L,
-  ale_bins = 10L,
-  replicates = 200L,
-  resampling_unit = "row",
-  min_interval_n = 10L,
-  seed = 42L
+```{r mlr3-assessment}
+fold_pfi = audit$artifacts$pfi$per_iteration
+stopifnot(nrow(pfi) == 2L, all(fold_pfi$importance > 2 * fold_pfi$monte_carlo_se))
+mlr_evidence = list(
+  supported("G0a", "The claim and all six scope elements are stated.", "csdg_claim() records them.",
+    "They fix the quantity, the learner, and the procedure."),
+  supported("G0b", "The data match what the claim says.", "Generated data without missing values or preprocessing.",
+    "The claim names only the generated sample."),
+  supported("G2", "Held-out marginal permutation computes the log-loss increase named in the claim.",
+    "Permutation within each held-out fold; the predictors are independent, so permuted inputs are realistic.",
+    "The computation matches the quantity and procedure of the claim."),
+  csdg_evidence_record(
+    "G5", TRUE, "necessary_requirement", result_direction = "supports",
+    claim_consequence = "retain_exact_claim",
+    criterion = list(value = "PFI > 2 Monte Carlo standard errors in every fold", direction = "minimum"),
+    criterion_source = "translated from the claim with the paper's stability rule",
+    criterion_rationale = "\"Relies on\" means a positive held-out PFI beyond Monte Carlo error in each fold.",
+    rationale = "Both predictors meet the criterion in every fold.",
+    required_property = "Both predictors increase held-out log loss in every fold.",
+    observation = sprintf("Positive PFI beyond twice its Monte Carlo standard error in all %d folds for both predictors.",
+      pfi$n_iterations[1L]),
+    relevance_to_proposition = "Folds vary the training and evaluation data while the learner and perturbation stay fixed.")
 )
-
-csdg_plot_data(ale_intervals$ale_1d, type = "ale", style = "monochrome")
+decision_mlr = csdg_adjudicate_claim(mlr_evidence, claim_applicable = TRUE)
+decision_mlr$decision
+stopifnot(identical(decision_mlr$decision, "met"))
 ```
 
-For clustered observations, set `resampling_unit = "cluster"`, supply one cluster label per task row, and use
-`strata` when clusters must be sampled independently within prespecified strata.
+## Export, reload, and verify the actual output
 
-## Reading gate-status labels
+The explicit assessment file records the installed package version and, for all four claims, the evidence, decisions,
+and reported claims, together with the revision relation. For the audit claim, it supersedes the audit bundle's own
+claim report (unresolved). The file and a receipt are written next to the audit bundle, not into it, so the bundle's
+checksum manifest stays valid; the receipt names the file, its SHA-256 checksum, the audit bundle, and all claim
+identifiers. After reading the files back, the code checks the claim identifiers, the four decisions, the file
+checksum, and the audit's unresolved claim report.
 
-The following labels describe individual gate records, not the claim-level decision returned by
-`csdg_adjudicate_claim()`.
-
-`not_applicable` means that the prespecified claim does not invoke a gate.
-`unresolved` means that a required component, criterion, or scope check is missing or cannot yet be adjudicated.
-`not_met` records a prespecified diagnostic failure. `error` preserves a computational failure rather than silently
-converting it into support. `met` means only that the evidence required by the declared gate was available and met
-the declared criterion.
-
-None of these labels converts a predictive association into a causal effect.
-Nor do they establish population transport, fairness, user comprehension, or
-real-world utility unless those components were explicitly designed and
-supplied.
-
-## Adjudicating the exact claim
-
-Claim applicability is separate from module applicability. Use `claim_applicable = TRUE` for an in-scope proposition;
-empty or irrelevant supplied evidence leaves that proposition unresolved. Only an explicit out-of-scope declaration
-with a rationale can yield the claim decision `not_applicable`. Existing calls that omit the argument retain an
-explicitly recorded in-scope default, not an inference from module applicability.
-
-```{r claim-adjudication}
-evidence_record = csdg_evidence_record(
-  "G5", TRUE, "necessary_requirement", result_direction = "supports",
-  claim_consequence = "unresolved",
-  rationale = "The necessary property is supported, but an unresolved qualification limits the exact claim."
+```{r export}
+export_root = tempfile("csdg_walkthrough_")
+dir.create(export_root)
+audit_bundle = csdg_export(audit, path = export_root)
+explicit = list(
+  package_version = as.character(packageVersion("mlr3autoiml")),
+  claims = list(claim_both, claim_a, claim_use, mlr_claim),
+  evidence = list(evidence_both, evidence_a, evidence_use, mlr_evidence),
+  decisions = list(decision_both, decision_a, decision_use, decision_mlr),
+  reported_claims = c(reported_claims, mlr_claim$statement), relation = relation
 )
-csdg_adjudicate_claim(list(evidence_record), claim_applicable = TRUE)
+assessment_path = file.path(export_root, "explicit_assessments.json")
+jsonlite::write_json(explicit, assessment_path, auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null")
+receipt = list(
+  assessment_file = basename(assessment_path),
+  assessment_sha256 = digest::digest(file = assessment_path, algo = "sha256"),
+  audit_claim_id = mlr_claim$id, audit_bundle = basename(audit_bundle),
+  claim_ids = c(claim_both$id, claim_a$id, claim_use$id, mlr_claim$id)
+)
+jsonlite::write_json(receipt, file.path(export_root, "receipt.json"), auto_unbox = TRUE, pretty = TRUE)
+read_back = jsonlite::read_json(assessment_path)
+read_receipt = jsonlite::read_json(file.path(export_root, "receipt.json"))
+stopifnot(identical(vapply(read_back$claims, `[[`, character(1L), "id"), receipt$claim_ids),
+  identical(vapply(read_back$decisions, `[[`, character(1L), "decision"), c("not_met", "met", "unresolved", "met")),
+  identical(read_receipt$assessment_sha256, digest::digest(file = assessment_path, algo = "sha256")),
+  all(read.csv(file.path(audit_bundle, "claim_report.csv"))$decision == "unresolved"))
+cat("Export and read-back verified for all four claims.\n")
+# A caller can retain this synthetic-only bundle without changing the tutorial.
+keep = Sys.getenv("CSDG_VIGNETTE_EXPORT_DIR")
+if (nzchar(keep)) {
+  dir.create(keep, recursive = TRUE, showWarnings = FALSE)
+  stopifnot(all(file.copy(list.files(export_root, full.names = TRUE), keep, recursive = TRUE)))
+}
 ```
 
-Record consequences are binding constraints: a justified nonretention or revision takes precedence over unresolved
-evidence, and unresolved evidence prevents `met`. Favorable evidence cannot compensate for either constraint.
-`met` is conditional on the supplied applicable necessary requirements; it does not certify that every relevant
-obligation was identified. See `inst/MIGRATION_0_1_4.md` for legacy handling and the complete decision contract.
+## The applications in the paper
 
-## Exporting the audit trail
+In SHILD, the claim that explanations of individual predictions can guide follow-up decisions remains unresolved,
+because no criterion derived from the use and no evidence on the decisions exist. Three claims that answer other
+questions are met: the local explanations are less accurate on new points than on the points used to fit them, and the
+two accuracy measures disagree about where the explanations work best; for this rare outcome, local explanations
+reproduce the model more accurately when they are fitted on the log-odds scale; and the model relies mainly on
+self-rated health and depressed mood.
 
-```{r export, eval=FALSE, purl=FALSE}
-bundle = csdg_export(result, path = "results")
-bundle
+In PISA, the five most important predictors of the XGBoost model are the same for every plausible value (met), but
+three similarly accurate models do not have the same five most important predictors (not met). The revised claim, that
+all three models rely heavily on assessing credibility, but ridge regression relies far more on socioeconomic indices
+than XGBoost and random forest do, is met. The paper's online supplement records the sources of variation and the
+sensitivity analyses.
+
+For further diagnostics, use the installed help pages (`?csdg_ale_bootstrap`, `?csdg_local_fidelity_audit`,
+and `?csdg_importance_agreement`). They are optional analyses selected by a claim, not additional mandatory tutorial steps.
+
+```{r session}
+sessionInfo()
 ```
-
-The bundle contains machine-readable cards, the gate plan, report and claim
-cards, diagnostic tables, a serialized result, session information, an
-uncertainty-scope note, and file checksums.

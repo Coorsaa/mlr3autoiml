@@ -1,0 +1,95 @@
+url: https://coorsaa.github.io/mlr3autoiml
+template:
+  bootstrap: 5
+
+reference:
+- title: CSDG cards and planning
+  contents:
+  - csdg_claim
+  - csdg_claim_revision
+  - csdg_claim_relation
+  - csdg_evidence_record
+  - csdg_adjudicate_claim
+  - csdg_resolve_sources
+  - csdg_measurement
+  - csdg_explanation
+  - csdg_config
+  - csdg_gate_plan
+- title: CSDG resampling and diagnostics
+  contents:
+  - csdg_ale_bootstrap
+  - csdg_resample
+  - csdg_grouped_resampling
+  - csdg_performance
+  - csdg_oof_predictions
+  - csdg_dependence
+  - csdg_effect_diagnostics
+  - csdg_interaction_diagnostics
+  - csdg_shapley_diagnostics
+  - csdg_prediction_multiplicity
+  - csdg_mask_effect_support
+  - csdg_calibration
+  - csdg_calibration_bootstrap
+  - csdg_decision_curve
+  - csdg_fold_pfi
+  - csdg_importance_agreement
+  - csdg_local_surrogate
+  - csdg_oof_local_surrogate
+  - csdg_local_fidelity_audit
+  - csdg_local_fidelity_randomness_audit
+  - csdg_local_tree_comparator
+  - csdg_summarize_local_fidelity
+  - csdg_local_support
+  - csdg_subgroup_metrics
+  - csdg_plausible_value_summary
+- title: CSDG model and setting generalization
+  contents:
+  - csdg_rashomon
+  - csdg_near_equivalence_sensitivity
+  - csdg_rashomon_agreement
+  - csdg_explanation_sensitivity
+  - csdg_leave_one_group_out
+  - csdg_matched_setting_exclusion
+  - csdg_transport_status
+- title: CSDG audit and reporting
+  contents:
+  - csdg_audit
+  - CSDGAudit
+  - csdg_report_card
+  - csdg_claim_report
+  - csdg_claim_matrix
+  - csdg_plot_claim_matrix
+  - csdg_export
+  - csdg_plot
+  - csdg_plot_data
+  - csdg_plot_legend
+- title: AutoIML workflow
+  contents:
+  - AutoIML
+  - AutoIMLResult
+  - GateResult
+  - autoiml
+  - guide_workflow
+  - make_claim_card
+  - make_measurement_card
+- title: AutoIML reporting and export
+  contents:
+  - report_card
+  - report_card_extended
+  - export_analysis_bundle
+  - export_audit_bundle
+  - save_analysis_plot
+  - save_analysis_table
+  - gate0_tables
+  - gate2_tables
+  - gate6_tables
+- title: Plot styling
+  contents:
+  - autoiml_palette
+  - autoiml_model_colors
+
+articles:
+- title: CSDG guide
+  navbar: CSDG guide
+  contents:
+  - claim_scoped_diagnostic_gates

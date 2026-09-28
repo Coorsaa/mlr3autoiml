@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.4
+Version: 0.1.5
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -24,23 +24,47 @@ License: LGPL-3 + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Depends: R (>= 4.3.0)
-Imports: checkmate, cli, data.table, digest, ggplot2, jsonlite, mlr3,
-        mlr3measures, mlr3misc, parallel, R6, stats, utils, yaml
-Suggests: callr, FNN, future, future.apply, ggforce, glmnet, iml,
-        knitr, lgr, mlr3learners, mlr3pipelines, mlr3tuning, mlr3viz,
-        patchwork, png, ranger, rmarkdown, rpart, testthat (>= 3.0.0),
-        withr, xgboost
+Depends:
+    R (>= 4.3.0)
+Imports:
+    checkmate,
+    cli,
+    data.table,
+    digest,
+    ggplot2,
+    jsonlite,
+    mlr3,
+    mlr3measures,
+    mlr3misc,
+    parallel,
+    R6,
+    stats,
+    utils,
+    yaml
+Suggests:
+    callr,
+    FNN,
+    future,
+    future.apply,
+    ggforce,
+    glmnet,
+    iml,
+    knitr,
+    lgr,
+    mlr3learners,
+    mlr3pipelines,
+    mlr3tuning,
+    mlr3viz,
+    patchwork,
+    png,
+    ranger,
+    rmarkdown,
+    rpart,
+    testthat (>= 3.0.0),
+    withr,
+    xgboost
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-URL: https://github.com/coorsaa/mlr3autoiml,
-        https://github.com/mlr-org/mlr3, https://mlr3.mlr-org.com
+URL: https://github.com/coorsaa/mlr3autoiml, https://github.com/mlr-org/mlr3,
+    https://mlr3.mlr-org.com
 BugReports: https://github.com/coorsaa/mlr3autoiml/issues
-NeedsCompilation: no
-Packaged: 2026-09-12 13:06:08 UTC; 35955
-Author: Stefan Coors [aut, cre],
-  Clara Vetter [aut],
-  Jonas Hauck [aut],
-  Bernd Bischl [aut],
-  Sven Hilbert [aut]
-Maintainer: Stefan Coors <mail@stefancoors.de>

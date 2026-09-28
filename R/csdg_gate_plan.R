@@ -7,7 +7,7 @@
     "Dependence, support, and heterogeneity",
     "Calibration",
     "Utility and decision consequences",
-    "Local faithfulness and recourse language",
+    "Local fidelity and recourse language",
     "Explanation stability",
     "Model multiplicity",
     "Setting transport",

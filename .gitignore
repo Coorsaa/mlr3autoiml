@@ -61,3 +61,16 @@ Simulation_Study.R
 CLAUDE.md
 .claude/
 README.html
+
+# Built vignettes and archives
+inst/doc/
+*.tar.gz
+*.zip
+*.sha256
+*.diff
+
+# Paper and analysis material lives in a separate repository; never commit it here
+analysis/
+CSDG_*/
+**/private/
+.venv*/
