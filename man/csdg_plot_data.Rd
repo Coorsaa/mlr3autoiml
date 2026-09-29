@@ -68,8 +68,9 @@ Multi-group inputs must provide one status for every group-by-gate combination.
 \code{y_limits}, \code{caption}, and \code{display}.
 Set \code{display = "aligned"} for an aligned dot display, or \code{display = "diverging"} for opposing bars of
 performance-tolerance consumption and PFI pair-order reversals on a common proportion scale.
-Both displays also accept \code{include_focal}, \code{reference_learner}, and \code{learner_order}; the diverging display accepts
-\code{bar_width} between 0.05 and 0.9.
+Both displays also accept \code{reference_learner} (the learner with which the others are compared),
+\code{include_focal} (whether to show the reference learner itself; default \code{TRUE}), and \code{learner_order};
+the diverging display accepts \code{bar_width} between 0.05 and 0.9.
 In the color style, group colors may be named by original group IDs or by uniquely mapped group labels.
 The monochrome style uses black shapes instead.
 

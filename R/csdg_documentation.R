@@ -87,7 +87,8 @@
 #' @param aggregation Aggregation rule for explanations.
 #' @param seed Master random seed.
 #' @param resampling,performance,dependence,calibration,faithfulness,stability,generalization,subgroup,decision,export
-#'   Named lists that override configuration defaults.
+#'   Named lists that override configuration defaults; `faithfulness` holds the settings of the local-fidelity
+#'   diagnostics (G4).
 #' @param criteria Named criterion metadata keyed by the documented configuration path.
 #'
 #'   Every entry must contain nonempty `source` and `rationale` fields.
@@ -158,11 +159,12 @@ NULL
 #'
 #' The surrogate is a weighted ridge regression on the design matrix `model.matrix(~ .)` of all features (an
 #' intercept, numeric features, and R's default contrasts for factors and character features: treatment coding for
-#' unordered factors and orthogonal polynomial coding for ordered factors). Weights are rescaled to mean 1; each
-#' non-intercept column is centered and scaled by its weighted mean and weighted standard deviation, and columns
-#' without weighted variance are dropped (coefficient 0). The intercept is not penalized; every other standardized
-#' column receives the penalty \eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the
-#' number of points used for the fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
+#' unordered factors and polynomial contrasts, `contr.poly()`, for ordered factors).
+#' Weights are rescaled to mean 1; each non-intercept column is centered and scaled by its weighted mean and
+#' weighted standard deviation, and columns without weighted variance are dropped (coefficient 0).
+#' The intercept is not penalized; every other standardized column receives the penalty
+#' \eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the number of points used for the
+#' fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 #' \eqn{n_{eff} = (\sum w)^2 / \sum w^2} the Kish effective sample size of the weights. The coefficients solve
 #' \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 #' fixed rule, not tuned.
@@ -270,7 +272,7 @@ NULL
 #' @param rashomon A `CSDGRashomon` object.
 #' @param pfi Named permutation-importance results for accepted learners.
 #' @param top_k Number of top-ranked feature groups.
-#' @param learner Focal learner.
+#' @param learner The learner whose results are compared across settings.
 #' @param group One setting identifier per task row.
 #' @param measures Performance measures.
 #' @param scores Setting-level score table.
@@ -303,7 +305,7 @@ NULL
 #' evidence.
 #'
 #' @param task An [mlr3::Task].
-#' @param learner Focal learner with preprocessing embedded in its pipeline.
+#' @param learner The [mlr3::Learner] to audit, with preprocessing embedded in its pipeline.
 #' @param claim A `CSDGClaim` object.
 #' @param measurement A `CSDGMeasurement` object.
 #' @param explanation A `CSDGExplanation` object or `NULL`.

@@ -91,7 +91,7 @@ When omitted, the direction-specific best candidate is the reference.}
 
 \item{top_k}{Number of top-ranked feature groups.}
 
-\item{learner}{Focal learner.}
+\item{learner}{The learner whose results are compared across settings.}
 
 \item{group}{One setting identifier per task row.}
 

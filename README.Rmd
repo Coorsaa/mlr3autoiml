@@ -21,13 +21,16 @@ if (identical(Sys.getenv("CSDG_README_DOCUMENTATION_ONLY"), "true")) {
 
 # mlr3autoiml
 
-`mlr3autoiml` implements **Claim-Scoped Diagnostic Gates (CSDG)** for the **mlr3 ecosystem**. CSDG replaces the
-question "What does this explanation show?" with "Does the evidence support this claim?" Its workflow has five steps:
-write the claim, the conclusion you intend to report (`csdg_claim()`); specify its scope in six elements, the
-quantity, model, procedure, data, meaning, and use; derive the properties the claim requires from the 12 gates
-(`csdg_gate_registry()`, `csdg_gate_plan()`); evaluate the evidence on each required property
-(`csdg_evidence_record()`, with diagnostics from `csdg_audit()`); and decide and report with a fixed rule
-(`csdg_adjudicate_claim()`).
+`mlr3autoiml` helps researchers decide whether the evidence supports a conclusion that they draw from an explanation
+of a machine learning model, such as "the model relies mainly on self-rated health." It implements
+**Claim-Scoped Diagnostic Gates (CSDG)** for the **mlr3 ecosystem** in five steps:
+
+1. **Write the claim**, the conclusion you intend to report (`csdg_claim()`).
+2. **Specify its scope** in six elements: the quantity, model, procedure, data, meaning, and use.
+3. **Derive the required properties** from the 12 gates (`csdg_gate_registry()`, `csdg_gate_plan()`).
+4. **Evaluate the evidence** on each required property (`csdg_evidence_record()`, with diagnostics from
+   `csdg_audit()`).
+5. **Decide and report** with a fixed rule (`csdg_adjudicate_claim()`).
 
 The package records the claim and its scope, derives the gate plan, computes diagnostics, and applies the decision
 rule. The researcher sets the criteria, states the relevance of each observation, and enters established
@@ -42,11 +45,6 @@ is computed.
 | Assessment of a claim | not met if a required property is contradicted; otherwise unresolved if one is open; otherwise met |
 | Decision | a met claim is retained; a claim that is not met or unresolved is revised or withheld |
 
-Start with **[the complete walkthrough](vignettes/claim_scoped_diagnostic_gates.Rmd)**
-(`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`), which follows the five steps with the
-numerical example of the accompanying article. Version 0.1.6 uses the vocabulary of the article; labels of earlier
-versions still work with a deprecation warning (see [the migration note](inst/MIGRATION_0_1_6.md)).
-
 ## Installation
 
 Install the current version from GitHub:
@@ -54,17 +52,16 @@ Install the current version from GitHub:
 ```{r install, eval = FALSE}
 remotes::install_github("coorsaa/mlr3autoiml", build_vignettes = TRUE)
 library(mlr3autoiml)
-vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")
 ```
 
-Released versions are tagged, for example `remotes::install_github("coorsaa/mlr3autoiml@v0.1.6")`. Version 0.1.0
-produced the primary analyses of the accompanying article.
+Released versions are tagged, for example `remotes::install_github("coorsaa/mlr3autoiml@v0.1.7")`.
 
 ## Quick start: the numerical example of the article
 
 Two items carry the same information: `Z` is standard normal, and both items and the outcome equal `Z`. Model A
 predicts with item 1 and model B with item 2 (`f_A(x) = x1`, `f_B(x) = x2`); because the outcome equals each item,
-the linear fit in every fold is exact. The held-out PFI with squared error is computed with the package.
+the linear fit in every fold is exact. The package computes the held-out permutation feature importance (PFI) with
+squared error.
 
 ```{r quick-start-data}
 library(mlr3)
@@ -201,285 +198,41 @@ assessment_a$decision_options
 
 The revised claim is met (exploratory; it was written after the results were seen) and retained.
 
+## Learn more
+
+* **[The CSDG walkthrough](https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html)**
+  (`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`) follows the five steps with the numerical
+  example, an unresolved claim with an unresolved threat, and a met claim assessed with `csdg_audit()`.
+* **[The function reference](https://stefancoors.de/mlr3autoiml/reference/index.html)** documents every function,
+  including the diagnostics of `csdg_audit()` and the local surrogate described in `?csdg_diagnostics`.
+* `csdg_claim_record_template()` returns the blank claim record of the article as a table to fill in, and
+  `supported()`, `contradicted()`, and `open_status()` return the three property statuses.
+* Labels of versions before 0.1.6 still work with a deprecation warning; see
+  [the migration note](https://github.com/coorsaa/mlr3autoiml/blob/main/inst/MIGRATION_0_1_6.md) and
+  [the changelog](https://stefancoors.de/mlr3autoiml/news/index.html).
+
 ## Diagnostics in an mlr3 workflow
 
 `csdg_audit()` derives the gate plan and computes the diagnostics of an mlr3 learner: held-out performance,
 dependence and support, calibration, decision curves, cross-fitted local fidelity, stability of held-out PFI,
 comparisons with similarly accurate models, leave-one-setting-out refits, and subgroup results.
-`csdg_report_card()` lists the gates with the status of each required property (a gate that the claim does not
-require is reported as context, without a property status), and `csdg_claim_report()` applies the decision rule to
-the audit and to evidence records that the researcher supplies. `csdg_learner_pfi_interval()` computes the corrected
-resampled interval of a learner-level mean across folds, and `csdg_pfi_mc_difference()` applies the Monte Carlo rule.
-`csdg_local_fidelity_audit()` evaluates local surrogates on points not used to fit them (the fitted surrogate is
-described in `?csdg_diagnostics`, section "Local surrogate").
-A numerical criterion needs a source and a rationale: for example, `performance = list(maximum_primary_score =
-value)` must be accompanied by `criteria = list(performance.maximum_primary_score = list(source = source,
-rationale = rationale))`; without them, the property remains open. `csdg_rashomon()` likewise returns candidate
-performance without an accepted set unless a tolerance with its source and rationale is supplied.
+`csdg_report_card()` lists the gates with the status of each required property, and `csdg_claim_report()` applies
+the decision rule to the audit and to evidence records that the researcher supplies.
+A numerical criterion needs a source and a rationale; without them, the property remains open.
+By default, `csdg_export()` omits fitted models and observation-level predictions; review the generated bundle before
+sharing it.
 
-## Package and study-script boundary
+## The accompanying article
 
-The package owns reusable claim and evidence records, the gate plan, resampling, permutation importance, calibration,
-ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities, plotting, reporting, and
-provenance. Study-specific equal-country sampling, plausible-value loops, SHILD and PISA orchestration, country
-exclusion schedules, matched-control scheduling, and manuscript synthesis remain in the analysis scripts, which are
-kept in a separate repository. No single package call reproduces either complete empirical study.
-
-Keep `output_dir = NULL` while inspecting an audit, and export to a dedicated directory when it is ready. By default,
-`csdg_export()` omits fitted models and observation-level predictions. This is not a privacy or licensing clearance:
-review the generated bundle before sharing it, and set `include_models = TRUE` or `include_predictions = TRUE` only
-when its release is explicitly approved.
-
----
+Version 0.1.0 produced the primary analyses of the accompanying article. The scripts of its two empirical
+applications are kept in a separate analysis repository.
 
 ## Legacy AutoIML workflow
 
-The examples in this section are not evaluated when this README is rendered. The `AutoIML` interface is the earlier
-workflow of the package; its gate identifiers (G0A to G7B, with combined G3 and G6) and its pass/warn/fail/skip labels
-are not the CSDG gate registry (`csdg_gate_registry()`) or the CSDG vocabulary.
-
-The earlier `AutoIML` interface remains available for compatibility.
-Its `GateResult` pass/warn/fail/skip labels are heuristic workflow diagnostics, not CSDG evidence roles or claim
-decisions. Printing a legacy `GateResult` emits a targeted deprecation warning.
-The examples below demonstrate that workflow; new analyses should start from
-the CSDG interface shown above.
-
-### Example 1 — Classification · decision support
-
-**Task:** `german_credit` (1 000 rows, 20 mixed-type features, binary
-`credit_risk`). Full compatibility-gate path including combined G3 calibration and decision utility and
-G7A subgroup audit.
-
-```{r classif-setup, eval = FALSE}
-library(mlr3)
-library(mlr3autoiml)
-library(mlr3learners)
-library(mlr3pipelines)
-
-task = tsk("german_credit")
-task$set_col_roles("personal_status_sex", add_to = "group")
-
-learner = lrn("classif.rpart", predict_type = "prob", maxdepth = 6L)
-```
-
-The `ctx$claim` block is a pre-analysis declaration, not a model output.
-The operative part is the claim scope, semantics, stakes, and any decision thresholds.
-AutoIML can derive conservative defaults for non-use, prohibited interpretations,
-and decision-policy wording from those declarations,
-so you only need to spell them out when the analysis warrants narrower boundaries.
-
-```{r classif-autoiml, eval = FALSE}
-auto = AutoIML$new(
-  task = task,
-  learner = learner,
-  resampling = rsmp("cv", folds = 3),
-  purpose = "decision_support",
-  seed = 42
-)
-
-auto$ctx$claim = make_claim_card(
-  purpose = "decision_support",
-  semantics = "within_support",
-  stakes = "medium",
-  claims = list(global = TRUE, local = FALSE, decision = TRUE),
-  decision_spec = list(
-    thresholds = seq(0.20, 0.60, by = 0.05),
-    utility = list(tp = 1, fp = -0.5, fn = -1, tn = 0)
-  )
-)
-
-auto$ctx$measurement = make_measurement_card(
-  level = "item"
-)
-auto$ctx$sensitive_features = "personal_status_sex"
-auto$ctx$alt_learners = list(
-  featureless = lrn("classif.featureless", predict_type = "prob")
-)
-auto$ctx$multiplicity$transport_mode = "group_performance"
-```
-
-The measurement card now only needs the part the analysis cannot infer reliably.
-Here that is just the measurement level.
-Gate 0B derives task- and pipeline-level notes for missingness and scoring automatically,
-and only asks for comparability or reliability evidence when the measurement type makes those claims material.
-
-```{r classif-run, results = "hide", eval = FALSE}
-auto$run()
-```
-
-```{r classif-report, eval = FALSE}
-knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-```
-
-With the operative claim card,
-analysis-derived measurement notes, and subgroup audit in place,
-the remaining warnings are substantive rather than setup-related:
-calibration, net benefit in the declared threshold range,
-and the interaction pattern that makes a simple one-feature story too thin.
-
-```{r classif-g3, fig.width = 5.5, fig.height = 4.2, out.width = "49%", fig.show = "hold", eval = FALSE}
-auto$plot("g3_calibration")
-auto$plot("g3_dca")
-```
-
-Gate 2 then shows why the package warns instead of presenting a single global
-effect curve as the main story:
-`amount` and `duration` dominate,
-and they interact strongly.
-
-```{r classif-g2, fig.width = 5.5, fig.height = 4.4, out.width = "49%", fig.show = "hold", eval = FALSE}
-auto$plot("g2_hstats", top_n = 3L)
-auto$plot("g2_ale_2d", feature1 = "amount", feature2 = "duration", class_label = task$positive)
-```
-
-When Gate 2 regionalization is enabled
-(`auto$ctx$structure$regionalize = TRUE`) and the interaction screen finds
-materially heterogeneous effects, the GADGET-style views decompose the global
-effect into interpretable regions and show the split rules that produced those
-regions.
-If no such regions are found, the paper-aligned Gate 2 evidence remains the
-global effect plot, the interaction screen, and the top 2D ALE surface.
-Optional `pint_enabled = TRUE` adds a permutation-based interaction screen
-before regionalization.
-
-```{r classif-g2-gadget, eval = FALSE}
-if (!is.null(auto$result$gate_results$G2$artifacts$gadget_regions) &&
-    nrow(auto$result$gate_results$G2$artifacts$gadget_regions) > 0L) {
-  auto$plot("g2_gadget")
-  auto$plot("g2_gadget_tree")
-}
-auto$plot("g2_pint")
-```
-
-```{r classif-export, eval = FALSE}
-export_analysis_bundle(auto, dir = "bundle_german_credit", prefix = "german_credit")
-```
-
----
-
-### Example 2 — Regression · global insight
-
-**Task:** `california_housing` (20 433 complete cases from the 20 640-row benchmark,
-8 numeric + 1 factor feature, continuous `median_house_value`).
-We use a complete-case subset so `ranger`, lasso, and `xgboost` benchmark the same
-design matrix. Correlated spatial predictors still trigger ALE selection in G2,
-and the mixed learner family makes Gate 6 Rashomon diagnostics realistic.
-
-```{r regr-setup, eval = FALSE}
-task = tsk("california_housing")
-task$filter(task$row_ids[stats::complete.cases(task$data())])
-
-learner = lrn(
-  "regr.ranger",
-  num.trees = 200L,
-  mtry.ratio = 0.5,
-  min.node.size = 5L
-)
-```
-
-The claim card here is not extra decoration;
-it fixes the semantics and scope before Gate 6 compares models.
-Analysis-specific transport and preprocessing notes can remain implicit unless you need
-to declare a narrower boundary than the task- and pipeline-level defaults.
-
-```{r regr-autoiml, eval = FALSE}
-auto = AutoIML$new(
-  task = task,
-  learner = learner,
-  resampling = rsmp("cv", folds = 3),
-  purpose = "global_insight",
-  seed = 42
-)
-
-auto$ctx$claim = make_claim_card(
-  purpose = "global_insight",
-  semantics = "within_support",
-  stakes = "low",
-  claims = list(global = TRUE, local = FALSE, decision = FALSE)
-)
-
-auto$ctx$measurement = make_measurement_card(
-  level = "item"
-)
-auto$ctx$sensitive_features = "ocean_proximity"
-auto$ctx$alt_learners = list(
-  lasso = as_learner(po("encode") %>>% lrn("regr.glmnet", alpha = 1)),
-  xgboost = as_learner(
-    po("encode") %>>%
-      lrn(
-        "regr.xgboost",
-        nrounds = 150L,
-        eta = 0.05,
-        max_depth = 6L,
-        subsample = 0.8,
-        colsample_bytree = 0.8,
-        verbose = 0
-      )
-  ),
-  tree = lrn("regr.rpart", maxdepth = 12L, cp = 1e-03),
-  featureless = lrn("regr.featureless")
-)
-auto$ctx$structure$max_features = 8L
-```
-
-```{r regr-run, results = "hide", eval = FALSE}
-auto$run()
-```
-
-```{r regr-report, eval = FALSE}
-knitr::kable(auto$report_card()[, .(gate_id, gate_name, status, summary)])
-```
-
-The effect plots focus on the housing variables that dominate the model story:
-income and coastal location.
-`ranger` keeps the global effects readable,
-while Gate 6 benchmarks it against lasso, `xgboost`, and a single tree baseline.
-
-```{r regr-g2, fig.width = 10, fig.height = 4.4, fig.alt = "ALE effects for median income and spatial coordinates", eval = FALSE}
-auto$plot("g2_effect", feature = c("median_income", "latitude", "longitude"))
-```
-
-The supporting views below add two complementary angles:
-conditional SHAP importance for the fitted tree,
-and a Rashomon rank heatmap for the near-tie models in Gate 6.
-
-```{r regr-shap-g6, fig.width = 5.8, fig.height = 4.6, out.width = "49%", fig.show = "hold", eval = FALSE}
-auto$plot("shap_importance", n_rows = 40L, sample_size = 15L, background_n = 40L, top_n = 8L)
-auto$plot("g6_rank_heatmap", top_n = 8L)
-```
-
-```{r regr-export, eval = FALSE}
-export_analysis_bundle(auto, dir = "bundle_california", prefix = "california")
-```
-
----
-
-## AutoIML gate overview
-
-This table documents the legacy compatibility interface; it is not the CSDG applicability map returned by
-`csdg_gate_plan()` or the gate registry of `csdg_gate_registry()`.
-
-| Gate | Triggered when | Evidence checks |
-|------|---------------|-----------------|
-| G0A  | always | Claim and semantics declaration; hard-stop on `causal_recourse` without identification |
-| G0B  | always | Measurement readiness; reliability / invariance evidence for high-stakes |
-| G1   | always | CV performance + calibration snapshot |
-| G2   | always | Feature dependence · ALE vs PDP selection · pairwise interaction screening |
-| G3   | `claims$decision = TRUE` | Calibration curve + Decision Curve Analysis |
-| G4   | `claims$local = TRUE` | SHAP faithfulness + perturbation sensitivity checks |
-| G5   | always | Stability of narrated patterns under bootstrap resampling |
-| G6   | high-resolution profile | Rashomon multiplicity + transport probes |
-| G7A  | `sensitive_features` set | Subgroup performance + calibration audit |
-| G7B  | user-facing + high-stakes | Human-factors (task-based evaluation) evidence |
-
-## AutoIML compatibility status
-
-The compatibility workflow uses a claim-first, gate-based architecture with
-explicit semantics, direct gate evidence, and claim-dependent gate planning.
-Default compatibility runs use the `high_resolution` profile;
-`quick_start = TRUE` is available for rapid prototyping. Report cards and
-guides retain the individual gate results and their claim-specific restrictions
-instead of reducing them to a summary evidence score.
+The earlier `AutoIML` interface remains available for compatibility. Its gate identifiers and pass/warn/fail/skip
+labels are separate from the CSDG gate registry and vocabulary. Its examples and gate overview are in
+[the legacy AutoIML article](https://stefancoors.de/mlr3autoiml/articles/legacy_autoiml.html)
+(`vignette("legacy_autoiml", package = "mlr3autoiml")`); new analyses start from the CSDG interface above.
 
 ## License
 

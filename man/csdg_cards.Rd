@@ -217,7 +217,8 @@ Unknown top-level fields supplied to \code{csdg_config()} are rejected.}
 
 \item{seed}{Master random seed.}
 
-\item{resampling, performance, dependence, calibration, faithfulness, stability, generalization, subgroup, decision, export}{Named lists that override configuration defaults.}
+\item{resampling, performance, dependence, calibration, faithfulness, stability, generalization, subgroup, decision, export}{Named lists that override configuration defaults; \code{faithfulness} holds the settings of the local-fidelity
+diagnostics (G4).}
 
 \item{criteria}{Named criterion metadata keyed by the documented configuration path.
 

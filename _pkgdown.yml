@@ -1,4 +1,4 @@
-url: https://coorsaa.github.io/mlr3autoiml
+url: https://stefancoors.de/mlr3autoiml
 template:
   bootstrap: 5
 
@@ -9,7 +9,9 @@ reference:
   - csdg_claim_revision
   - csdg_claim_relation
   - csdg_evidence_record
+  - csdg_property_status
   - csdg_adjudicate_claim
+  - csdg_claim_record_template
   - csdg_resolve_sources
   - csdg_measurement
   - csdg_explanation
@@ -96,3 +98,7 @@ articles:
   navbar: CSDG guide
   contents:
   - claim_scoped_diagnostic_gates
+- title: Legacy AutoIML workflow
+  navbar: Legacy AutoIML workflow
+  contents:
+  - legacy_autoiml

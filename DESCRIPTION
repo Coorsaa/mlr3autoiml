@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.6
+Version: 0.1.7
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -68,6 +68,6 @@ Suggests:
     xgboost
 VignetteBuilder: knitr
 Config/testthat/edition: 3
-URL: https://github.com/coorsaa/mlr3autoiml, https://github.com/mlr-org/mlr3,
-    https://mlr3.mlr-org.com
+URL: https://stefancoors.de/mlr3autoiml/, https://github.com/coorsaa/mlr3autoiml,
+    https://github.com/mlr-org/mlr3, https://mlr3.mlr-org.com
 BugReports: https://github.com/coorsaa/mlr3autoiml/issues

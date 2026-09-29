@@ -84,11 +84,12 @@ Gaussian kernel \eqn{w = \exp(-d^2 / h^2)}, where \eqn{h} is \code{kernel_width}
 
 The surrogate is a weighted ridge regression on the design matrix \code{model.matrix(~ .)} of all features (an
 intercept, numeric features, and R's default contrasts for factors and character features: treatment coding for
-unordered factors and orthogonal polynomial coding for ordered factors). Weights are rescaled to mean 1; each
-non-intercept column is centered and scaled by its weighted mean and weighted standard deviation, and columns
-without weighted variance are dropped (coefficient 0). The intercept is not penalized; every other standardized
-column receives the penalty \eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the
-number of points used for the fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
+unordered factors and polynomial contrasts, \code{contr.poly()}, for ordered factors).
+Weights are rescaled to mean 1; each non-intercept column is centered and scaled by its weighted mean and
+weighted standard deviation, and columns without weighted variance are dropped (coefficient 0).
+The intercept is not penalized; every other standardized column receives the penalty
+\eqn{\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))}, where \eqn{m} is the number of points used for the
+fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 \eqn{n_{eff} = (\sum w)^2 / \sum w^2} the Kish effective sample size of the weights. The coefficients solve
 \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.

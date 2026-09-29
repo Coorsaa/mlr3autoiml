@@ -22,7 +22,7 @@ Stateful CSDG audit runner
 \describe{
 \item{\code{task}}{An \link[mlr3:Task]{mlr3::Task}.}
 
-\item{\code{learner}}{The focal \link[mlr3:Learner]{mlr3::Learner}.}
+\item{\code{learner}}{The audited \link[mlr3:Learner]{mlr3::Learner}.}
 
 \item{\code{claim}}{A \code{CSDGClaim} object.}
 
@@ -71,7 +71,7 @@ Create a stateful CSDG audit runner.
 \describe{
 \item{\code{task}}{An \link[mlr3:Task]{mlr3::Task}.}
 
-\item{\code{learner}}{The focal \link[mlr3:Learner]{mlr3::Learner}.}
+\item{\code{learner}}{The \link[mlr3:Learner]{mlr3::Learner} to audit.}
 
 \item{\code{claim}}{A \code{CSDGClaim} object.}
 

@@ -36,7 +36,7 @@ test_that("table-oriented estimate plots preserve blue-red interval semantics", 
     q90
   )])
   focal_plot = csdg_plot_data(focal_performance, type = "performance")
-  expect_identical(levels(focal_plot$data$learner_label), "Focal model")
+  expect_identical(levels(focal_plot$data$learner_label), "Reference model")
 
   edge_performance = data.table::data.table(
     learner_id = c("xgboost", "ridge", "random_forest", "featureless"),
@@ -812,7 +812,7 @@ test_that("multiplicity and decision-curve plots use aggregate scientific tables
   )
   decision_plot = csdg_plot_data(decision, type = "decision_curve")
   expect_s3_class(decision_plot, "ggplot")
-  expect_setequal(levels(decision_plot$data$strategy), c("Focal model", "Treat all", "Treat none"))
+  expect_setequal(levels(decision_plot$data$strategy), c("Reference model", "Treat all", "Treat none"))
 
   expect_error(csdg_plot_data(bins, type = "multiplicity", bogus = TRUE), "Unknown option")
   expect_error(csdg_plot_data(bins, type = "multiplicity", base_size = 5), "not >= 6", fixed = TRUE)

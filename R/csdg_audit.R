@@ -836,7 +836,8 @@
       function(candidate) identical(candidate$id, learner$id),
       logical(1L)
     ))) {
-      learners = c(list(focal = learner), learners)
+      audited_name = if (learner$id %in% names(learners)) "audited_learner" else learner$id
+      learners = c(stats::setNames(list(learner), audited_name), learners)
     }
     primary = .resolve_primary_measure(config, task)
     rs = resampling %||% artifacts$oof$resampling
@@ -876,9 +877,9 @@
       )
     }
     artifacts$rashomon = model_evidence
-    focal = model_evidence$candidates[learner_id == learner$id]
-    focal_present = nrow(focal) > 0L
-    focal_accepted = focal_present && any(focal$accepted %in% TRUE)
+    audited = model_evidence$candidates[learner_id == learner$id]
+    learner_present = nrow(audited) > 0L
+    learner_accepted = learner_present && any(audited$accepted %in% TRUE)
     agreement = model_evidence$explanation_agreement$pairwise_top_k %||% data.table()
     median_jaccard = if (nrow(agreement)) median(agreement$jaccard, na.rm = TRUE) else NA_real_
     agreement_cutoff = config$stability$min_top_k_overlap
@@ -893,9 +894,9 @@
         .criterion_metadata(config, "stability.min_top_k_overlap")
       )
     }
-    status = if (!focal_present) {
+    status = if (!learner_present) {
       "open"
-    } else if (!focal_accepted) {
+    } else if (!learner_accepted) {
       "contradicted"
     } else {
       .criteria_status(agreement_criterion)
@@ -903,10 +904,10 @@
     new_gate_result(
       "G6a",
       status = status,
-      summary = if (!focal_present) {
-        "The focal learner was not identifiable among the model-multiplicity candidates."
-      } else if (!focal_accepted) {
-        "The focal learner was outside the prespecified near-equivalence set."
+      summary = if (!learner_present) {
+        "The audited learner was not identifiable among the similarly accurate candidate models."
+      } else if (!learner_accepted) {
+        "The audited learner was outside the prespecified set of similarly accurate models."
       } else if (!is.finite(median_jaccard)) {
         "Fewer than two accepted models were available for explanation comparison."
       } else if (is.null(agreement_cutoff)) {
@@ -925,9 +926,10 @@
         rashomon_reference_learner = config$generalization$rashomon_reference_learner,
         minimum_median_jaccard = config$stability$min_top_k_overlap
       ),
+      # The diagnostic field names are kept for compatibility with earlier versions.
       diagnostics = list(
-        focal_present = focal_present,
-        focal_accepted = focal_accepted,
+        focal_present = learner_present,
+        focal_accepted = learner_accepted,
         median_jaccard = median_jaccard
       ),
       limitations = c(
@@ -1244,7 +1246,7 @@ CSDGAudit = R6::R6Class(
     task = NULL,
 
     #' @field learner
-    #' The focal [mlr3::Learner].
+    #' The audited [mlr3::Learner].
     learner = NULL,
 
     #' @field claim
@@ -1275,7 +1277,7 @@ CSDGAudit = R6::R6Class(
     #' Create a stateful CSDG audit runner.
     #'
     #' @param task An [mlr3::Task].
-    #' @param learner The focal [mlr3::Learner].
+    #' @param learner The [mlr3::Learner] to audit.
     #' @param claim A `CSDGClaim` object.
     #' @param measurement A `CSDGMeasurement` object.
     #' @param explanation A `CSDGExplanation` object or `NULL`.

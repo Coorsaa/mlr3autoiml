@@ -414,10 +414,11 @@ test_that("model generalization cannot pass when the focal learner is outside to
 
   expect_equal(result$gates$G6a$status, "contradicted")
   expect_false(result$gates$G6a$diagnostics$focal_accepted)
-  expect_match(result$gates$G6a$summary, "focal learner was outside")
+  expect_match(result$gates$G6a$summary, "audited learner was outside")
   expect_true(any(
     result$gates$G6a$evidence$model_generalization$candidates$learner_id == focal$id
   ))
+  expect_true(focal$id %in% result$gates$G6a$evidence$model_generalization$candidates$learner_name)
 })
 
 test_that("default export removes task, learner, models, and predictions", {

@@ -48,6 +48,9 @@ Model A is `f_A(x) = x1` and model B is `f_B(x) = x2`, both defined for all inpu
 
 > **Under marginal permutation, both models rely more on item 1 than on item 2.**
 
+Reliance is measured by held-out permutation feature importance (PFI): the increase in expected squared error when
+one item is permuted.
+
 The record states that the claim was written before the values were computed (specified in advance).
 
 ## Step 2: Specify the scope
@@ -146,8 +149,8 @@ stopifnot(marginal[model == "A", item_1 > item_2], marginal[model == "B", item_1
 
 The Monte Carlo rule decides whether a difference is beyond the error due to random permutation: its absolute value
 must exceed the .975 quantile of the t distribution with R - 1 degrees of freedom times its Monte Carlo standard
-error, where R is the number of permutations. This rule screens out permutation noise, not sampling uncertainty. In
-model A, the difference between the items exceeds it in every fold. The corrected resampled t interval of the
+error, where R is the number of permutations. This rule addresses permutation noise; the interval below describes
+sampling uncertainty. In model A, the difference between the items exceeds it in every fold. The corrected resampled t interval of the
 learner-level mean difference is reported descriptively.
 
 ```{r monte-carlo}
@@ -175,7 +178,8 @@ stopifnot(all(abs(as.matrix(conditional_table[, .(item_1, item_2)])) < 1e-12))
 
 For each required property, the record contains four entries: the property, the criterion that decides whether it
 holds, the observation, and its relevance. Judged against its criterion, each required property is supported,
-contradicted, or open.
+contradicted, or open; `supported()`, `contradicted()`, and `open_status()` return these statuses.
+`csdg_claim_record_template()` returns the blank claim record of the article with all its fields.
 
 ```{r evidence-supported}
 property = function(gate_id, status, required_property, observation, relevance, criterion = NULL) {
@@ -203,8 +207,8 @@ foundation = list(
 ```
 
 The decisive property is G6a: only the model differs between the two computations, the claim covers both models, and
-model B reverses the ordering. The status records the researcher's judgment under the criterion; the package does not
-infer it from the numbers.
+model B reverses the ordering. The status records the researcher's judgment: the researcher applies the criterion to
+the numbers.
 
 ```{r evidence-both}
 g6a = property("G6a", "contradicted", "Item 1 has the larger marginal PFI in A and in B.",
@@ -257,7 +261,7 @@ The revised claim is met (exploratory) and retained. Narrowing a claim can reuse
 The record compares the revised claim with its predecessor in two ways: for each scope element, whether the new scope
 is the same, narrower, broader, or incomparable; and, separately, whether the revised claim follows from its
 predecessor. Here it does: a claim about both models is universal, so it implies the claim about model A (a logical
-weakening). The package stores this argument; it does not prove it.
+weakening). The package records this argument as the researcher states it.
 
 ```{r relation}
 relation = csdg_claim_relation(
@@ -272,8 +276,7 @@ relation = csdg_claim_relation(
 knitr::kable(relation$scope)
 ```
 
-A met claim holds relative to the listed required properties; it is not a certificate that every relevant property
-was identified.
+The assessment of a met claim refers to the required properties listed in its record.
 
 ## An unresolved claim: an unresolved threat
 
@@ -352,8 +355,8 @@ A model description of the same learner, "The logistic regression learner relies
 requires G2 and G5;
 held-out performance is context, and the predictor selection bears on it only through performance, which this claim
 does not interpret. The audit computes the diagnostics: dependence and observed support for G2, and held-out PFI in
-every fold for G5. It cannot judge whether the procedure computes the quantity that the claim names, so G2 stays open
-until the researcher records it.
+every fold for G5. Whether the procedure computes the quantity that the claim names is recorded by the researcher;
+until then, G2 is open.
 
 ```{r mlr3-audit}
 claim_relies = csdg_claim(
@@ -432,10 +435,9 @@ stopifnot(
 
 ## Export, reload, and verify
 
-The audit bundle contains the claim report of the audit claim, now assessed by the decision rule from the audit
-diagnostics alone: without the researcher's records, G2 and G5 are open, so the claim is unresolved. The explicit assessments of all four claims, with the researcher's
-records, are written next to the bundle, not into it, so the bundle's checksum manifest stays valid; a receipt names
-the file, its SHA-256 checksum, the bundle, and all claim identifiers.
+The audit bundle contains the claim report of the audit claim, assessed by the decision rule from the audit
+diagnostics alone: without the researcher's records, G2 and G5 are open, so the claim is unresolved. The assessments
+of all four claims, with the researcher's records, are written to a separate file next to the bundle and read back.
 
 ```{r export}
 export_root = tempfile("csdg_walkthrough_")
@@ -454,20 +456,13 @@ explicit = list(
 )
 assessment_path = file.path(export_root, "explicit_assessments.json")
 jsonlite::write_json(explicit, assessment_path, auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null")
-receipt = list(
-  assessment_file = basename(assessment_path),
-  assessment_sha256 = digest::digest(file = assessment_path, algo = "sha256"),
-  audit_bundle = basename(audit_bundle),
-  claim_ids = c(claim_both$id, claim_a$id, claim_predict$id, claim_relies$id)
-)
-jsonlite::write_json(receipt, file.path(export_root, "receipt.json"), auto_unbox = TRUE, pretty = TRUE)
 read_back = jsonlite::read_json(assessment_path)
-read_receipt = jsonlite::read_json(file.path(export_root, "receipt.json"))
 bundle_report = read.csv(file.path(audit_bundle, "claim_report.csv"))
-stopifnot(identical(vapply(read_back$claims, `[[`, character(1L), "id"), receipt$claim_ids),
+stopifnot(
+  identical(vapply(read_back$claims, `[[`, character(1L), "id"),
+    c(claim_both$id, claim_a$id, claim_predict$id, claim_relies$id)),
   identical(unlist(read_back$assessments), c("not_met", "met", "unresolved", "met")),
   identical(unlist(read_back$decisions), c("revise", "retain", "withhold", "retain")),
-  identical(read_receipt$assessment_sha256, digest::digest(file = assessment_path, algo = "sha256")),
   identical(bundle_report$assessment, "unresolved"), identical(bundle_report$open_gates, "G2, G5"))
 cat("Export and read-back verified for all four claims.\n")
 # A caller can retain this synthetic-only bundle without changing the tutorial.

@@ -1,3 +1,27 @@
+# mlr3autoiml 0.1.7
+
+This is a documentation release; the computations and the decision rule are unchanged.
+
+* New `supported()`, `contradicted()`, and `open_status()` return the three statuses of a required property, checked
+  against the vocabulary of the package. The open status is `open_status()`, not `open()`, so that `base::open()` is
+  not masked.
+* New `csdg_claim_record_template()` returns the blank claim record of the article (Supplement B) as a data table
+  with one row per field and the corresponding package functions; the template is stored in
+  `inst/templates/claim_record_template.csv`.
+* The CSDG documentation, the G6a summaries of `csdg_audit()`, and plot labels use the vocabulary of the article:
+  the audited learner and the reference model instead of "focal", and local fidelity instead of "faithfulness" (for
+  example in `?csdg_explanation_sensitivity` and `?Gate4Faithfulness`; the legacy AutoIML workflow keeps its gate
+  names); `?csdg_diagnostics` names the coding of ordered
+  factors in the local surrogate as polynomial contrasts (`contr.poly()`). Function, argument,
+  column, and diagnostic names are unchanged, including `focal_learner`, the `*_vs_focal` columns, and the G6a
+  diagnostics `focal_present` and `focal_accepted`. When `candidate_learners` are named and do not contain the
+  audited learner, `csdg_audit()` adds it under its id instead of the name `"focal"`.
+* The README is organized for applied users (purpose, installation, quick start with the numerical example, and links
+  to the walkthrough and the reference on the package website, https://stefancoors.de/mlr3autoiml/). The examples of
+  the legacy `AutoIML` workflow moved to the new vignette `vignette("legacy_autoiml")`.
+* The CSDG walkthrough no longer writes a checksum receipt for the exported assessments, and its statements of scope
+  are phrased directly.
+
 # mlr3autoiml 0.1.6
 
 This release aligns the package with the vocabulary and rules of the accompanying article. Old labels and argument

@@ -169,7 +169,7 @@
   assert_flag(include_zero)
   summary[, `:=`(
     learner_label = if (is.null(learner_column)) {
-      "Focal model"
+      "Reference model"
     } else if (is.null(learner_labels)) {
       .csdg_plot_model_labels(get(learner_column))
     } else {
@@ -1950,7 +1950,7 @@
     ) +
     labs(
       x = .csdg_plot_data_option(options, "x_label", "Performance tolerance consumed"),
-      y = .csdg_plot_data_option(options, "y_label", "Rank reversals versus focal model"),
+      y = .csdg_plot_data_option(options, "y_label", "Rank reversals versus reference model"),
       title = title,
       subtitle = subtitle,
       caption = .csdg_plot_data_option(options, "caption")
@@ -2556,14 +2556,14 @@
   long[, strategy := factor(
     strategy,
     levels = c("net_benefit_model", "net_benefit_treat_all", "net_benefit_treat_none"),
-    labels = c("Focal model", "Treat all", "Treat none")
+    labels = c("Reference model", "Treat all", "Treat none")
   )]
   palette = .csdg_plot_data_palette(options)
   strategy_colors = if (.csdg_plot_data_is_monochrome(options)) {
     setNames(rep("#111111", 3L), levels(long$strategy))
   } else {
     c(
-      "Focal model" = palette$metric[["secondary"]],
+      "Reference model" = palette$metric[["secondary"]],
       "Treat all" = palette$metric[["primary"]],
       "Treat none" = "grey45"
     )
@@ -2642,8 +2642,9 @@
 #'   `y_limits`, `caption`, and `display`.
 #'   Set `display = "aligned"` for an aligned dot display, or `display = "diverging"` for opposing bars of
 #'   performance-tolerance consumption and PFI pair-order reversals on a common proportion scale.
-#'   Both displays also accept `include_focal`, `reference_learner`, and `learner_order`; the diverging display accepts
-#'   `bar_width` between 0.05 and 0.9.
+#'   Both displays also accept `reference_learner` (the learner with which the others are compared),
+#'   `include_focal` (whether to show the reference learner itself; default `TRUE`), and `learner_order`;
+#'   the diverging display accepts `bar_width` between 0.05 and 0.9.
 #'   In the color style, group colors may be named by original group IDs or by uniquely mapped group labels.
 #'   The monochrome style uses black shapes instead.
 #'

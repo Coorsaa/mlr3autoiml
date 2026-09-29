@@ -1,7 +1,7 @@
 #' Quantify explanation sensitivity across near-equivalent models
 #'
 #' Compares the performance and complete feature-group ranking of each accepted model with an explicitly selected
-#' focal model.
+#' reference learner.
 #' The calculation is descriptive: it does not construct confidence intervals or perform hypothesis tests.
 #'
 #' `importance_ranks` is a stable tabular interface so that ranks from any compatible importance method can be used.
@@ -13,18 +13,22 @@
 #' @param importance_ranks A data frame with one row per learner and feature group and columns `learner_name`,
 #'   `feature_group`, and `rank`.
 #'   Within each learner, `rank` must be a complete average-rank ordering; fractional ranks therefore represent ties.
-#' @param focal_learner Name of the accepted learner used as the comparison reference.
+#' @param focal_learner Name of the reference learner: the accepted learner with which the others are compared.
 #' @param top_k Number of top-ranked feature groups used for Jaccard similarity.
 #'   Ties at the cutoff are resolved by feature-group name to keep the selected set deterministic.
 #' @return A data table with one row per accepted learner.
-#'   Raw performance difference is the candidate score minus the focal score.
-#'   Direction-adjusted performance difference is positive when the candidate performs worse than the focal model.
-#'   Two tolerance fractions distinguish distance from the best score from deterioration relative to the focal score.
+#'   Raw performance difference is the candidate score minus the score of the reference learner.
+#'   Direction-adjusted performance difference is positive when the candidate performs worse than the reference
+#'   learner.
+#'   Two tolerance fractions distinguish distance from the best score from deterioration relative to the reference
+#'   learner.
 #'   Kendall's tau-b, strict reversals among all feature-group pairs, and top-k Jaccard similarity compare each
-#'   candidate ranking with the focal ranking.
+#'   candidate ranking with the ranking of the reference learner.
+#'   Columns whose names end in `_from_focal` or `_vs_focal` refer to the reference learner; the names are kept for
+#'   compatibility with earlier versions.
 #' @examples
 #' candidates = data.frame(
-#'   learner_name = c("focal", "alternative"),
+#'   learner_name = c("reference", "alternative"),
 #'   accepted = c(TRUE, TRUE),
 #'   mean_score = c(1.00, 1.05),
 #'   primary_measure = "regr.rmse",
@@ -34,11 +38,11 @@
 #'   distance_from_best = c(0, 0.05)
 #' )
 #' ranks = data.frame(
-#'   learner_name = rep(c("focal", "alternative"), each = 3L),
+#'   learner_name = rep(c("reference", "alternative"), each = 3L),
 #'   feature_group = rep(c("a", "b", "c"), 2L),
 #'   rank = c(1, 2, 3, 1, 3, 2)
 #' )
-#' csdg_explanation_sensitivity(candidates, ranks, focal_learner = "focal", top_k = 2L)
+#' csdg_explanation_sensitivity(candidates, ranks, focal_learner = "reference", top_k = 2L)
 #' @export
 csdg_explanation_sensitivity = function(
     rashomon,
@@ -209,7 +213,7 @@ csdg_explanation_sensitivity = function(
   focal_features = sort(focal_ranks$feature_group)
   n_features = length(focal_features)
   if (!n_features) {
-    .csdg_stop("`importance_ranks` contains no feature groups for the focal learner.")
+    .csdg_stop("`importance_ranks` contains no feature groups for the reference learner.")
   }
   focal_rank = focal_ranks$rank[match(focal_features, focal_ranks$feature_group)]
 
@@ -221,7 +225,7 @@ csdg_explanation_sensitivity = function(
   ]
   if (length(inconsistent_learners)) {
     .csdg_stop(
-      "Every accepted learner must rank the same feature groups as the focal learner; inconsistent learners: %s.",
+      "Every accepted learner must rank the same feature groups as the reference learner; inconsistent learners: %s.",
       paste(inconsistent_learners, collapse = ", ")
     )
   }

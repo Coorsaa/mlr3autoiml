@@ -28,7 +28,7 @@ csdg_audit(
 \arguments{
 \item{task}{An \link[mlr3:Task]{mlr3::Task}.}
 
-\item{learner}{Focal learner with preprocessing embedded in its pipeline.}
+\item{learner}{The \link[mlr3:Learner]{mlr3::Learner} to audit, with preprocessing embedded in its pipeline.}
 
 \item{claim}{A \code{CSDGClaim} object.}
 

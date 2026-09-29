@@ -1,6 +1,6 @@
 # FILE: R/gate_04_faithfulness.R
 
-#' @title Gate 4: Faithfulness (Surrogates, Local Accuracy, Local Interactions)
+#' @title Gate 4: Local Fidelity (Surrogates, Local Accuracy, Local Interactions)
 #'
 #' @description
 #' Screens whether the model's behavior is reasonably captured by:
@@ -9,9 +9,9 @@
 #'   \item Additive, case-level attributions (SHAP local accuracy checks)
 #' }
 #'
-#' The gate intentionally keeps diagnostics lightweight; it is not a proof of
-#' faithfulness. If strong interactions or heterogeneous effects are present,
-#' prefer region-wise explanations and interaction-aware tools.
+#' The gate computes lightweight screening diagnostics of local fidelity.
+#' If strong interactions or heterogeneous effects are present,
+#' region-wise explanations and interaction-aware tools describe the model more accurately.
 #'
 #' @section Modes:
 #' SHAP mode defaults to conditional (on-manifold) for within_support semantics

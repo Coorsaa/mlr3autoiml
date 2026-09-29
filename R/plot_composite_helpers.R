@@ -31,7 +31,7 @@ NULL
 .autoiml_distinct_linetypes = c(1L, 2L, 3L, 4L, 5L, 6L)
 .autoiml_quantile_shapes = c(p50 = 16L, p90 = 17L, p95 = 15L)
 .autoiml_quantile_linetypes = c(p50 = 2L, p90 = 3L, p95 = 4L)
-.autoiml_decision_linetypes = c("Focal model" = 1L, "Treat all" = 2L, "Treat none" = 3L)
+.autoiml_decision_linetypes = c("Reference model" = 1L, "Treat all" = 2L, "Treat none" = 3L)
 
 .autoiml_named_plot_values = function(levels, values) {
   setNames(rep(values, length.out = length(levels)), levels)
