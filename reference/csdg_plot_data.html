@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,6 +21,9 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
+    <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -112,8 +115,9 @@ Multi-group inputs must provide one status for every group-by-gate combination.<
 <code>y_limits</code>, <code>caption</code>, and <code>display</code>.
 Set <code>display = "aligned"</code> for an aligned dot display, or <code>display = "diverging"</code> for opposing bars of
 performance-tolerance consumption and PFI pair-order reversals on a common proportion scale.
-Both displays also accept <code>include_focal</code>, <code>reference_learner</code>, and <code>learner_order</code>; the diverging display accepts
-<code>bar_width</code> between 0.05 and 0.9.
+Both displays also accept <code>reference_learner</code> (the learner with which the others are compared),
+<code>include_focal</code> (whether to show the reference learner itself; default <code>TRUE</code>), and <code>learner_order</code>;
+the diverging display accepts <code>bar_width</code> between 0.05 and 0.9.
 In the color style, group colors may be named by original group IDs or by uniquely mapped group labels.
 The monochrome style uses black shapes instead.</p>
 <p><code>ale</code> draws a pointwise uncertainty ribbon when the input contains both <code>ale_lower</code> and <code>ale_upper</code>.

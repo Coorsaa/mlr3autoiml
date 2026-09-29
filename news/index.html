@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -21,6 +21,9 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
+    <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
   </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -38,6 +41,15 @@
       <small>Source: <a href="https://github.com/coorsaa/mlr3autoiml/blob/HEAD/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.7" id="mlr3autoiml-017">mlr3autoiml 0.1.7<a class="anchor" aria-label="anchor" href="#mlr3autoiml-017"></a></h2>
+<p>This is a documentation release; the computations and the decision rule are unchanged.</p>
+<ul><li>New <code><a href="../reference/csdg_property_status.html">supported()</a></code>, <code><a href="../reference/csdg_property_status.html">contradicted()</a></code>, and <code><a href="../reference/csdg_property_status.html">open_status()</a></code> return the three statuses of a required property, checked against the vocabulary of the package. The open status is <code><a href="../reference/csdg_property_status.html">open_status()</a></code>, not <code><a href="https://rdrr.io/r/base/connections.html" class="external-link">open()</a></code>, so that <code><a href="https://rdrr.io/r/base/connections.html" class="external-link">base::open()</a></code> is not masked.</li>
+<li>New <code><a href="../reference/csdg_claim_record_template.html">csdg_claim_record_template()</a></code> returns the blank claim record of the article (Supplement B) as a data table with one row per field and the corresponding package functions; the template is stored in <code>inst/templates/claim_record_template.csv</code>.</li>
+<li>The CSDG documentation, the G6a summaries of <code><a href="../reference/csdg_audit.html">csdg_audit()</a></code>, and plot labels use the vocabulary of the article: the audited learner and the reference model instead of “focal”, and local fidelity instead of “faithfulness” (for example in <code><a href="../reference/csdg_explanation_sensitivity.html">?csdg_explanation_sensitivity</a></code> and <code><a href="../reference/Gate4Faithfulness.html">?Gate4Faithfulness</a></code>; the legacy AutoIML workflow keeps its gate names); <code><a href="../reference/csdg_diagnostics.html">?csdg_diagnostics</a></code> names the coding of ordered factors in the local surrogate as polynomial contrasts (<code><a href="https://rdrr.io/r/stats/contrast.html" class="external-link">contr.poly()</a></code>). Function, argument, column, and diagnostic names are unchanged, including <code>focal_learner</code>, the <code>*_vs_focal</code> columns, and the G6a diagnostics <code>focal_present</code> and <code>focal_accepted</code>. When <code>candidate_learners</code> are named and do not contain the audited learner, <code><a href="../reference/csdg_audit.html">csdg_audit()</a></code> adds it under its id instead of the name <code>"focal"</code>.</li>
+<li>The README is organized for applied users (purpose, installation, quick start with the numerical example, and links to the walkthrough and the reference on the package website, <a href="https://stefancoors.de/mlr3autoiml/" class="uri">https://stefancoors.de/mlr3autoiml/</a>). The examples of the legacy <code>AutoIML</code> workflow moved to the new vignette <code><a href="../articles/legacy_autoiml.html">vignette("legacy_autoiml")</a></code>.</li>
+<li>The CSDG walkthrough no longer writes a checksum receipt for the exported assessments, and its statements of scope are phrased directly.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.1.6" id="mlr3autoiml-016">mlr3autoiml 0.1.6<a class="anchor" aria-label="anchor" href="#mlr3autoiml-016"></a></h2>
 <p>This release aligns the package with the vocabulary and rules of the accompanying article. Old labels and argument values still work with a deprecation warning (class <code>mlr3autoiml_deprecated</code>, once per session); see <code>inst/MIGRATION_0_1_6.md</code>.</p>

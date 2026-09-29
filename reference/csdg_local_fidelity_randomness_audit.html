@@ -15,7 +15,7 @@ The section "Local surrogate" states exactly what is fitted.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -29,6 +29,9 @@ The section "Local surrogate" states exactly what is fitted.'></head><body>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
+    <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
   </ul></li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
@@ -154,11 +157,12 @@ standard deviation; for other features, 0 if equal to the case value and 1 other
 Gaussian kernel \(w = \exp(-d^2 / h^2)\), where \(h\) is <code>kernel_width</code> (default 0.75); the case has weight 1.</p>
 <p>The surrogate is a weighted ridge regression on the design matrix <code>model.matrix(~ .)</code> of all features (an
 intercept, numeric features, and R's default contrasts for factors and character features: treatment coding for
-unordered factors and orthogonal polynomial coding for ordered factors). Weights are rescaled to mean 1; each
-non-intercept column is centered and scaled by its weighted mean and weighted standard deviation, and columns
-without weighted variance are dropped (coefficient 0). The intercept is not penalized; every other standardized
-column receives the penalty \(\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))\), where \(m\) is the
-number of points used for the fit, \(a\) the number of non-constant design columns (intercept excluded), and
+unordered factors and polynomial contrasts, <code><a href="https://rdrr.io/r/stats/contrast.html" class="external-link">contr.poly()</a></code>, for ordered factors).
+Weights are rescaled to mean 1; each non-intercept column is centered and scaled by its weighted mean and
+weighted standard deviation, and columns without weighted variance are dropped (coefficient 0).
+The intercept is not penalized; every other standardized column receives the penalty
+\(\lambda = m \max(10^{-4}, 0.01 a / \max(n_{eff}, 1))\), where \(m\) is the number of points used for the
+fit, \(a\) the number of non-constant design columns (intercept excluded), and
 \(n_{eff} = (\sum w)^2 / \sum w^2\) the Kish effective sample size of the weights. The coefficients solve
 \((X^\top W X + \Lambda) b = X^\top W y\) and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.</p>

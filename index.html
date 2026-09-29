@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -38,6 +38,9 @@
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
     <li><a class="dropdown-item" href="articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
+    <li><a class="dropdown-item" href="articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
@@ -57,7 +60,19 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="mlr3autoiml">mlr3autoiml<a class="anchor" aria-label="anchor" href="#mlr3autoiml"></a>
 </h1></div>
-<p><code>mlr3autoiml</code> implements <strong>Claim-Scoped Diagnostic Gates (CSDG)</strong> for the <strong>mlr3 ecosystem</strong>. CSDG replaces the question “What does this explanation show?” with “Does the evidence support this claim?” Its workflow has five steps: write the claim, the conclusion you intend to report (<code><a href="reference/csdg_cards.html">csdg_claim()</a></code>); specify its scope in six elements, the quantity, model, procedure, data, meaning, and use; derive the properties the claim requires from the 12 gates (<code><a href="reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>, <code><a href="reference/csdg_gate_plan.html">csdg_gate_plan()</a></code>); evaluate the evidence on each required property (<code><a href="reference/csdg_evidence_record.html">csdg_evidence_record()</a></code>, with diagnostics from <code><a href="reference/csdg_audit.html">csdg_audit()</a></code>); and decide and report with a fixed rule (<code><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim()</a></code>).</p>
+<p><code>mlr3autoiml</code> helps researchers decide whether the evidence supports a conclusion that they draw from an explanation of a machine learning model, such as “the model relies mainly on self-rated health.” It implements <strong>Claim-Scoped Diagnostic Gates (CSDG)</strong> for the <strong>mlr3 ecosystem</strong> in five steps:</p>
+<ol style="list-style-type: decimal">
+<li>
+<strong>Write the claim</strong>, the conclusion you intend to report (<code><a href="reference/csdg_cards.html">csdg_claim()</a></code>).</li>
+<li>
+<strong>Specify its scope</strong> in six elements: the quantity, model, procedure, data, meaning, and use.</li>
+<li>
+<strong>Derive the required properties</strong> from the 12 gates (<code><a href="reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>, <code><a href="reference/csdg_gate_plan.html">csdg_gate_plan()</a></code>).</li>
+<li>
+<strong>Evaluate the evidence</strong> on each required property (<code><a href="reference/csdg_evidence_record.html">csdg_evidence_record()</a></code>, with diagnostics from <code><a href="reference/csdg_audit.html">csdg_audit()</a></code>).</li>
+<li>
+<strong>Decide and report</strong> with a fixed rule (<code><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim()</a></code>).</li>
+</ol>
 <p>The package records the claim and its scope, derives the gate plan, computes diagnostics, and applies the decision rule. The researcher sets the criteria, states the relevance of each observation, and enters established counterevidence and unresolved threats. Favorable results never offset a contradicted property, and no aggregate score is computed.</p>
 <table class="table">
 <colgroup>
@@ -91,26 +106,24 @@
 </tr>
 </tbody>
 </table>
-<p>Start with <strong><a href="vignettes/claim_scoped_diagnostic_gates.Rmd">the complete walkthrough</a></strong> (<code><a href="articles/claim_scoped_diagnostic_gates.html">vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")</a></code>), which follows the five steps with the numerical example of the accompanying article. Version 0.1.6 uses the vocabulary of the article; labels of earlier versions still work with a deprecation warning (see <a href="inst/MIGRATION_0_1_6.html">the migration note</a>).</p>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
 <p>Install the current version from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"coorsaa/mlr3autoiml"</span>, build_vignettes <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/coorsaa/mlr3autoiml" class="external-link">mlr3autoiml</a></span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/vignette.html" class="external-link">vignette</a></span><span class="op">(</span><span class="st">"claim_scoped_diagnostic_gates"</span>, package <span class="op">=</span> <span class="st">"mlr3autoiml"</span><span class="op">)</span></span></code></pre></div>
-<p>Released versions are tagged, for example <code>remotes::install_github("coorsaa/mlr3autoiml@v0.1.6")</code>. Version 0.1.0 produced the primary analyses of the accompanying article.</p>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span></code></pre></div>
+<p>Released versions are tagged, for example <code>remotes::install_github("coorsaa/mlr3autoiml@v0.1.7")</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="quick-start-the-numerical-example-of-the-article">Quick start: the numerical example of the article<a class="anchor" aria-label="anchor" href="#quick-start-the-numerical-example-of-the-article"></a>
 </h2>
-<p>Two items carry the same information: <code>Z</code> is standard normal, and both items and the outcome equal <code>Z</code>. Model A predicts with item 1 and model B with item 2 (<code>f_A(x) = x1</code>, <code>f_B(x) = x2</code>); because the outcome equals each item, the linear fit in every fold is exact. The held-out PFI with squared error is computed with the package.</p>
+<p>Two items carry the same information: <code>Z</code> is standard normal, and both items and the outcome equal <code>Z</code>. Model A predicts with item 1 and model B with item 2 (<code>f_A(x) = x1</code>, <code>f_B(x) = x2</code>); because the outcome equals each item, the linear fit in every fold is exact. The package computes the held-out permutation feature importance (PFI) with squared error.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3.mlr-org.com" class="external-link">mlr3</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3learners.mlr-org.com" class="external-link">mlr3learners</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3pipelines.mlr-org.com" class="external-link">mlr3pipelines</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/coorsaa/mlr3autoiml" class="external-link">mlr3autoiml</a></span><span class="op">)</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">20260926</span><span class="op">)</span></span>
@@ -262,233 +275,32 @@
 <p>The revised claim is met (exploratory; it was written after the results were seen) and retained.</p>
 </div>
 <div class="section level2">
-<h2 id="diagnostics-in-an-mlr3-workflow">Diagnostics in an mlr3 workflow<a class="anchor" aria-label="anchor" href="#diagnostics-in-an-mlr3-workflow"></a>
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
-<p><code><a href="reference/csdg_audit.html">csdg_audit()</a></code> derives the gate plan and computes the diagnostics of an mlr3 learner: held-out performance, dependence and support, calibration, decision curves, cross-fitted local fidelity, stability of held-out PFI, comparisons with similarly accurate models, leave-one-setting-out refits, and subgroup results. <code><a href="reference/csdg_reporting.html">csdg_report_card()</a></code> lists the gates with the status of each required property (a gate that the claim does not require is reported as context, without a property status), and <code><a href="reference/csdg_reporting.html">csdg_claim_report()</a></code> applies the decision rule to the audit and to evidence records that the researcher supplies. <code><a href="reference/csdg_learner_pfi_interval.html">csdg_learner_pfi_interval()</a></code> computes the corrected resampled interval of a learner-level mean across folds, and <code><a href="reference/csdg_pfi_mc_difference.html">csdg_pfi_mc_difference()</a></code> applies the Monte Carlo rule. <code><a href="reference/csdg_local_fidelity_audit.html">csdg_local_fidelity_audit()</a></code> evaluates local surrogates on points not used to fit them (the fitted surrogate is described in <code><a href="reference/csdg_diagnostics.html">?csdg_diagnostics</a></code>, section “Local surrogate”). A numerical criterion needs a source and a rationale: for example, <code>performance = list(maximum_primary_score = value)</code> must be accompanied by <code>criteria = list(performance.maximum_primary_score = list(source = source, rationale = rationale))</code>; without them, the property remains open. <code><a href="reference/csdg_generalization.html">csdg_rashomon()</a></code> likewise returns candidate performance without an accepted set unless a tolerance with its source and rationale is supplied.</p>
+<ul>
+<li>
+<strong><a href="https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html">The CSDG walkthrough</a></strong> (<code><a href="articles/claim_scoped_diagnostic_gates.html">vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")</a></code>) follows the five steps with the numerical example, an unresolved claim with an unresolved threat, and a met claim assessed with <code><a href="reference/csdg_audit.html">csdg_audit()</a></code>.</li>
+<li>
+<strong><a href="https://stefancoors.de/mlr3autoiml/reference/index.html">The function reference</a></strong> documents every function, including the diagnostics of <code><a href="reference/csdg_audit.html">csdg_audit()</a></code> and the local surrogate described in <code><a href="reference/csdg_diagnostics.html">?csdg_diagnostics</a></code>.</li>
+<li>
+<code><a href="reference/csdg_claim_record_template.html">csdg_claim_record_template()</a></code> returns the blank claim record of the article as a table to fill in, and <code><a href="reference/csdg_property_status.html">supported()</a></code>, <code><a href="reference/csdg_property_status.html">contradicted()</a></code>, and <code><a href="reference/csdg_property_status.html">open_status()</a></code> return the three property statuses.</li>
+<li>Labels of versions before 0.1.6 still work with a deprecation warning; see <a href="https://github.com/coorsaa/mlr3autoiml/blob/main/inst/MIGRATION_0_1_6.md" class="external-link">the migration note</a> and <a href="https://stefancoors.de/mlr3autoiml/news/index.html">the changelog</a>.</li>
+</ul>
 </div>
 <div class="section level2">
-<h2 id="package-and-study-script-boundary">Package and study-script boundary<a class="anchor" aria-label="anchor" href="#package-and-study-script-boundary"></a>
+<h2 id="diagnostics-in-an-mlr3-workflow">Diagnostics in an mlr3 workflow<a class="anchor" aria-label="anchor" href="#diagnostics-in-an-mlr3-workflow"></a>
 </h2>
-<p>The package owns reusable claim and evidence records, the gate plan, resampling, permutation importance, calibration, ALE bootstrap, local-fidelity audits, importance agreement, matched-setting utilities, plotting, reporting, and provenance. Study-specific equal-country sampling, plausible-value loops, SHILD and PISA orchestration, country exclusion schedules, matched-control scheduling, and manuscript synthesis remain in the analysis scripts, which are kept in a separate repository. No single package call reproduces either complete empirical study.</p>
-<p>Keep <code>output_dir = NULL</code> while inspecting an audit, and export to a dedicated directory when it is ready. By default, <code><a href="reference/csdg_reporting.html">csdg_export()</a></code> omits fitted models and observation-level predictions. This is not a privacy or licensing clearance: review the generated bundle before sharing it, and set <code>include_models = TRUE</code> or <code>include_predictions = TRUE</code> only when its release is explicitly approved.</p>
-<hr>
+<p><code><a href="reference/csdg_audit.html">csdg_audit()</a></code> derives the gate plan and computes the diagnostics of an mlr3 learner: held-out performance, dependence and support, calibration, decision curves, cross-fitted local fidelity, stability of held-out PFI, comparisons with similarly accurate models, leave-one-setting-out refits, and subgroup results. <code><a href="reference/csdg_reporting.html">csdg_report_card()</a></code> lists the gates with the status of each required property, and <code><a href="reference/csdg_reporting.html">csdg_claim_report()</a></code> applies the decision rule to the audit and to evidence records that the researcher supplies. A numerical criterion needs a source and a rationale; without them, the property remains open. By default, <code><a href="reference/csdg_reporting.html">csdg_export()</a></code> omits fitted models and observation-level predictions; review the generated bundle before sharing it.</p>
+</div>
+<div class="section level2">
+<h2 id="the-accompanying-article">The accompanying article<a class="anchor" aria-label="anchor" href="#the-accompanying-article"></a>
+</h2>
+<p>Version 0.1.0 produced the primary analyses of the accompanying article. The scripts of its two empirical applications are kept in a separate analysis repository.</p>
 </div>
 <div class="section level2">
 <h2 id="legacy-autoiml-workflow">Legacy AutoIML workflow<a class="anchor" aria-label="anchor" href="#legacy-autoiml-workflow"></a>
 </h2>
-<p>The examples in this section are not evaluated when this README is rendered. The <code>AutoIML</code> interface is the earlier workflow of the package; its gate identifiers (G0A to G7B, with combined G3 and G6) and its pass/warn/fail/skip labels are not the CSDG gate registry (<code><a href="reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>) or the CSDG vocabulary.</p>
-<p>The earlier <code>AutoIML</code> interface remains available for compatibility. Its <code>GateResult</code> pass/warn/fail/skip labels are heuristic workflow diagnostics, not CSDG evidence roles or claim decisions. Printing a legacy <code>GateResult</code> emits a targeted deprecation warning. The examples below demonstrate that workflow; new analyses should start from the CSDG interface shown above.</p>
-<div class="section level3">
-<h3 id="example-1--classification--decision-support">Example 1 — Classification · decision support<a class="anchor" aria-label="anchor" href="#example-1--classification--decision-support"></a>
-</h3>
-<p><strong>Task:</strong> <code>german_credit</code> (1 000 rows, 20 mixed-type features, binary <code>credit_risk</code>). Full compatibility-gate path including combined G3 calibration and decision utility and G7A subgroup audit.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3.mlr-org.com" class="external-link">mlr3</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/coorsaa/mlr3autoiml" class="external-link">mlr3autoiml</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3learners.mlr-org.com" class="external-link">mlr3learners</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3pipelines.mlr-org.com" class="external-link">mlr3pipelines</a></span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">task</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">tsk</a></span><span class="op">(</span><span class="st">"german_credit"</span><span class="op">)</span></span>
-<span><span class="va">task</span><span class="op">$</span><span class="fu">set_col_roles</span><span class="op">(</span><span class="st">"personal_status_sex"</span>, add_to <span class="op">=</span> <span class="st">"group"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">learner</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"classif.rpart"</span>, predict_type <span class="op">=</span> <span class="st">"prob"</span>, maxdepth <span class="op">=</span> <span class="fl">6L</span><span class="op">)</span></span></code></pre></div>
-<p>The <code>ctx$claim</code> block is a pre-analysis declaration, not a model output. The operative part is the claim scope, semantics, stakes, and any decision thresholds. AutoIML can derive conservative defaults for non-use, prohibited interpretations, and decision-policy wording from those declarations, so you only need to spell them out when the analysis warrants narrower boundaries.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span> <span class="op">=</span> <span class="va"><a href="reference/AutoIML.html">AutoIML</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  task <span class="op">=</span> <span class="va">task</span>,</span>
-<span>  learner <span class="op">=</span> <span class="va">learner</span>,</span>
-<span>  resampling <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">rsmp</a></span><span class="op">(</span><span class="st">"cv"</span>, folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
-<span>  purpose <span class="op">=</span> <span class="st">"decision_support"</span>,</span>
-<span>  seed <span class="op">=</span> <span class="fl">42</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">claim</span> <span class="op">=</span> <span class="fu"><a href="reference/make_claim_card.html">make_claim_card</a></span><span class="op">(</span></span>
-<span>  purpose <span class="op">=</span> <span class="st">"decision_support"</span>,</span>
-<span>  semantics <span class="op">=</span> <span class="st">"within_support"</span>,</span>
-<span>  stakes <span class="op">=</span> <span class="st">"medium"</span>,</span>
-<span>  claims <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>global <span class="op">=</span> <span class="cn">TRUE</span>, local <span class="op">=</span> <span class="cn">FALSE</span>, decision <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>  decision_spec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>    thresholds <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq</a></span><span class="op">(</span><span class="fl">0.20</span>, <span class="fl">0.60</span>, by <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span>,</span>
-<span>    utility <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>tp <span class="op">=</span> <span class="fl">1</span>, fp <span class="op">=</span> <span class="op">-</span><span class="fl">0.5</span>, fn <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, tn <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">measurement</span> <span class="op">=</span> <span class="fu"><a href="reference/make_measurement_card.html">make_measurement_card</a></span><span class="op">(</span></span>
-<span>  level <span class="op">=</span> <span class="st">"item"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">sensitive_features</span> <span class="op">=</span> <span class="st">"personal_status_sex"</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">alt_learners</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  featureless <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"classif.featureless"</span>, predict_type <span class="op">=</span> <span class="st">"prob"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">multiplicity</span><span class="op">$</span><span class="va">transport_mode</span> <span class="op">=</span> <span class="st">"group_performance"</span></span></code></pre></div>
-<p>The measurement card now only needs the part the analysis cannot infer reliably. Here that is just the measurement level. Gate 0B derives task- and pipeline-level notes for missingness and scoring automatically, and only asks for comparability or reliability evidence when the measurement type makes those claims material.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">auto</span><span class="op">$</span><span class="fu">report_card</span><span class="op">(</span><span class="op">)</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">gate_id</span>, <span class="va">gate_name</span>, <span class="va">status</span>, <span class="va">summary</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></code></pre></div>
-<p>With the operative claim card, analysis-derived measurement notes, and subgroup audit in place, the remaining warnings are substantive rather than setup-related: calibration, net benefit in the declared threshold range, and the interaction pattern that makes a simple one-feature story too thin.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g3_calibration"</span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g3_dca"</span><span class="op">)</span></span></code></pre></div>
-<p>Gate 2 then shows why the package warns instead of presenting a single global effect curve as the main story: <code>amount</code> and <code>duration</code> dominate, and they interact strongly.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_hstats"</span>, top_n <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_ale_2d"</span>, feature1 <span class="op">=</span> <span class="st">"amount"</span>, feature2 <span class="op">=</span> <span class="st">"duration"</span>, class_label <span class="op">=</span> <span class="va">task</span><span class="op">$</span><span class="va">positive</span><span class="op">)</span></span></code></pre></div>
-<p>When Gate 2 regionalization is enabled (<code>auto$ctx$structure$regionalize = TRUE</code>) and the interaction screen finds materially heterogeneous effects, the GADGET-style views decompose the global effect into interpretable regions and show the split rules that produced those regions. If no such regions are found, the paper-aligned Gate 2 evidence remains the global effect plot, the interaction screen, and the top 2D ALE surface. Optional <code>pint_enabled = TRUE</code> adds a permutation-based interaction screen before regionalization.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">auto</span><span class="op">$</span><span class="va">result</span><span class="op">$</span><span class="va">gate_results</span><span class="op">$</span><span class="va">G2</span><span class="op">$</span><span class="va">artifacts</span><span class="op">$</span><span class="va">gadget_regions</span><span class="op">)</span> <span class="op">&amp;&amp;</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">auto</span><span class="op">$</span><span class="va">result</span><span class="op">$</span><span class="va">gate_results</span><span class="op">$</span><span class="va">G2</span><span class="op">$</span><span class="va">artifacts</span><span class="op">$</span><span class="va">gadget_regions</span><span class="op">)</span> <span class="op">&gt;</span> <span class="fl">0L</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_gadget"</span><span class="op">)</span></span>
-<span>  <span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_gadget_tree"</span><span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_pint"</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/export_analysis_bundle.html">export_analysis_bundle</a></span><span class="op">(</span><span class="va">auto</span>, dir <span class="op">=</span> <span class="st">"bundle_german_credit"</span>, prefix <span class="op">=</span> <span class="st">"german_credit"</span><span class="op">)</span></span></code></pre></div>
-<hr>
-</div>
-<div class="section level3">
-<h3 id="example-2--regression--global-insight">Example 2 — Regression · global insight<a class="anchor" aria-label="anchor" href="#example-2--regression--global-insight"></a>
-</h3>
-<p><strong>Task:</strong> <code>california_housing</code> (20 433 complete cases from the 20 640-row benchmark, 8 numeric + 1 factor feature, continuous <code>median_house_value</code>). We use a complete-case subset so <code>ranger</code>, lasso, and <code>xgboost</code> benchmark the same design matrix. Correlated spatial predictors still trigger ALE selection in G2, and the mixed learner family makes Gate 6 Rashomon diagnostics realistic.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">task</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">tsk</a></span><span class="op">(</span><span class="st">"california_housing"</span><span class="op">)</span></span>
-<span><span class="va">task</span><span class="op">$</span><span class="fu">filter</span><span class="op">(</span><span class="va">task</span><span class="op">$</span><span class="va">row_ids</span><span class="op">[</span><span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/complete.cases.html" class="external-link">complete.cases</a></span><span class="op">(</span><span class="va">task</span><span class="op">$</span><span class="fu">data</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">learner</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span></span>
-<span>  <span class="st">"regr.ranger"</span>,</span>
-<span>  num.trees <span class="op">=</span> <span class="fl">200L</span>,</span>
-<span>  mtry.ratio <span class="op">=</span> <span class="fl">0.5</span>,</span>
-<span>  min.node.size <span class="op">=</span> <span class="fl">5L</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>The claim card here is not extra decoration; it fixes the semantics and scope before Gate 6 compares models. Analysis-specific transport and preprocessing notes can remain implicit unless you need to declare a narrower boundary than the task- and pipeline-level defaults.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span> <span class="op">=</span> <span class="va"><a href="reference/AutoIML.html">AutoIML</a></span><span class="op">$</span><span class="fu">new</span><span class="op">(</span></span>
-<span>  task <span class="op">=</span> <span class="va">task</span>,</span>
-<span>  learner <span class="op">=</span> <span class="va">learner</span>,</span>
-<span>  resampling <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">rsmp</a></span><span class="op">(</span><span class="st">"cv"</span>, folds <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
-<span>  purpose <span class="op">=</span> <span class="st">"global_insight"</span>,</span>
-<span>  seed <span class="op">=</span> <span class="fl">42</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">claim</span> <span class="op">=</span> <span class="fu"><a href="reference/make_claim_card.html">make_claim_card</a></span><span class="op">(</span></span>
-<span>  purpose <span class="op">=</span> <span class="st">"global_insight"</span>,</span>
-<span>  semantics <span class="op">=</span> <span class="st">"within_support"</span>,</span>
-<span>  stakes <span class="op">=</span> <span class="st">"low"</span>,</span>
-<span>  claims <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>global <span class="op">=</span> <span class="cn">TRUE</span>, local <span class="op">=</span> <span class="cn">FALSE</span>, decision <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">measurement</span> <span class="op">=</span> <span class="fu"><a href="reference/make_measurement_card.html">make_measurement_card</a></span><span class="op">(</span></span>
-<span>  level <span class="op">=</span> <span class="st">"item"</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">sensitive_features</span> <span class="op">=</span> <span class="st">"ocean_proximity"</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">alt_learners</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  lasso <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_learner.html" class="external-link">as_learner</a></span><span class="op">(</span><span class="fu"><a href="https://mlr3pipelines.mlr-org.com/reference/po.html" class="external-link">po</a></span><span class="op">(</span><span class="st">"encode"</span><span class="op">)</span> <span class="op"><a href="https://mlr3pipelines.mlr-org.com/reference/grapes-greater-than-greater-than-grapes.html" class="external-link">%&gt;&gt;%</a></span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"regr.glmnet"</span>, alpha <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  xgboost <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_learner.html" class="external-link">as_learner</a></span><span class="op">(</span></span>
-<span>    <span class="fu"><a href="https://mlr3pipelines.mlr-org.com/reference/po.html" class="external-link">po</a></span><span class="op">(</span><span class="st">"encode"</span><span class="op">)</span> <span class="op"><a href="https://mlr3pipelines.mlr-org.com/reference/grapes-greater-than-greater-than-grapes.html" class="external-link">%&gt;&gt;%</a></span></span>
-<span>      <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span></span>
-<span>        <span class="st">"regr.xgboost"</span>,</span>
-<span>        nrounds <span class="op">=</span> <span class="fl">150L</span>,</span>
-<span>        eta <span class="op">=</span> <span class="fl">0.05</span>,</span>
-<span>        max_depth <span class="op">=</span> <span class="fl">6L</span>,</span>
-<span>        subsample <span class="op">=</span> <span class="fl">0.8</span>,</span>
-<span>        colsample_bytree <span class="op">=</span> <span class="fl">0.8</span>,</span>
-<span>        verbose <span class="op">=</span> <span class="fl">0</span></span>
-<span>      <span class="op">)</span></span>
-<span>  <span class="op">)</span>,</span>
-<span>  tree <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"regr.rpart"</span>, maxdepth <span class="op">=</span> <span class="fl">12L</span>, cp <span class="op">=</span> <span class="fl">1e-03</span><span class="op">)</span>,</span>
-<span>  featureless <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"regr.featureless"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="va">ctx</span><span class="op">$</span><span class="va">structure</span><span class="op">$</span><span class="va">max_features</span> <span class="op">=</span> <span class="fl">8L</span></span></code></pre></div>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">run</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">auto</span><span class="op">$</span><span class="fu">report_card</span><span class="op">(</span><span class="op">)</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">gate_id</span>, <span class="va">gate_name</span>, <span class="va">status</span>, <span class="va">summary</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></code></pre></div>
-<p>The effect plots focus on the housing variables that dominate the model story: income and coastal location. <code>ranger</code> keeps the global effects readable, while Gate 6 benchmarks it against lasso, <code>xgboost</code>, and a single tree baseline.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g2_effect"</span>, feature <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"median_income"</span>, <span class="st">"latitude"</span>, <span class="st">"longitude"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p>The supporting views below add two complementary angles: conditional SHAP importance for the fitted tree, and a Rashomon rank heatmap for the near-tie models in Gate 6.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"shap_importance"</span>, n_rows <span class="op">=</span> <span class="fl">40L</span>, sample_size <span class="op">=</span> <span class="fl">15L</span>, background_n <span class="op">=</span> <span class="fl">40L</span>, top_n <span class="op">=</span> <span class="fl">8L</span><span class="op">)</span></span>
-<span><span class="va">auto</span><span class="op">$</span><span class="fu">plot</span><span class="op">(</span><span class="st">"g6_rank_heatmap"</span>, top_n <span class="op">=</span> <span class="fl">8L</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/export_analysis_bundle.html">export_analysis_bundle</a></span><span class="op">(</span><span class="va">auto</span>, dir <span class="op">=</span> <span class="st">"bundle_california"</span>, prefix <span class="op">=</span> <span class="st">"california"</span><span class="op">)</span></span></code></pre></div>
-<hr>
-</div>
-</div>
-<div class="section level2">
-<h2 id="autoiml-gate-overview">AutoIML gate overview<a class="anchor" aria-label="anchor" href="#autoiml-gate-overview"></a>
-</h2>
-<p>This table documents the legacy compatibility interface; it is not the CSDG applicability map returned by <code><a href="reference/csdg_gate_plan.html">csdg_gate_plan()</a></code> or the gate registry of <code><a href="reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>.</p>
-<table class="table">
-<colgroup>
-<col width="33%">
-<col width="33%">
-<col width="33%">
-</colgroup>
-<thead><tr>
-<th>Gate</th>
-<th>Triggered when</th>
-<th>Evidence checks</th>
-</tr></thead>
-<tbody>
-<tr>
-<td>G0A</td>
-<td>always</td>
-<td>Claim and semantics declaration; hard-stop on <code>causal_recourse</code> without identification</td>
-</tr>
-<tr>
-<td>G0B</td>
-<td>always</td>
-<td>Measurement readiness; reliability / invariance evidence for high-stakes</td>
-</tr>
-<tr>
-<td>G1</td>
-<td>always</td>
-<td>CV performance + calibration snapshot</td>
-</tr>
-<tr>
-<td>G2</td>
-<td>always</td>
-<td>Feature dependence · ALE vs PDP selection · pairwise interaction screening</td>
-</tr>
-<tr>
-<td>G3</td>
-<td><code>claims$decision = TRUE</code></td>
-<td>Calibration curve + Decision Curve Analysis</td>
-</tr>
-<tr>
-<td>G4</td>
-<td><code>claims$local = TRUE</code></td>
-<td>SHAP faithfulness + perturbation sensitivity checks</td>
-</tr>
-<tr>
-<td>G5</td>
-<td>always</td>
-<td>Stability of narrated patterns under bootstrap resampling</td>
-</tr>
-<tr>
-<td>G6</td>
-<td>high-resolution profile</td>
-<td>Rashomon multiplicity + transport probes</td>
-</tr>
-<tr>
-<td>G7A</td>
-<td>
-<code>sensitive_features</code> set</td>
-<td>Subgroup performance + calibration audit</td>
-</tr>
-<tr>
-<td>G7B</td>
-<td>user-facing + high-stakes</td>
-<td>Human-factors (task-based evaluation) evidence</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section level2">
-<h2 id="autoiml-compatibility-status">AutoIML compatibility status<a class="anchor" aria-label="anchor" href="#autoiml-compatibility-status"></a>
-</h2>
-<p>The compatibility workflow uses a claim-first, gate-based architecture with explicit semantics, direct gate evidence, and claim-dependent gate planning. Default compatibility runs use the <code>high_resolution</code> profile; <code>quick_start = TRUE</code> is available for rapid prototyping. Report cards and guides retain the individual gate results and their claim-specific restrictions instead of reducing them to a summary evidence score.</p>
+<p>The earlier <code>AutoIML</code> interface remains available for compatibility. Its gate identifiers and pass/warn/fail/skip labels are separate from the CSDG gate registry and vocabulary. Its examples and gate overview are in <a href="https://stefancoors.de/mlr3autoiml/articles/legacy_autoiml.html">the legacy AutoIML article</a> (<code><a href="articles/legacy_autoiml.html">vignette("legacy_autoiml", package = "mlr3autoiml")</a></code>); new analyses start from the CSDG interface above.</p>
 </div>
 <div class="section level2">
 <h2 id="license">License<a class="anchor" aria-label="anchor" href="#license"></a>

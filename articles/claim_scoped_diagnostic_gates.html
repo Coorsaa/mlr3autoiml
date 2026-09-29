@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,9 @@
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><hr class="dropdown-divider"></li>
+    <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
+    <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -82,13 +85,13 @@ The first part works through the numerical example of the article. The
 second part applies the steps to a fitted <code>mlr3</code> learner and
 shows an unresolved claim with an unresolved threat.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/coorsaa/mlr3autoiml" class="external-link">mlr3autoiml</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3.mlr-org.com" class="external-link">mlr3</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3learners.mlr-org.com" class="external-link">mlr3learners</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3pipelines.mlr-org.com" class="external-link">mlr3pipelines</a></span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/packageDescription.html" class="external-link">packageVersion</a></span><span class="op">(</span><span class="st">"mlr3autoiml"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] '0.1.6'</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] '0.1.7'</span></span></code></pre></div>
 <style>
 pre, pre code, pre > code.sourceCode { white-space: pre-wrap; overflow-wrap: anywhere; }
 pre > code.sourceCode { display: block; }
@@ -109,6 +112,9 @@ defined for all inputs and without error. The claim is:</p>
 <p><strong>Under marginal permutation, both models rely more on item 1
 than on item 2.</strong></p>
 </blockquote>
+<p>Reliance is measured by held-out permutation feature importance
+(PFI): the increase in expected squared error when one item is
+permuted.</p>
 <p>The record states that the claim was written before the values were
 computed (specified in advance).</p>
 </div>
@@ -389,10 +395,10 @@ A and (0, 2) in B.</caption>
 due to random permutation: its absolute value must exceed the .975
 quantile of the t distribution with R - 1 degrees of freedom times its
 Monte Carlo standard error, where R is the number of permutations. This
-rule screens out permutation noise, not sampling uncertainty. In model
-A, the difference between the items exceeds it in every fold. The
-corrected resampled t interval of the learner-level mean difference is
-reported descriptively.</p>
+rule addresses permutation noise; the interval below describes sampling
+uncertainty. In model A, the difference between the items exceeds it in
+every fold. The corrected resampled t interval of the learner-level mean
+difference is reported descriptively.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mc_a</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_pfi_mc_difference.html">csdg_pfi_mc_difference</a></span><span class="op">(</span><span class="va">pfi</span><span class="op">$</span><span class="va">A</span>, <span class="st">"item_1"</span>, <span class="st">"item_2"</span><span class="op">)</span></span>
 <span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/kable.html" class="external-link">kable</a></span><span class="op">(</span><span class="va">mc_a</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">iteration</span>, <span class="va">estimate</span>, <span class="va">se</span>, <span class="va">threshold</span>, <span class="va">beyond_monte_carlo_error</span><span class="op">)</span><span class="op">]</span>, digits <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
@@ -501,7 +507,10 @@ models (the column <code>both_items</code> above).</p>
 <p>For each required property, the record contains four entries: the
 property, the criterion that decides whether it holds, the observation,
 and its relevance. Judged against its criterion, each required property
-is supported, contradicted, or open.</p>
+is supported, contradicted, or open; <code><a href="../reference/csdg_property_status.html">supported()</a></code>,
+<code><a href="../reference/csdg_property_status.html">contradicted()</a></code>, and <code><a href="../reference/csdg_property_status.html">open_status()</a></code> return these
+statuses. <code><a href="../reference/csdg_claim_record_template.html">csdg_claim_record_template()</a></code> returns the blank
+claim record of the article with all its fields.</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">property</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">gate_id</span>, <span class="va">status</span>, <span class="va">required_property</span>, <span class="va">observation</span>, <span class="va">relevance</span>, <span class="va">criterion</span> <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="../reference/csdg_evidence_record.html">csdg_evidence_record</a></span><span class="op">(</span></span>
@@ -527,8 +536,8 @@ is supported, contradicted, or open.</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>The decisive property is G6a: only the model differs between the two
 computations, the claim covers both models, and model B reverses the
-ordering. The status records the researcher’s judgment under the
-criterion; the package does not infer it from the numbers.</p>
+ordering. The status records the researcher’s judgment: the researcher
+applies the criterion to the numbers.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">g6a</span> <span class="op">=</span> <span class="fu">property</span><span class="op">(</span><span class="st">"G6a"</span>, <span class="st">"contradicted"</span>, <span class="st">"Item 1 has the larger marginal PFI in A and in B."</span>,</span>
 <span>  <span class="st">"PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B."</span>,</span>
@@ -592,7 +601,7 @@ element, whether the new scope is the same, narrower, broader, or
 incomparable; and, separately, whether the revised claim follows from
 its predecessor. Here it does: a claim about both models is universal,
 so it implies the claim about model A (a logical weakening). The package
-stores this argument; it does not prove it.</p>
+records this argument as the researcher states it.</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">relation</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_claim_relation.html">csdg_claim_relation</a></span><span class="op">(</span></span>
 <span>  <span class="va">claim_both</span>, <span class="va">claim_a</span>,</span>
@@ -664,8 +673,8 @@ cross-validation</td>
 </tr>
 </tbody>
 </table>
-<p>A met claim holds relative to the listed required properties; it is
-not a certificate that every relevant property was identified.</p>
+<p>The assessment of a met claim refers to the required properties
+listed in its record.</p>
 </div>
 <div class="section level2">
 <h2 id="an-unresolved-claim-an-unresolved-threat">An unresolved claim: an unresolved threat<a class="anchor" aria-label="anchor" href="#an-unresolved-claim-an-unresolved-threat"></a>
@@ -811,9 +820,9 @@ learner relies on both selected predictors,” requires G2 and G5;
 held-out performance is context, and the predictor selection bears on it
 only through performance, which this claim does not interpret. The audit
 computes the diagnostics: dependence and observed support for G2, and
-held-out PFI in every fold for G5. It cannot judge whether the procedure
-computes the quantity that the claim names, so G2 stays open until the
-researcher records it.</p>
+held-out PFI in every fold for G5. Whether the procedure computes the
+quantity that the claim names is recorded by the researcher; until then,
+G2 is open.</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">claim_relies</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_cards.html">csdg_claim</a></span><span class="op">(</span></span>
 <span>  id <span class="op">=</span> <span class="st">"learner_relies"</span>,</span>
@@ -1081,13 +1090,12 @@ rationale.</p>
 <div class="section level2">
 <h2 id="export-reload-and-verify">Export, reload, and verify<a class="anchor" aria-label="anchor" href="#export-reload-and-verify"></a>
 </h2>
-<p>The audit bundle contains the claim report of the audit claim, now
+<p>The audit bundle contains the claim report of the audit claim,
 assessed by the decision rule from the audit diagnostics alone: without
 the researcher’s records, G2 and G5 are open, so the claim is
-unresolved. The explicit assessments of all four claims, with the
-researcher’s records, are written next to the bundle, not into it, so
-the bundle’s checksum manifest stays valid; a receipt names the file,
-its SHA-256 checksum, the bundle, and all claim identifiers.</p>
+unresolved. The assessments of all four claims, with the researcher’s
+records, are written to a separate file next to the bundle and read
+back.</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">export_root</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"csdg_walkthrough_"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">export_root</span><span class="op">)</span></span>
@@ -1105,20 +1113,13 @@ its SHA-256 checksum, the bundle, and all claim identifiers.</p>
 <span><span class="op">)</span></span>
 <span><span class="va">assessment_path</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">export_root</span>, <span class="st">"explicit_assessments.json"</span><span class="op">)</span></span>
 <span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/read_json.html" class="external-link">write_json</a></span><span class="op">(</span><span class="va">explicit</span>, <span class="va">assessment_path</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span>, pretty <span class="op">=</span> <span class="cn">TRUE</span>, null <span class="op">=</span> <span class="st">"null"</span>, na <span class="op">=</span> <span class="st">"null"</span><span class="op">)</span></span>
-<span><span class="va">receipt</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  assessment_file <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="va">assessment_path</span><span class="op">)</span>,</span>
-<span>  assessment_sha256 <span class="op">=</span> <span class="fu">digest</span><span class="fu">::</span><span class="fu"><a href="https://eddelbuettel.github.io/digest/man/digest.html" class="external-link">digest</a></span><span class="op">(</span>file <span class="op">=</span> <span class="va">assessment_path</span>, algo <span class="op">=</span> <span class="st">"sha256"</span><span class="op">)</span>,</span>
-<span>  audit_bundle <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="va">audit_bundle</span><span class="op">)</span>,</span>
-<span>  claim_ids <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">claim_both</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_a</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_predict</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_relies</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/read_json.html" class="external-link">write_json</a></span><span class="op">(</span><span class="va">receipt</span>, <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">export_root</span>, <span class="st">"receipt.json"</span><span class="op">)</span>, auto_unbox <span class="op">=</span> <span class="cn">TRUE</span>, pretty <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">read_back</span> <span class="op">=</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/read_json.html" class="external-link">read_json</a></span><span class="op">(</span><span class="va">assessment_path</span><span class="op">)</span></span>
-<span><span class="va">read_receipt</span> <span class="op">=</span> <span class="fu">jsonlite</span><span class="fu">::</span><span class="fu"><a href="https://jeroen.r-universe.dev/jsonlite/reference/read_json.html" class="external-link">read_json</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">export_root</span>, <span class="st">"receipt.json"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">bundle_report</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">audit_bundle</span>, <span class="st">"claim_report.csv"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">read_back</span><span class="op">$</span><span class="va">claims</span>, <span class="va">`[[`</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1L</span><span class="op">)</span>, <span class="st">"id"</span><span class="op">)</span>, <span class="va">receipt</span><span class="op">$</span><span class="va">claim_ids</span><span class="op">)</span>,</span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/stopifnot.html" class="external-link">stopifnot</a></span><span class="op">(</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">read_back</span><span class="op">$</span><span class="va">claims</span>, <span class="va">`[[`</span>, <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="fl">1L</span><span class="op">)</span>, <span class="st">"id"</span><span class="op">)</span>,</span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">claim_both</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_a</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_predict</span><span class="op">$</span><span class="va">id</span>, <span class="va">claim_relies</span><span class="op">$</span><span class="va">id</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">read_back</span><span class="op">$</span><span class="va">assessments</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"not_met"</span>, <span class="st">"met"</span>, <span class="st">"unresolved"</span>, <span class="st">"met"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist</a></span><span class="op">(</span><span class="va">read_back</span><span class="op">$</span><span class="va">decisions</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"revise"</span>, <span class="st">"retain"</span>, <span class="st">"withhold"</span>, <span class="st">"retain"</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">read_receipt</span><span class="op">$</span><span class="va">assessment_sha256</span>, <span class="fu">digest</span><span class="fu">::</span><span class="fu"><a href="https://eddelbuettel.github.io/digest/man/digest.html" class="external-link">digest</a></span><span class="op">(</span>file <span class="op">=</span> <span class="va">assessment_path</span>, algo <span class="op">=</span> <span class="st">"sha256"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">bundle_report</span><span class="op">$</span><span class="va">assessment</span>, <span class="st">"unresolved"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="va">bundle_report</span><span class="op">$</span><span class="va">open_gates</span>, <span class="st">"G2, G5"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Export and read-back verified for all four claims.\n"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Export and read-back verified for all four claims.</span></span>
@@ -1176,7 +1177,7 @@ described in <code><a href="../reference/csdg_diagnostics.html">?csdg_diagnostic
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; other attached packages:</span></span>
 <span><span class="co">#&gt; [1] mlr3pipelines_0.11.0 mlr3learners_0.12.0  mlr3_1.6.0          </span></span>
-<span><span class="co">#&gt; [4] data.table_1.18.2.1  mlr3autoiml_0.1.6   </span></span>
+<span><span class="co">#&gt; [4] data.table_1.18.2.1  mlr3autoiml_0.1.7   </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; loaded via a namespace (and not attached):</span></span>
 <span><span class="co">#&gt;  [1] sass_0.4.10          future_1.70.0        generics_0.1.4      </span></span>
