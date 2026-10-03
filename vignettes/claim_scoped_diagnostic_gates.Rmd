@@ -1,497 +1,120 @@
 ---
-title: "From a claim to evidence: a complete CSDG walkthrough"
+title: "The numerical example of the article"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{From a claim to evidence: a complete CSDG walkthrough}
+  %\VignetteIndexEntry{The numerical example of the article}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", warning = TRUE)
+```{r setup, include = FALSE}
+run = all(vapply(c("mlr3learners", "mlr3pipelines"), requireNamespace, logical(1L), quietly = TRUE))
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = run)
+txt = function(x) if (run) x else "?"
 ```
 
-This guide follows the five steps of the accompanying article:
-**write the claim, specify the scope, derive the required properties, evaluate the evidence, and decide and report**.
-The input is a claim, a conclusion that a researcher intends to report. The output is its assessment (met, not met,
-or unresolved) and a decision: a met claim is retained; a claim that is not met or unresolved is revised or withheld.
-The package records the claim and its scope, derives the gate plan, computes diagnostics, and applies the decision
-rule. The researcher sets the criteria, states the relevance of each observation, and enters established
-counterevidence and unresolved threats.
+The article illustrates Claim-Scoped Diagnostic Gates (CSDG) with two items that carry the same information. Let `Z`
+be standard normal, let both items and the outcome equal `Z`, and use squared error. Model A predicts with item 1,
+`f_A(x) = x1`, and model B with item 2, `f_B(x) = x2`. In model A, shuffling item 1 replaces the prediction `Z` with
+an independent draw `Z'`, so the expected squared error rises from 0 to `E[(Z - Z')^2] = 2`; shuffling item 2 leaves
+the prediction unchanged, so its permutation feature importance (PFI) is 0. Model B reverses the values. Grouped
+PFI, which shuffles both items together, is 2 in both models; conditional PFI, which draws the permuted item given
+the other item, is 0, because that draw equals the original value. This vignette computes these values from 10,000
+simulated observations and assesses the three claims of the article with the functions introduced in
+`vignette("exploratory_workflow", package = "mlr3autoiml")`.
+`r if (!run) "The code is not run because the suggested packages mlr3learners or mlr3pipelines are not installed."`
 
-All code runs on generated data; no SHILD or PISA files are needed. The first part works through the numerical
-example of the article. The second part applies the steps to a fitted `mlr3` learner and shows an unresolved claim
-with an unresolved threat.
-
-```{r package, warning = FALSE, message = FALSE}
+```{r packages, message = FALSE, warning = FALSE}
 library(mlr3autoiml)
-library(data.table)
 library(mlr3)
 library(mlr3learners)
 library(mlr3pipelines)
-packageVersion("mlr3autoiml")
 ```
 
-<style>
-pre, pre code, pre > code.sourceCode { white-space: pre-wrap; overflow-wrap: anywhere; }
-pre > code.sourceCode { display: block; }
-pre > code.sourceCode > span { display: inline-block; max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
-table { width: 100%; table-layout: auto; }
-th, td { overflow-wrap: anywhere; vertical-align: top; }
-</style>
+## Data, models, and PFI
 
-## Step 1: Write the claim
+Each model is a linear model of one item, which reproduces the outcome exactly in every fold. The supplied strata
+are the exact values of `Z` (`strata`), so each stratum is one row: permuting an item within its stratum leaves it
+unchanged, which is the conditional distribution of one item given the other, and conditional PFI is exactly 0. The
+package warns about such small strata, because in real data they usually mean that the permutation changes almost
+nothing.
 
-Suppose that two items, for example two wordings of the self-rated health question, carry the same information. For
-exact arithmetic, let `Z` be standard normal, let both items and the outcome equal `Z`, and use squared error.
-Model A is `f_A(x) = x1` and model B is `f_B(x) = x2`, both defined for all inputs and without error. The claim is:
-
-> **Under marginal permutation, both models rely more on item 1 than on item 2.**
-
-Reliance is measured by held-out permutation feature importance (PFI): the increase in expected squared error when
-one item is permuted.
-
-The record states that the claim was written before the values were computed (specified in advance).
-
-## Step 2: Specify the scope
-
-The scope states what the claim refers to, in six elements: the quantity (the estimand that the claim interprets),
-the model, the procedure (the estimator that computes the quantity), the data, the meaning (model description,
-population claim, or causal claim), and the use.
-
-```{r claim}
-claim_both = csdg_claim(
-  id = "both_models",
-  statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
-  claim_type = "global_explanation",
-  quantity = "marginal PFI with squared error: increase in expected squared error when one item is permuted",
-  model = "several_models",
-  procedure = paste(
-    "each item permuted independently of the other item and the outcome;",
-    "20 permutations per held-out fold of a 5-fold cross-validation"
-  ),
-  data = "population Z ~ N(0, 1), item 1 = item 2 = outcome = Z; 10,000 simulated observations",
-  meaning = "model_description",
-  use = "scientific description",
-  unit = "simulated observation",
-  population = "Z standard normal",
-  provenance = list(origin = "specified_before_results", date = "2026-09-26",
-    time_basis = "date of the example", selection_basis = "written before the PFI values were computed",
-    evidence_ids = character())
-)
-knitr::kable(data.frame(element = names(claim_both$scope), content = unlist(claim_both$scope)),
-  row.names = FALSE)
-```
-
-Marginal permutation creates input combinations that never occur in the data: a permuted input has unequal items.
-A model description may cover such inputs if its scope says so, as must its reported wording. The qualifier "under
-marginal permutation" is therefore part of the claim; without it, the claim would be broader than its scope.
-
-```{r scope}
-measurement = csdg_measurement(
-  outcome = "y", predictors = c("item_1", "item_2"),
-  data_source = "simulated from the specified population",
-  sample_definition = "all simulated observations; no exclusions",
-  unit = "simulated observation", outcome_scale = "continuous, variance one",
-  missingness = "none", preprocessing = "none"
-)
-groups = list(item_1 = "item_1", item_2 = "item_2", both_items = c("item_1", "item_2"))
-explanation = csdg_explanation(
-  method_ids = "pfi", scope = "global", target = "prediction", feature_groups = groups,
-  perturbation = list(type = "marginal", distribution = "held-out fold")
-)
-```
-
-## Step 3: Derive the required properties
-
-A gate is a generic evidence question, such as "Does the result hold for all models the claim covers?" Applied to a
-claim, it becomes a required property, such as "item 1 has the larger PFI in model B." The package derives the gate
-plan from the column "Required if the claim ..." of the gate registry (Table 3 of the article).
-
-```{r plan}
-plan = csdg_gate_plan(claim_both, measurement, explanation)
-knitr::kable(plan[, .(gate_id, gate_name, required, plan_role, trigger)])
-stopifnot(identical(plan[required == TRUE, gate_id], c("G0a", "G0b", "G2", "G5", "G6a")))
-```
-
-Besides G0a and G0b, the claim requires G2 (it interprets PFI values), G5 (it states an ordering), and G6a (it covers
-two models). Held-out performance (G1) is context: a model description holds whatever the model's accuracy.
-
-## Step 4: Evaluate the evidence
-
-In model A, shuffling item 1 replaces the prediction `Z` with an independent draw `Z'` from the same distribution, so
-the expected squared error rises from 0 to `E[(Z - Z')^2] = Var(Z) + Var(Z') = 2`; shuffling item 2 leaves the
-prediction unchanged, so its PFI is 0. In model B, the values are reversed. These are exact population values. The
-package computes them approximately from 10,000 simulated observations: each model is a linear model of one item,
-which reproduces the outcome exactly in every fold.
-
-```{r compute}
-set.seed(260926)
-n = 10000L
-z = rnorm(n)
+```{r importance}
+set.seed(1)
+z = rnorm(10000)
 task = as_task_regr(data.frame(item_1 = z, item_2 = z, y = z), target = "y", id = "numerical_example")
 model_using = function(item) {
   as_learner(po("select", selector = selector_name(item), id = paste0("use_", item)) %>>% lrn("regr.lm"))
 }
-folds = rsmp("cv", folds = 5L)
-fits = list(
-  A = csdg_resample(task, model_using("item_1"), folds, measures = msrs("regr.mse"), seed = 1L),
-  B = csdg_resample(task, model_using("item_2"), folds, measures = msrs("regr.mse"), seed = 1L)
-)
-pfi = lapply(fits, csdg_fold_pfi, feature_groups = groups, loss = "mse", repetitions = 20L, seed = 2L)
-marginal = dcast(rbindlist(lapply(names(pfi), function(model) {
-  pfi[[model]]$summary[, .(model = model, feature_group, mean_importance)]
-})), model ~ feature_group, value.var = "mean_importance")
-knitr::kable(marginal, digits = 3,
-  caption = "Held-out PFI with squared error; the exact values are (2, 0) in A and (0, 2) in B.")
-stopifnot(marginal[model == "A", item_1 > item_2], marginal[model == "B", item_1 < item_2])
+fits = csdg_fit(task, list(A = model_using("item_1"), B = model_using("item_2")), folds = 5,
+  measure = "regr.mse", labels = c(A = "model A", B = "model B"), seed = 1)
+imp = csdg_importance(fits, repetitions = 20, groups = list(both_items = c("item_1", "item_2")),
+  strata = list(item_1 = z, item_2 = z), seed = 2)
+imp
 ```
 
-The Monte Carlo rule decides whether a difference is beyond the error due to random permutation: its absolute value
-must exceed the .975 quantile of the t distribution with R - 1 degrees of freedom times its Monte Carlo standard
-error, where R is the number of permutations. This rule addresses permutation noise; the interval below describes
-sampling uncertainty. In model A, the difference between the items exceeds it in every fold. The corrected resampled t interval of the
-learner-level mean difference is reported descriptively.
+The estimates are close to the exact values; relative to the improvement over the model without predictors, they
+are about 200%, because PFI values are not parts of the improvement. The claims below are derived from these results, so
+the package labels their assessments exploratory.
 
-```{r monte-carlo}
-mc_a = csdg_pfi_mc_difference(pfi$A, "item_1", "item_2")
-knitr::kable(mc_a[, .(iteration, estimate, se, threshold, beyond_monte_carlo_error)], digits = 4)
-stopifnot(all(mc_a$beyond_monte_carlo_error))
-interval_a = csdg_learner_pfi_interval(pfi$A, n_train = 8000, feature_group = "item_1", minus = "item_2")
-knitr::kable(interval_a[, .(estimate, se, lower, upper, df)], digits = 4)
+## The original claim covers both models
+
+```{r claim-both}
+items = c(item_1 = "item 1", item_2 = "item 2")
+claim_both = claim_order(imp, "item_1", "item_2", learners = c("A", "B"), marginal_only = TRUE, labels = items)
+res_both = csdg_assess(csdg_check(claim_both, imp))
+res_both
 ```
 
-Other versions of PFI answer other questions. Conditional PFI draws the permuted item from its distribution given the
-other item and so keeps the inputs realistic; because the items are equal, the draw equals the original value, and
-conditional PFI is 0 for both items in both models. Here, permuting within strata of `Z` implements this.
-Grouped PFI, which shuffles both items together, is about 2 in both models (the column `both_items` above).
-
-```{r conditional}
-conditional = lapply(fits, csdg_fold_pfi, feature_groups = groups[1:2], loss = "mse", repetitions = 5L,
-  strata = z, seed = 3L)
-conditional_table = dcast(rbindlist(lapply(names(conditional), function(model) {
-  conditional[[model]]$summary[, .(model = model, feature_group, mean_importance)]
-})), model ~ feature_group, value.var = "mean_importance")
-knitr::kable(conditional_table, digits = 3, caption = "Conditional PFI.")
-stopifnot(all(abs(as.matrix(conditional_table[, .(item_1, item_2)])) < 1e-12))
+```{r assert-both, include = FALSE}
+stopifnot(identical(res_both$assessment, "not_met"), "G6a" %in% res_both$decisive$gate)
 ```
 
-For each required property, the record contains four entries: the property, the criterion that decides whether it
-holds, the observation, and its relevance. Judged against its criterion, each required property is supported,
-contradicted, or open; `supported()`, `contradicted()`, and `open_status()` return these statuses.
-`csdg_claim_record_template()` returns the blank claim record of the article with all its fields.
+The claim is `r txt(res_both$label)`: it covers both models, so its content is checked for each under G6a, and
+model B reverses the ordering.
 
-```{r evidence-supported}
-property = function(gate_id, status, required_property, observation, relevance, criterion = NULL) {
-  csdg_evidence_record(
-    gate_id, TRUE, "required_property", status = status,
-    criterion = if (!is.null(criterion)) list(value = criterion, direction = "qualitative"),
-    criterion_source = if (!is.null(criterion)) "translated from the claim",
-    criterion_rationale = if (!is.null(criterion)) required_property,
-    rationale = observation, required_property = required_property, observation = observation,
-    relevance_to_proposition = relevance
-  )
-}
-foundation = list(
-  property("G0a", "supported", "The claim and its six scope elements are stated.",
-    "csdg_claim() records all six elements.", "They fix the quantity, the models, and the procedure."),
-  property("G0b", "supported", "The data cover what the claim names.",
-    "The population is defined exactly; there is no measurement error or preprocessing.",
-    "The claim names no construct and no other population."),
-  property("G2", "supported", "Marginal permutation computes the PFI that the claim names.",
-    "Squared error and marginal permutation; both models are defined for all inputs.",
-    "The claim names the perturbation, so the unrealistic permuted inputs are part of what it describes."),
-  property("G5", "supported", "The ordering persists when the quantity is estimated again.",
-    "Exact values do not vary.", "The same quantity is computed again.")
-)
+## The qualifier is needed
+
+On realistic inputs, where the items are equal, A and B are the same function; only a permuted input has unequal
+items. Without the qualifier "under marginal permutation," the claim about model A states more than marginal PFI
+shows.
+
+```{r claim-a}
+claim_a = claim_order(imp, "item_1", "item_2", learners = "A", labels = items)
+res_a = csdg_assess(csdg_check(claim_a, imp))
+res_a
 ```
 
-The decisive property is G6a: only the model differs between the two computations, the claim covers both models, and
-model B reverses the ordering. The status records the researcher's judgment: the researcher applies the criterion to
-the numbers.
-
-```{r evidence-both}
-g6a = property("G6a", "contradicted", "Item 1 has the larger marginal PFI in A and in B.",
-  "PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B.",
-  "Only the model differs between the two computations, and the claim covers both models.",
-  criterion = "strict ordering in both models")
-evidence_both = c(foundation, list(g6a))
+```{r assert-a, include = FALSE}
+stopifnot(identical(res_a$assessment, "not_met"), "G2" %in% res_a$decisive$gate)
 ```
 
-## Step 5: Decide and report
+Conditional PFI is 0 for both items, so the procedure property (`r txt(unique(res_a$decisive$gate))`) is
+contradicted and the claim is `r txt(res_a$label)`.
 
-The assessment follows a fixed rule: a claim is not met if at least one required property is contradicted; otherwise
-it is unresolved if at least one is open; otherwise it is met. Favorable results never offset a contradicted
-property. With the plan, a required gate without evidence would be open.
+## The revised claim
 
-```{r decide-both}
-assessment_both = csdg_adjudicate_claim(evidence_both, claim_applicable = TRUE, plan = plan)
-assessment_both
-stopifnot(identical(assessment_both$assessment, "not_met"),
-  identical(assessment_both$decision_options, c("revise", "withhold")))
+The revised claim names model A and the marginal permutation.
+
+```{r claim-revised}
+claim_revised = claim_order(imp, "item_1", "item_2", learners = "A", marginal_only = TRUE, labels = items)
+chk_revised = csdg_check(claim_revised, imp)
+chk_revised
+res_revised = csdg_assess(chk_revised)
+res_revised
 ```
 
-The original claim is not met; it faces contrary evidence and is revised. The revised claim, restricted to model A,
-is a new claim with its own record and assessment. It was written after the results were seen, so its assessment is
-exploratory.
-
-```{r revised-claim}
-claim_a = csdg_claim_revision(
-  claim_both, id = "model_a", claim_version = "C1", revision_relation = "narrower",
-  statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
-  model = "fitted_model",
-  provenance = list(origin = "retrospective_exploratory", date = "2026-09-26",
-    time_basis = "date of the example",
-    selection_basis = "restriction chosen after the comparison of A and B", evidence_ids = "both_models_G6a")
-)
-plan_a = csdg_gate_plan(claim_a, measurement, explanation)
-stopifnot(identical(plan_a[required == TRUE, gate_id], c("G0a", "G0b", "G2", "G5")))
-g2_a = property("G2", "supported",
-  "Marginal PFI with squared error in model A is larger for item 1, and the wording names the perturbation.",
-  "2 versus 0; conditional PFI 0 versus 0.",
-  "The computation uses the model, perturbation, and loss that the claim names.",
-  criterion = "strict ordering of the exact values; qualifier in the wording")
-evidence_a = c(foundation[c(1L, 2L, 4L)], list(g2_a))
-assessment_a = csdg_adjudicate_claim(evidence_a, claim_applicable = TRUE, plan = plan_a)
-assessment_a$assessment
-stopifnot(identical(assessment_a$assessment, "met"), identical(assessment_a$decision_options, "retain"))
+```{r assert-revised, include = FALSE}
+stopifnot(identical(res_revised$assessment, "met"))
 ```
 
-The revised claim is met (exploratory) and retained. Narrowing a claim can reuse the evidence for the narrower scope.
-The record compares the revised claim with its predecessor in two ways: for each scope element, whether the new scope
-is the same, narrower, broader, or incomparable; and, separately, whether the revised claim follows from its
-predecessor. Here it does: a claim about both models is universal, so it implies the claim about model A (a logical
-weakening). The package records this argument as the researcher states it.
+The revised claim is `r txt(res_revised$label)`. Model B's reversal is context, because the claim no longer covers
+model B, and the grouped PFI measures reliance on the pair rather than ordering its members.
 
-```{r relation}
-relation = csdg_claim_relation(
-  claim_both, claim_a,
-  coordinate_relations = c(quantity = "same", model = "narrower", procedure = "same", data = "same",
-    meaning = "same", use = "same"),
-  rationale = "The claim about models A and B is restricted to model A; everything else is unchanged.",
-  proposition_relation = "logical_weakening",
-  proposition_rationale = "A claim that holds for every model in {A, B} holds for A.",
-  revision_kind = "logical_weakening"
-)
-knitr::kable(relation$scope)
-```
+## Further reading
 
-The assessment of a met claim refers to the required properties listed in its record.
-
-## An unresolved claim: an unresolved threat
-
-The second part applies the steps to a fitted `mlr3` learner. The generated data contain 180 observations and ten
-candidate predictors; the two predictors of the task were chosen by screening all ten on the full sample, before the
-cross-validation. The claim uses the predictions, so held-out performance (G1) is required.
-
-```{r threat-data}
-set.seed(42)
-candidates = as.data.frame(matrix(rnorm(180 * 10), ncol = 10, dimnames = list(NULL, paste0("x", 1:10))))
-outcome = factor(rbinom(180, 1, plogis(1.5 * candidates$x1 - candidates$x2)), levels = c(0, 1))
-screening = sapply(candidates, function(x) abs(cor(x, as.numeric(outcome))))
-selected = names(sort(screening, decreasing = TRUE))[1:2]
-selected
-dat = data.frame(candidates[selected], y = outcome)
-task_screened = as_task_classif(dat, target = "y", positive = "1", id = "screened")
-learner = lrn("classif.log_reg", predict_type = "prob")
-claim_predict = csdg_claim(
-  id = "learner_predicts",
-  statement = "The logistic regression learner predicts the outcome better than a model without predictors.",
-  claim_type = "predictive_performance",
-  quantity = "held-out AUC of the learner and of a model without predictors",
-  model = "learner",
-  procedure = "3-fold cross-validation; the learner is refitted in each training fold",
-  data = "180 generated observations; two predictors screened from ten candidates on the full sample",
-  meaning = "model_description", use = "scientific description",
-  unit = "generated observation", population = "the generated sample"
-)
-measurement_screened = csdg_measurement(
-  outcome = "y", predictors = selected, data_source = "generated in this vignette",
-  sample_definition = "all 180 rows", unit = "generated observation", outcome_scale = "binary factor",
-  missingness = "none", preprocessing = "screening of ten candidates by correlation with the outcome",
-  verification = list(status = "author_reviewed", artifact = "the generating code of this vignette")
-)
-csdg_gate_plan(claim_predict, measurement_screened)[required == TRUE, gate_id]
-```
-
-The criterion for G1 translates "better than a model without predictors" into a margin with a source and a rationale.
-
-```{r threat-audit}
-config = csdg_config(
-  seed = 42L, resampling = list(folds = 3L, repeats = 1L),
-  performance = list(minimum_baseline_improvement = 0.05),
-  criteria = list(performance.minimum_baseline_improvement = list(
-    source = "translated from the claim",
-    rationale = "\"Better\" means a held-out AUC at least 0.05 above that of the model without predictors."
-  ))
-)
-audit_predict = csdg_audit(task_screened, learner, claim_predict, measurement_screened, config = config)
-knitr::kable(csdg_report_card(audit_predict)[required == TRUE, .(gate_id, gate_name, status, summary)])
-```
-
-The audit supports the G1 property under its criterion. But the predictors were selected on the same data outside
-the cross-validation, so the held-out values could be optimistic: a specific and plausible, but unquantified,
-problem. It is an unresolved threat to the G1 property, which is therefore open until a nested analysis quantifies
-the optimism.
-
-```{r threat}
-threat = csdg_evidence_record(
-  "G1", TRUE, "unresolved_threat",
-  required_property = "Held-out performance is not inflated by predictor selection.",
-  observation = "The predictors were selected on the same data outside the cross-validation.",
-  rationale = "The optimism was not quantified; a nested analysis that repeats the screening in each training fold would resolve it."
-)
-report_predict = csdg_claim_report(audit_predict, evidence = list(threat))
-knitr::kable(report_predict[, .(claim_id, assessment, decision_options, supported_gates, open_gates, threat_gates)])
-stopifnot(identical(report_predict$assessment, "unresolved"))
-```
-
-The claim is unresolved. It lacks evidence, which a nested analysis or new data could supply; until then, it is
-withheld and, where it matters, reported as not established.
-
-## The same learner: a met claim with the audit
-
-A model description of the same learner, "The logistic regression learner relies on both selected predictors,"
-requires G2 and G5;
-held-out performance is context, and the predictor selection bears on it only through performance, which this claim
-does not interpret. The audit computes the diagnostics: dependence and observed support for G2, and held-out PFI in
-every fold for G5. Whether the procedure computes the quantity that the claim names is recorded by the researcher;
-until then, G2 is open.
-
-```{r mlr3-audit}
-claim_relies = csdg_claim(
-  id = "learner_relies",
-  statement = "The logistic regression learner relies on both selected predictors.",
-  claim_type = "global_explanation",
-  quantity = "held-out log-loss increase under marginal permutation of each predictor",
-  model = "learner",
-  procedure = "3-fold cross-validation; 20 marginal permutations per predictor and held-out fold",
-  data = "180 generated observations with the two screened predictors",
-  meaning = "model_description", use = "scientific description",
-  unit = "generated observation", population = "the generated sample"
-)
-explanation_screened = csdg_explanation(method_ids = "pfi", scope = "global", target = "held-out log loss",
-  perturbation = list(type = "marginal", distribution = "assessment rows in each fold"))
-config_relies = csdg_config(seed = 42L, resampling = list(folds = 3L, repeats = 1L),
-  stability = list(pfi_repetitions = 20L, top_k = 2L))
-audit = csdg_audit(task_screened, learner, claim_relies, measurement_screened, explanation_screened, config = config_relies)
-report_card = csdg_report_card(audit)
-stopifnot(!any(report_card$status == "error"))
-stopifnot(identical(report_card[gate_id == "G1", status], "context"))
-knitr::kable(report_card[, .(gate_id, gate_name, required, evidence_role, status, diagnostic_status)])
-pfi_learner = audit$artifacts$pfi$per_iteration
-knitr::kable(pfi_learner[, .(iteration, feature_group, importance, monte_carlo_se)], digits = 4)
-```
-
-Held-out performance (G1) is computed and reported as context: it has no property status, and its computed result
-(`diagnostic_status`) never changes the assessment.
-The criterion for G5, positive PFI in every fold beyond twice its Monte Carlo standard error, translates "relies on"
-into numbers. The two predictors were generated independently, so permuted inputs are realistic (G2).
-
-```{r mlr3-assessment}
-stopifnot(all(pfi_learner$importance > 2 * pfi_learner$monte_carlo_se))
-g2_learner = property("G2", "supported",
-  "Held-out marginal permutation computes the log-loss increase that the claim names.",
-  "Permutation within each held-out fold; the predictors are independent, so permuted inputs are realistic.",
-  "The computation uses the learner, perturbation, and loss that the claim names.")
-g5_learner = property("G5", "supported", "Both predictors increase held-out log loss in every fold.",
-  sprintf("PFI above twice its Monte Carlo standard error in all %d folds for both predictors.",
-    length(unique(pfi_learner$iteration))),
-  "Folds vary the training and evaluation data while the learner and perturbation stay fixed.",
-  criterion = "PFI > 2 Monte Carlo standard errors in every fold")
-report_relies = csdg_claim_report(audit, evidence = list(g2_learner, g5_learner))
-knitr::kable(report_relies[, .(claim_id, assessment, decision_options, supported_gates, open_gates)])
-stopifnot(identical(report_relies$assessment, "met"))
-```
-
-## Counterevidence, context, errors, and claims outside the evaluation
-
-Established counterevidence is a demonstrated problem, such as a coding error shown to affect the result. It
-contradicts the property it bears on, so an otherwise met claim is not met. Context is reported but never changes
-the assessment. A computation error leaves the property open, not contradicted, and a whole claim is
-`not_applicable` only if it is explicitly placed outside the evaluation, with a rationale.
-
-```{r other-roles}
-coding_error = csdg_evidence_record(
-  "G2", TRUE, "established_counterevidence",
-  required_property = "Held-out marginal permutation computes the log-loss increase that the claim names.",
-  observation = "Illustration: the two predictor columns were swapped before the PFI computation.",
-  relevance_to_proposition = "The swap changes which predictor each reported value refers to.",
-  rationale = "A coding error shown to affect the result."
-)
-grouped = csdg_evidence_record("G5", TRUE, "context", result_direction = "descriptive",
-  rationale = "Grouped PFI of both predictors is reported for comparison; it does not bear on each predictor.")
-computation = tryCatch(stop("Illustrative computation error"), error = conditionMessage)
-failed = csdg_evidence_record("G2", TRUE, "required_property", status = "open", availability = "unavailable",
-  rationale = computation)
-stopifnot(
-  identical(csdg_claim_report(audit, evidence = list(g2_learner, g5_learner, coding_error))$assessment, "not_met"),
-  identical(csdg_claim_report(audit, evidence = list(g2_learner, g5_learner, grouped))$assessment, "met"),
-  identical(csdg_claim_report(audit, evidence = list(failed, g5_learner))$assessment, "unresolved"),
-  identical(csdg_adjudicate_claim(list(), claim_applicable = FALSE,
-    applicability_rationale = "The claim is outside this evaluation.")$assessment, "not_applicable")
-)
-```
-
-## Export, reload, and verify
-
-The audit bundle contains the claim report of the audit claim, assessed by the decision rule from the audit
-diagnostics alone: without the researcher's records, G2 and G5 are open, so the claim is unresolved. The assessments
-of all four claims, with the researcher's records, are written to a separate file next to the bundle and read back.
-
-```{r export}
-export_root = tempfile("csdg_walkthrough_")
-dir.create(export_root)
-audit_bundle = csdg_export(audit, path = export_root)
-explicit = list(
-  package_version = as.character(packageVersion("mlr3autoiml")),
-  claims = list(claim_both, claim_a, claim_predict, claim_relies),
-  evidence = list(evidence_both, evidence_a, list(threat), list(g2_learner, g5_learner)),
-  assessments = list(assessment_both$assessment, assessment_a$assessment, report_predict$assessment,
-    report_relies$assessment),
-  decisions = c("revise", "retain", "withhold", "retain"),
-  reported_claims = c("Revised to the claim about model A.", claim_a$statement,
-    "Withheld: not established.", claim_relies$statement),
-  relation = relation
-)
-assessment_path = file.path(export_root, "explicit_assessments.json")
-jsonlite::write_json(explicit, assessment_path, auto_unbox = TRUE, pretty = TRUE, null = "null", na = "null")
-read_back = jsonlite::read_json(assessment_path)
-bundle_report = read.csv(file.path(audit_bundle, "claim_report.csv"))
-stopifnot(
-  identical(vapply(read_back$claims, `[[`, character(1L), "id"),
-    c(claim_both$id, claim_a$id, claim_predict$id, claim_relies$id)),
-  identical(unlist(read_back$assessments), c("not_met", "met", "unresolved", "met")),
-  identical(unlist(read_back$decisions), c("revise", "retain", "withhold", "retain")),
-  identical(bundle_report$assessment, "unresolved"), identical(bundle_report$open_gates, "G2, G5"))
-cat("Export and read-back verified for all four claims.\n")
-# A caller can retain this synthetic-only bundle without changing the tutorial.
-keep = Sys.getenv("CSDG_VIGNETTE_EXPORT_DIR")
-if (nzchar(keep)) {
-  dir.create(keep, recursive = TRUE, showWarnings = FALSE)
-  stopifnot(all(file.copy(list.files(export_root, full.names = TRUE), keep, recursive = TRUE)))
-}
-```
-
-## The applications in the article
-
-In SHILD, the claim that XGBoost relies mainly on self-rated health and depressed mood is met (exploratory) and
-retained, as are the claims that apparent fidelity overstates how accurately the local surrogates reproduce the model
-on new points and that, for this rare outcome, surrogates fitted on the log-odds scale reproduce it more accurately.
-The claim that explanations of individual predictions can guide follow-up decisions is not met, because the stability
-property (G5) is contradicted, and is withheld. The revised population claim about the information that the two items
-carry is unresolved, because agreement among similarly accurate learners (G6a) is open, and is withheld.
-
-In PISA, the claim that the five most important predictors of XGBoost are the same for every plausible value is met
-(a sanity check). The claim that three similarly accurate learners have the same five most important predictors is
-not met and is revised; the claim that ridge regression relies far more on socioeconomic indices than XGBoost and
-random forest do is not met and is withheld. In the confirmatory stage, four of five claims are met. The article
-and its supplement report the records, criteria, and numbers.
-
-For further diagnostics, see the help pages `?csdg_audit`, `?csdg_local_fidelity_audit` (the fitted local surrogate
-is described in `?csdg_diagnostics`, section "Local surrogate"), `?csdg_learner_pfi_interval`, and
-`?csdg_importance_agreement`.
-
-```{r session-info}
-sessionInfo()
-```
+In the article's variant with items of different reliability, the model that uses the more reliable item has the
+larger PFI, although both items measure the same `Z`; importance can then reflect the reliability of a measure
+rather than the relevance of its construct. Analysts who record claims, scopes, and evidence by hand, for example
+for a claim stated before the analysis, find the record functions in `?csdg_claim`, `?csdg_evidence_record`,
+`?csdg_adjudicate_claim`, and `?csdg_claim_relation`.

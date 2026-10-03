@@ -16,8 +16,8 @@ identifiers (G0A to G7B, with combined G3 and G6) and its pass/warn/fail/skip la
 diagnostics; they are separate from the CSDG gate registry (`csdg_gate_registry()`), the property statuses, and the
 claim assessments. Printing a legacy `GateResult` emits a targeted deprecation warning. New analyses start from the
 CSDG interface described in
-[the CSDG walkthrough](https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html)
-(`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`).
+[Checking what an explanation shows](https://stefancoors.de/mlr3autoiml/articles/exploratory_workflow.html)
+(`vignette("exploratory_workflow", package = "mlr3autoiml")`).
 
 The code in this article is shown but not run when the article is built, because each example fits several learners
 with repeated resampling. To run it, install the suggested packages `mlr3learners`, `mlr3pipelines`, `ranger`,

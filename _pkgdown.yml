@@ -3,6 +3,21 @@ template:
   bootstrap: 5
 
 reference:
+- title: CSDG analysis
+  desc: Fit learners, compute held-out PFI, derive a claim from the result, check it, and assess it.
+  contents:
+  - csdg_fit
+  - csdg_importance
+  - csdg_effect
+  - claim_relies_mainly
+  - claim_top_k
+  - claim_order
+  - claim_direction
+  - csdg_check
+  - csdg_judge
+  - csdg_assess
+  - csdg_confirm
+  - csdg_export_assessment
 - title: CSDG cards and planning
   contents:
   - csdg_claim
@@ -97,6 +112,7 @@ articles:
 - title: CSDG guide
   navbar: CSDG guide
   contents:
+  - exploratory_workflow
   - claim_scoped_diagnostic_gates
 - title: Legacy AutoIML workflow
   navbar: Legacy AutoIML workflow

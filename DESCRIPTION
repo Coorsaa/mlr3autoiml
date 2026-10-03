@@ -1,7 +1,7 @@
 Package: mlr3autoiml
 Type: Package
 Title: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning
-Version: 0.1.7
+Version: 0.2.0
 Authors@R: c(
     person("Stefan", "Coors", email = "mail@stefancoors.de", role = c("aut","cre")),
     person("Clara", "Vetter", role = "aut"),
@@ -19,7 +19,10 @@ Description: Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for
     the 'mlr3' ecosystem and computes diagnostics such as held-out permutation
     feature importance, corrected resampled intervals, calibration,
     cross-fitted local fidelity of local surrogates, stability, and
-    comparisons across models, settings, and subgroups. Favorable evidence
+    comparisons across models, settings, and subgroups. An analysis-first
+    interface fits learners on common splits, computes held-out permutation
+    feature importance, derives claims from the results, and computes the
+    standard checks and the assessment. Favorable evidence
     never offsets a contradicted property, and no aggregate score is
     computed. The earlier 'AutoIML' workflow remains available for
     compatibility.

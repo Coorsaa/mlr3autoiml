@@ -7,24 +7,28 @@
 conclusion that they draw from an explanation of a machine learning
 model, such as “the model relies mainly on self-rated health.” It
 implements **Claim-Scoped Diagnostic Gates (CSDG)** for the **mlr3
-ecosystem** in five steps:
+ecosystem**. An analysis runs in its usual order:
 
-1.  **Write the claim**, the conclusion you intend to report
-    (`csdg_claim()`).
-2.  **Specify its scope** in six elements: the quantity, model,
-    procedure, data, meaning, and use.
-3.  **Derive the required properties** from the 12 gates
-    (`csdg_gate_registry()`, `csdg_gate_plan()`).
-4.  **Evaluate the evidence** on each required property
-    (`csdg_evidence_record()`, with diagnostics from `csdg_audit()`).
-5.  **Decide and report** with a fixed rule (`csdg_adjudicate_claim()`).
+1.  **Fit** learners and a model without predictors on the same
+    cross-validation splits with `mlr3::benchmark()` (`csdg_fit()`).
+2.  **Look** at held-out permutation feature importance (PFI), also
+    grouped and conditional (`csdg_importance()`), or at accumulated
+    local effects (`csdg_effect()`).
+3.  **State a claim** that the result suggests (`claim_relies_mainly()`,
+    `claim_top_k()`, `claim_order()`, `claim_direction()`).
+4.  **Check it**: the package derives the properties that the claim
+    requires from the 12 gates of the article and computes the default
+    checks (`csdg_check()`).
+5.  **Assess it** with a fixed decision rule (`csdg_assess()`) and test
+    it on new data with the same criteria (`csdg_confirm()`).
 
-The package records the claim and its scope, derives the gate plan,
-computes diagnostics, and applies the decision rule. The researcher sets
-the criteria, states the relevance of each observation, and enters
-established counterevidence and unresolved threats. Favorable results
-never offset a contradicted property, and no aggregate score is
-computed.
+The package writes the claim, its scope, the criteria, and the
+observations from the computations. Properties that cannot be computed,
+such as validity evidence for a construct, are entered with
+`csdg_judge()`. Favorable results never offset a contradicted property,
+and no aggregate score is computed. Claims, scopes, and evidence can
+also be recorded by hand (`csdg_claim()`, `csdg_evidence_record()`,
+`csdg_adjudicate_claim()`).
 
 | Term | Values |
 |----|----|
@@ -44,210 +48,151 @@ library(mlr3autoiml)
 ```
 
 Released versions are tagged, for example
-`remotes::install_github("coorsaa/mlr3autoiml@v0.1.7")`.
+`remotes::install_github("coorsaa/mlr3autoiml@v0.2.0")`.
 
-## Quick start: the numerical example of the article
+## Quick start
 
-Two items carry the same information: `Z` is standard normal, and both
-items and the outcome equal `Z`. Model A predicts with item 1 and model
-B with item 2 (`f_A(x) = x1`, `f_B(x) = x2`); because the outcome equals
-each item, the linear fit in every fold is exact. The package computes
-the held-out permutation feature importance (PFI) with squared error.
+A simulated survey of 500 respondents has 12 items and a binary outcome.
+Two scale scores, `low_mood` and `fatigue`, predict it strongly;
+`worry_a` and `worry_b` are two wordings of one worry item; three items
+have weak effects and five none.
 
 ``` r
 library(mlr3)
 library(mlr3learners)
-library(mlr3pipelines)
 library(mlr3autoiml)
 library(data.table)
 
-set.seed(20260926)
-n = 10000L
-z = rnorm(n)
-task = as_task_regr(data.frame(item_1 = z, item_2 = z, y = z), target = "y", id = "numerical_example")
-model_using = function(item) {
-  as_learner(po("select", selector = selector_name(item), id = paste0("use_", item)) %>>% lrn("regr.lm"))
+simulate_survey = function(n, seed) {
+  set.seed(seed)
+  items = c("low_mood", "fatigue", "worry_a", "worry_b", "poor_sleep", "stress", "loneliness", "inactivity",
+    "appetite", "concentration", "support", "optimism")
+  x = as.data.table(matrix(rnorm(n * 12), n, 12, dimnames = list(NULL, items)))
+  worry = rnorm(n)
+  x[, worry_a := as.integer(cut(worry + rnorm(n, sd = 0.3), c(-Inf, -1.2, -0.4, 0.4, 1.2, Inf)))]
+  x[, worry_b := pmin(5L, pmax(1L, worry_a + ifelse(runif(n) < 0.02, sample(c(-1L, 1L), n, TRUE), 0L)))]
+  eta = -0.3 + 1.2 * x$low_mood + 1.1 * x$fatigue + 0.7 * worry + 0.3 * x$poor_sleep + 0.2 * x$stress +
+    0.15 * x$loneliness
+  x[, low_wellbeing := factor(rbinom(n, 1, plogis(eta)), levels = c(0, 1))]
+  as_task_classif(x, target = "low_wellbeing", positive = "1", id = "survey")
 }
-folds = rsmp("cv", folds = 2L)
-fits = list(
-  A = csdg_resample(task, model_using("item_1"), folds, measures = msrs("regr.mse"), seed = 1L),
-  B = csdg_resample(task, model_using("item_2"), folds, measures = msrs("regr.mse"), seed = 1L)
+task = simulate_survey(500L, seed = 3L)
+```
+
+**Fit and look.** XGBoost and ridge logistic regression are fitted on
+the same five folds as a model without predictors; held-out PFI is the
+increase in held-out log loss when one predictor is permuted. Common
+learners are labeled by their method in all generated text.
+
+``` r
+learners = list(
+  xgboost = lrn("classif.xgboost", nrounds = 100, eta = 0.1, max_depth = 3, predict_type = "prob"),
+  ridge = lrn("classif.cv_glmnet", alpha = 0, nfolds = 5, predict_type = "prob")
 )
-groups = list(item_1 = "item_1", item_2 = "item_2", both_items = c("item_1", "item_2"))
-pfi = lapply(fits, csdg_fold_pfi, feature_groups = groups, loss = "mse", repetitions = 20L, seed = 2L)
-marginal = rbindlist(lapply(names(pfi), function(model) {
-  pfi[[model]]$summary[, .(model = model, feature_group, mean_importance)]
-}))
-dcast(marginal, model ~ feature_group, value.var = "mean_importance")[, lapply(.SD, function(x) {
-  if (is.numeric(x)) round(x, 2) else x
-})]
-#> Key: <model>
-#>     model both_items item_1 item_2
-#>    <char>      <num>  <num>  <num>
-#> 1:      A       1.98   1.98   0.00
-#> 2:      B       1.98   0.00   1.99
+fits = csdg_fit(task, learners, folds = 5, seed = 1)
+imp = csdg_importance(fits, repetitions = 10, seed = 2)
+imp
+#> <CSDGImportance> held-out PFI, increase in log loss; 5 folds x 10 permutations
+#> XGBoost: held-out log loss 0.607 versus 0.681 for the model without predictors (improvement 0.0743)
+#>   predictor    mean PFI   relative to improvement   folds in top 2
+#>   fatigue         0.181                      244%              5/5
+#>   low_mood        0.180                      242%              5/5
+#>   worry_a        0.0149                       20%              0/5
+#>   stress         0.0123                       17%              0/5
+#>   poor_sleep     0.0069                      9.3%              0/5
+#>   loneliness     0.0030                      4.1%              0/5
+#>   ... 6 more predictors
+#> ridge logistic regression: held-out log loss 0.560 versus 0.681 for the model without predictors (improvement 0.121)
+#>   predictor    mean PFI   relative to improvement   folds in top 2
+#>   low_mood       0.0950                       79%              5/5
+#>   fatigue        0.0860                       71%              5/5
+#>   stress         0.0055                      4.5%              0/5
+#>   poor_sleep     0.0048                      4.0%              0/5
+#>   worry_a        0.0046                      3.8%              0/5
+#>   worry_b        0.0025                      2.1%              0/5
+#>   ... 6 more predictors
+#> Folds in top 2: folds in which the predictor has one of the 2 largest PFI values (print(imp, k = )).
+#> PFI values are not parts of the improvement, so PFI relative to the improvement can exceed 100%.
 ```
-
-The exact population values are 2 and 0 in model A and 0 and 2 in model
-B; permuting both items together (grouped PFI) gives 2 in both models.
-Conditional PFI, which draws the permuted item from its distribution
-given the other item, is 0 for both items in both models; here the
-permutation within strata of `Z` implements it, because each item equals
-the other.
 
 ``` r
-conditional = lapply(fits, csdg_fold_pfi, feature_groups = groups[1:2], loss = "mse", repetitions = 5L,
-  strata = z, seed = 3L)
-rbindlist(lapply(names(conditional), function(model) {
-  conditional[[model]]$summary[, .(model = model, feature_group, mean_importance)]
-}))
-#>     model feature_group mean_importance
-#>    <char>        <char>           <num>
-#> 1:      A        item_1               0
-#> 2:      A        item_2               0
-#> 3:      B        item_1               0
-#> 4:      B        item_2               0
+plot(imp)
 ```
 
-**Steps 1 and 2: the claim and its scope.** The claim covers both
-models.
+<img src="man/figures/README-quick-start-plot-1.png" width="100%" />
+
+**Claim, check, and assess.** The result suggests that XGBoost relies
+mainly on `low_mood` and `fatigue`. `claim_relies_mainly()` states the
+claim, `csdg_check()` computes the properties that it requires, and
+`csdg_assess()` applies the decision rule.
 
 ``` r
-claim_both = csdg_claim(
-  id = "both_models",
-  statement = "Under marginal permutation, both models rely more on item 1 than on item 2.",
-  claim_type = "global_explanation",
-  quantity = "marginal PFI with squared error: increase in expected squared error when one item is permuted",
-  model = "several_models",
-  procedure = "each item permuted independently of the other item and the outcome; 20 permutations per fold",
-  data = "Z standard normal; item 1 = item 2 = outcome = Z; 10,000 simulated observations",
-  meaning = "model_description",
-  use = "scientific description",
-  provenance = list(origin = "specified_before_results", date = "2026-09-26",
-    time_basis = "date of the example", selection_basis = "written before the PFI values were computed",
-    evidence_ids = character())
-)
-measurement = csdg_measurement(outcome = "y", predictors = c("item_1", "item_2"), data_source = "simulation",
-  sample_definition = "all simulated observations", missingness = "none", preprocessing = "none")
-explanation = csdg_explanation(method_ids = "pfi", feature_groups = groups)
+claim = claim_relies_mainly(imp, k = 2, factor = 2, learners = "xgboost")
+chk = csdg_check(claim, imp)
+chk
+#> <CSDG check> XGBoost relies mainly on fatigue and low_mood.
+#> Criteria (defaults, see ?csdg_check): minimum importance 1% of the improvement;
+#> at least 5 of 5 folds; Monte Carlo rule; corrected 95% interval must clear the
+#> smallest relevant difference.
+#> gate  check               status        observation
+#> G0a/b scope               supported     The six scope elements are generated
+#>                                         from the analysis; the claim names
+#>                                         analyzed variables, not constructs.
+#> G1    performance         context       Held-out log loss 0.607 versus 0.681
+#>                                         for the model without predictors
+#>                                         (improvement 0.0743, 11%); 4 of 5 folds
+#>                                         improve.
+#> G2    content             supported     fatigue 0.181 and low_mood 0.180 versus
+#>                                         0.0149 for worry_a, the largest other
+#>                                         predictor (12.2 and 12.0 times); margin
+#>                                         (PFI minus 2 x PFI of worry_a) 0.152
+#>                                         [0.0576, 0.246] and 0.150 [0.0779,
+#>                                         0.222]. Against the largest other
+#>                                         predictor of each fold, which can
+#>                                         differ between folds: 0.134 [0.0448,
+#>                                         0.223] and 0.133 [0.0432, 0.222].
+#> G2    minimum importance  supported     fatigue 0.181 (244%) and low_mood 0.180
+#>                                         (242%) of the improvement of 0.0743
+#>                                         (0.681 to 0.607).
+#> G2    procedure           supported     Held-out marginal PFI with log loss, 10
+#>                                         permutations per fold in 5 folds, as
+#>                                         the scope names. No grouped or
+#>                                         conditional comparison was requested.
+#> G5    stability           supported     Selected anew in each fold: 5 of 5
+#>                                         folds reproduce the result (cutoff 1: 0
+#>                                         of 5; cutoff 3: 1 of 5).
+#> G6a   other learner       context       ridge logistic regression: the result
+#>                                         also holds (fatigue 0.0860 and low_mood
+#>                                         0.0950 versus 0.0055 for stress).
+csdg_assess(chk)
+#> <CSDG assessment> XGBoost relies mainly on fatigue and low_mood.
+#>   Met (exploratory)
+#>   Specification (G0a) supported | Measurement (G0b) supported | Content (G2)
+#>   supported | Minimum importance (G2) supported | Procedure (G2) supported |
+#>   Stability (G5) supported
+#>   On average, fatigue and low_mood have 12.2 and 12.0 times the PFI of the
+#>   largest other predictor, worry_a; the result recurs in 5 of 5 folds. The
+#>   claim was formulated after the explanation was inspected; it is established
+#>   only after a test on new data (csdg_confirm()).
+#>   Decision options: retain
 ```
 
-**Step 3: the required properties.** Besides G0a and G0b, the claim
-requires G2 (it interprets PFI values), G5 (it states an ordering), and
-G6a (it covers two models). Held-out performance (G1) is context,
-because a model description holds whatever the model’s accuracy.
-
-``` r
-plan = csdg_gate_plan(claim_both, measurement, explanation)
-plan[, .(gate_id, gate_name, required, plan_role)]
-#>     gate_id              gate_name required    plan_role
-#>      <char>                 <char>   <lgcl>       <char>
-#>  1:     G0a          Specification     TRUE     required
-#>  2:     G0b   Measurement and data     TRUE     required
-#>  3:      G1 Predictive performance    FALSE      context
-#>  4:      G2              Procedure     TRUE     required
-#>  5:     G3a            Calibration    FALSE not_required
-#>  6:     G3b              Decisions    FALSE not_required
-#>  7:      G4         Local fidelity    FALSE not_required
-#>  8:      G5              Stability     TRUE     required
-#>  9:     G6a                 Models     TRUE     required
-#> 10:     G6b               Settings    FALSE not_required
-#> 11:     G7a              Subgroups    FALSE not_required
-#> 12:     G7b                  Users    FALSE not_required
-```
-
-**Step 4: the evidence.** In model A, the difference between the two
-items is far beyond the error due to random permutation (Monte Carlo
-rule, per fold). The decisive property is G6a: model B reverses the
-ordering.
-
-``` r
-csdg_pfi_mc_difference(pfi$A, "item_1", "item_2")[, .(iteration, estimate, threshold, beyond_monte_carlo_error)]
-#>    iteration estimate   threshold beyond_monte_carlo_error
-#>        <int>    <num>       <num>                   <lgcl>
-#> 1:         1 1.965369 0.009051588                     TRUE
-#> 2:         2 1.995245 0.009445336                     TRUE
-
-property = function(gate_id, status, required_property, observation, relevance, criterion = NULL) {
-  csdg_evidence_record(
-    gate_id, TRUE, "required_property", status = status,
-    criterion = if (!is.null(criterion)) list(value = criterion, direction = "qualitative"),
-    criterion_source = if (!is.null(criterion)) "translated from the claim",
-    criterion_rationale = if (!is.null(criterion)) required_property,
-    rationale = observation, required_property = required_property, observation = observation,
-    relevance_to_proposition = relevance
-  )
-}
-foundation = list(
-  property("G0a", "supported", "The claim and its six scope elements are stated.",
-    "All six elements are recorded.", "They fix the quantity, the models, and the procedure."),
-  property("G0b", "supported", "The data cover what the claim names.",
-    "The population is defined exactly; there is no measurement error or preprocessing.",
-    "The claim names no construct and no other population."),
-  property("G2", "supported", "Marginal permutation computes the PFI that the claim names.",
-    "Squared error and marginal permutation; both models are defined for all inputs.",
-    "The claim names the perturbation, so the unrealistic permuted inputs are part of what it describes."),
-  property("G5", "supported", "The ordering persists when the quantity is estimated again.",
-    "Exact values do not vary.", "The same quantity is computed again.")
-)
-g6a = property("G6a", "contradicted", "Item 1 has the larger marginal PFI in A and in B.",
-  "PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B.",
-  "Only the model differs between the two computations, and the claim covers both models.",
-  criterion = "strict ordering in both models")
-```
-
-**Step 5: decide and report.** The original claim is not met and is
-revised to model A.
-
-``` r
-assessment_both = csdg_adjudicate_claim(c(foundation, list(g6a)), claim_applicable = TRUE, plan = plan)
-assessment_both
-#> <CSDGClaimAdjudication>
-#>   Assessment: not met 
-#>   Decision options: revise or withhold 
-#>   Required properties:
-#>    G0a: supported (record)
-#>    G0b: supported (record)
-#>    G2: supported (record)
-#>    G5: supported (record)
-#>    G6a: contradicted (record)
-#> 
-#>   A required property is contradicted; favorable results never offset it.
-
-claim_a = csdg_claim_revision(
-  claim_both, id = "model_a", claim_version = "C1", revision_relation = "narrower",
-  statement = "Under marginal permutation, model A relies more on item 1 than on item 2.",
-  model = "fitted_model",
-  provenance = list(origin = "retrospective_exploratory", date = "2026-09-26", time_basis = "date of the example",
-    selection_basis = "restriction chosen after the comparison of A and B", evidence_ids = "both_models_G6a")
-)
-plan_a = csdg_gate_plan(claim_a, measurement, explanation)
-plan_a[required == TRUE, gate_id]
-#> [1] "G0a" "G0b" "G2"  "G5"
-g2_a = property("G2", "supported",
-  "Marginal PFI with squared error in model A is larger for item 1, and the wording names the perturbation.",
-  "2 versus 0; conditional PFI 0 versus 0.",
-  "The computation uses the model, perturbation, and loss that the claim names.",
-  criterion = "strict ordering of the exact values; qualifier in the wording")
-assessment_a = csdg_adjudicate_claim(c(foundation[c(1L, 2L, 4L)], list(g2_a)), claim_applicable = TRUE,
-  plan = plan_a)
-assessment_a$assessment
-#> [1] "met"
-assessment_a$decision_options
-#> [1] "retain"
-```
-
-The revised claim is met (exploratory; it was written after the results
-were seen) and retained.
+The claim was formulated after the explanation was inspected, so its
+assessment is exploratory; `csdg_confirm(chk, new_task)` fits the same
+learners to new data and applies the claim with the same criteria.
 
 ## Learn more
 
-- **[The CSDG
-  walkthrough](https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html)**
+- **[Checking what an explanation
+  shows](https://stefancoors.de/mlr3autoiml/articles/exploratory_workflow.html)**
+  (`vignette("exploratory_workflow", package = "mlr3autoiml")`) works
+  through the simulated survey with 1,000 respondents: a claim that is
+  met, a claim about the two wordings that conditional PFI contradicts,
+  a direction, and the test on new data.
+- **[The numerical example of the
+  article](https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html)**
   (`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`)
-  follows the five steps with the numerical example, an unresolved claim
-  with an unresolved threat, and a met claim assessed with
-  `csdg_audit()`.
+  assesses the three claims of the article’s numerical example.
 - **[The function
   reference](https://stefancoors.de/mlr3autoiml/reference/index.html)**
   documents every function, including the diagnostics of `csdg_audit()`

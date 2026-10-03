@@ -1,0 +1,218 @@
+---
+title: "Checking what an explanation shows"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Checking what an explanation shows}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+run = all(vapply(c("mlr3learners", "xgboost", "glmnet"), requireNamespace, logical(1L), quietly = TRUE))
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 4.5, eval = run)
+num = function(x, digits = 3L) if (run) formatC(signif(x, digits), digits = digits, format = "fg", flag = "#") else "?"
+txt = function(x) if (run) x else "?"
+```
+
+An explanation of a fitted model, such as permutation feature importance (PFI), often suggests a conclusion: "the
+model relies mainly on these two predictors." This vignette checks such conclusions, called claims, in the order of
+an ordinary analysis: fit learners, compute the explanation and look at it, state the claim that the result suggests,
+and let the package compute the checks of Claim-Scoped Diagnostic Gates (CSDG) and the assessment. The package
+writes the claim, its scope, the criteria, and the observations from the computations.
+`r if (!run) "The code is not run because the suggested packages mlr3learners, xgboost, or glmnet are not installed."`
+
+```{r packages, message = FALSE, warning = FALSE}
+library(mlr3autoiml)
+library(mlr3)
+library(mlr3learners)
+library(data.table)
+```
+
+## Data
+
+The simulated survey has 1,000 respondents, 12 items, and a binary outcome, `low_wellbeing`. Two scale scores
+(`low_mood`, `fatigue`) predict it strongly; `worry_a` and `worry_b` are two wordings of the same 5-point worry item,
+with nearly identical answers; `poor_sleep`, `stress`, and `loneliness` have weak effects; the other five items have
+none.
+
+```{r data}
+simulate_survey = function(n, seed) {
+  set.seed(seed)
+  items = c("low_mood", "fatigue", "worry_a", "worry_b", "poor_sleep", "stress", "loneliness", "inactivity",
+    "appetite", "concentration", "support", "optimism")
+  x = as.data.table(matrix(rnorm(n * 12), n, 12, dimnames = list(NULL, items)))
+  worry = rnorm(n)
+  # two wordings of the same 5-point worry item; 2% of respondents answer them one category apart
+  x[, worry_a := as.integer(cut(worry + rnorm(n, sd = 0.3), c(-Inf, -1.2, -0.4, 0.4, 1.2, Inf)))]
+  x[, worry_b := pmin(5L, pmax(1L, worry_a + ifelse(runif(n) < 0.02, sample(c(-1L, 1L), n, TRUE), 0L)))]
+  eta = -0.3 + 1.2 * x$low_mood + 1.1 * x$fatigue + 0.7 * worry + 0.3 * x$poor_sleep + 0.2 * x$stress +
+    0.15 * x$loneliness
+  x[, low_wellbeing := factor(rbinom(n, 1, plogis(eta)), levels = c(0, 1))]
+  as_task_classif(x, target = "low_wellbeing", positive = "1", id = "survey")
+}
+task = simulate_survey(1000L, seed = 3L)
+```
+
+## Fit and look
+
+`csdg_fit()` fits XGBoost and ridge logistic regression with `mlr3::benchmark()` on the same ten cross-validation
+splits, together with a model without predictors. The loss, log loss by default, is used for the fold scores, for
+PFI, and for the improvement over the model without predictors.
+
+```{r fit}
+learners = list(
+  xgboost = lrn("classif.xgboost", nrounds = 100, eta = 0.1, max_depth = 3, predict_type = "prob"),
+  ridge = lrn("classif.cv_glmnet", alpha = 0, nfolds = 5, predict_type = "prob")
+)
+fits = csdg_fit(task, learners, folds = 10, seed = 1)
+fits
+```
+
+`csdg_importance()` computes held-out PFI, the increase in held-out log loss when one predictor is permuted, in each
+fold with 20 permutations.
+
+```{r importance}
+imp = csdg_importance(fits, repetitions = 20, seed = 2)
+imp
+plot(imp)
+```
+
+The printout reports the improvement of each learner over the model without predictors, here
+`r num(imp$improvement[learner == "xgboost", improvement])` log-loss units for XGBoost. PFI values are not parts of
+this improvement, so PFI relative to the improvement can exceed 100%. In the plot, the bars are averages over folds,
+the points are folds, and the dashed line marks 1% of the improvement, the default minimum importance.
+`summary(imp)` returns the table with corrected 95% intervals for a results table.
+
+## Claim 1: XGBoost relies mainly on two items
+
+The result suggests that XGBoost relies mainly on `low_mood` and `fatigue`. `claim_relies_mainly()` states this as a
+claim: each of the two predictors with the largest average PFI has at least twice the PFI of every other predictor.
+`csdg_check()` computes the properties that the claim requires.
+
+```{r claim-1}
+claim1 = claim_relies_mainly(imp, k = 2, factor = 2, learners = "xgboost")
+claim1
+chk1 = csdg_check(claim1, imp)
+chk1
+```
+
+Each row is one property with its gate, check, and status. Under G2, the content row compares the averages over
+folds; the margin is the PFI of each named item minus twice the PFI of the largest other item, and it must hold
+beyond Monte Carlo error and with the lower bound of its corrected resampled t interval. The minimum importance
+compares each named item with 1% of the improvement, and the procedure row records that the wording names marginal
+PFI. Under G5, the selection is repeated in each fold: `r txt(chk1$details$stability$xgboost$n_holds)` of
+`r txt(fits$K)` folds reproduce the claim. The result of ridge logistic regression (G6a) and held-out performance
+(G1) are context. `print(chk1, details = TRUE)` adds each criterion and its relevance; `?csdg_check` documents the
+criteria and their sources.
+
+```{r assess-1}
+res1 = csdg_assess(chk1)
+res1
+```
+
+```{r assert-1, include = FALSE}
+stopifnot(identical(res1$assessment, "met"))
+```
+
+The claim is `r txt(res1$label)`. It is exploratory because it was formulated after the explanation was inspected;
+the data that suggested it cannot also test it.
+
+## Claim 2: one wording matters more than the other
+
+XGBoost gives the two wordings of the worry item different PFI. Given the pair, `claim_order()` orders it by the
+average PFI and states that XGBoost relies more on the first wording than on the second.
+
+```{r claim-2}
+claim2 = claim_order(imp, c("worry_a", "worry_b"), learners = "xgboost")
+chk2_marginal = csdg_check(claim2, imp)
+csdg_assess(chk2_marginal)
+```
+
+The two wordings correlate at
+r = `r txt(sub("^0", "", num(cor(task$data()$worry_a, task$data()$worry_b), 2L)))`. Marginal PFI can shift
+importance between correlated predictors, so without a comparison that accounts for the correlation, the claim faces
+an unresolved threat under G2 and is `r txt(csdg_assess(chk2_marginal)$label)`. Conditional PFI permutes one wording
+within the answers to the other, so the permuted inputs stay realistic. Passing the existing result to
+`csdg_importance()` adds it; the marginal values do not change.
+
+```{r claim-2-conditional}
+imp2 = csdg_importance(imp, conditional = list(worry_a = "worry_b", worry_b = "worry_a"))
+plot(imp2, features = c("worry_a", "worry_b"))
+res2 = csdg_assess(csdg_check(claim2, imp2))
+res2
+```
+
+```{r assert-2, include = FALSE}
+stopifnot(res2$assessment %in% c("not_met", "unresolved"))
+```
+
+Once one wording is known, the other adds
+`r num(imp2$summary[learner == "xgboost" & type == "conditional" & feature_group == claim2$first, mean_importance], 2L)`
+(`r txt(claim2$first)`) and
+`r num(imp2$summary[learner == "xgboost" & type == "conditional" & feature_group == claim2$second, mean_importance], 2L)`
+(`r txt(claim2$second)`) log-loss units. The claim is `r txt(res2$label)` (decisive:
+`r txt(as.data.table(res2)$decisive_checks)`): conditional PFI does not establish that either wording adds
+information beyond the other. The check also reports the same comparison for ridge logistic regression as context
+(G6a). With `marginal_only = TRUE`, the claim would describe only
+marginal permutation; which wording XGBoost uses can change with the sample.
+
+## A direction
+
+`csdg_effect()` computes the accumulated local effect (ALE) of predictors in the held-out folds and its change
+between the 10th and the 90th percentile. After looking at it, `claim_direction()` states the sign.
+
+```{r direction}
+eff = csdg_effect(fits, c("poor_sleep", "stress"))
+eff
+claim3 = claim_direction(eff, "poor_sleep", learners = "xgboost")
+res3 = csdg_assess(csdg_check(claim3, eff))
+res3
+```
+
+This claim is `r txt(res3$label)`.
+
+## Claim 1 on new data
+
+`csdg_confirm()` applies claim 1 with the criteria of `chk1` to a new sample from the same population. Given a new
+task, it fits the same learners with the same resampling and seeds and computes PFI with the same settings; the two
+predictors are not selected again, and the criteria were fixed before the new data were analyzed. Rows that also
+occur in the data of the check are an error.
+
+```{r confirm}
+task_new = simulate_survey(1000L, seed = 1003L)
+conf1 = csdg_confirm(chk1, task_new)
+conf1
+```
+
+```{r assert-3, include = FALSE}
+stopifnot(identical(conf1$assessment, "met"))
+```
+
+Claim 1 is `r txt(conf1$label)`.
+
+## Constructs and judgments
+
+A claim that names constructs rather than the analyzed variables needs validity evidence for them (G0b), which the
+package cannot compute. `refers_to = "constructs"` marks such a claim, and `csdg_judge()` enters the evidence.
+
+```{r judge}
+claim1c = claim_relies_mainly(imp, k = 2, learners = "xgboost", refers_to = "constructs")
+judged = csdg_judge("G0b", supported(), note = "Both scales: omega above .85 and scalar invariance (Table S2).")
+csdg_assess(csdg_check(claim1c, imp, judgments = judged))$label
+```
+
+## The records
+
+The printouts are summaries. `as.data.table(chk1)` holds the full property, criterion, observation, and relevance
+texts; `chk1$records` are the evidence records built with `csdg_evidence_record()`, and `res1$adjudication` is the
+result of `csdg_adjudicate_claim()`. `csdg_export_assessment()` writes them to a directory, without models,
+predictions, or row-level data.
+
+```{r records}
+as.data.table(chk1)[, .(gate, check, role, status)]
+list.files(csdg_export_assessment(res1, tempdir()))
+```
+
+The numerical example of the article is worked through in
+`vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")`, and the
+[function reference](https://stefancoors.de/mlr3autoiml/reference/index.html) documents all arguments and criteria.
