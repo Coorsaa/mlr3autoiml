@@ -11,8 +11,8 @@
 <script src="deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Claim-Scoped Diagnostic Gates for Interpretable Machine Learning">
-<meta name="description" content="Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for deciding whether evidence supports a conclusion drawn from an explanation of a machine learning model. Users write the claim, specify its scope (quantity, model, procedure, data, meaning, and use), derive the properties it requires from a catalog of 12 gates, evaluate each property as supported, contradicted, or open, and apply a fixed decision rule under which a claim is met, not met, or unresolved. The package integrates with the mlr3 ecosystem and computes diagnostics such as held-out permutation feature importance, corrected resampled intervals, calibration, cross-fitted local fidelity of local surrogates, stability, and comparisons across models, settings, and subgroups. Favorable evidence never offsets a contradicted property, and no aggregate score is computed. The earlier AutoIML workflow remains available for compatibility.">
-<meta property="og:description" content="Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for deciding whether evidence supports a conclusion drawn from an explanation of a machine learning model. Users write the claim, specify its scope (quantity, model, procedure, data, meaning, and use), derive the properties it requires from a catalog of 12 gates, evaluate each property as supported, contradicted, or open, and apply a fixed decision rule under which a claim is met, not met, or unresolved. The package integrates with the mlr3 ecosystem and computes diagnostics such as held-out permutation feature importance, corrected resampled intervals, calibration, cross-fitted local fidelity of local surrogates, stability, and comparisons across models, settings, and subgroups. Favorable evidence never offsets a contradicted property, and no aggregate score is computed. The earlier AutoIML workflow remains available for compatibility.">
+<meta name="description" content="Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for deciding whether evidence supports a conclusion drawn from an explanation of a machine learning model. Users write the claim, specify its scope (quantity, model, procedure, data, meaning, and use), derive the properties it requires from a catalog of 12 gates, evaluate each property as supported, contradicted, or open, and apply a fixed decision rule under which a claim is met, not met, or unresolved. The package integrates with the mlr3 ecosystem and computes diagnostics such as held-out permutation feature importance, corrected resampled intervals, calibration, cross-fitted local fidelity of local surrogates, stability, and comparisons across models, settings, and subgroups. An analysis-first interface fits learners on common splits, computes held-out permutation feature importance, derives claims from the results, and computes the standard checks and the assessment. Favorable evidence never offsets a contradicted property, and no aggregate score is computed. The earlier AutoIML workflow remains available for compatibility.">
+<meta property="og:description" content="Implements Claim-Scoped Diagnostic Gates (CSDG), a framework for deciding whether evidence supports a conclusion drawn from an explanation of a machine learning model. Users write the claim, specify its scope (quantity, model, procedure, data, meaning, and use), derive the properties it requires from a catalog of 12 gates, evaluate each property as supported, contradicted, or open, and apply a fixed decision rule under which a claim is met, not met, or unresolved. The package integrates with the mlr3 ecosystem and computes diagnostics such as held-out permutation feature importance, corrected resampled intervals, calibration, cross-fitted local fidelity of local surrogates, stability, and comparisons across models, settings, and subgroups. An analysis-first interface fits learners on common splits, computes held-out permutation feature importance, derives claims from the results, and computes the standard checks and the assessment. Favorable evidence never offsets a contradicted property, and no aggregate score is computed. The earlier AutoIML workflow remains available for compatibility.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -37,7 +37,8 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><a class="dropdown-item" href="articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
     <li><a class="dropdown-item" href="articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
@@ -60,20 +61,20 @@
   <main id="main" class="col-md-9"><div class="section level1">
 <div class="page-header"><h1 id="mlr3autoiml">mlr3autoiml<a class="anchor" aria-label="anchor" href="#mlr3autoiml"></a>
 </h1></div>
-<p><code>mlr3autoiml</code> helps researchers decide whether the evidence supports a conclusion that they draw from an explanation of a machine learning model, such as “the model relies mainly on self-rated health.” It implements <strong>Claim-Scoped Diagnostic Gates (CSDG)</strong> for the <strong>mlr3 ecosystem</strong> in five steps:</p>
+<p><code>mlr3autoiml</code> helps researchers decide whether the evidence supports a conclusion that they draw from an explanation of a machine learning model, such as “the model relies mainly on self-rated health.” It implements <strong>Claim-Scoped Diagnostic Gates (CSDG)</strong> for the <strong>mlr3 ecosystem</strong>. An analysis runs in its usual order:</p>
 <ol style="list-style-type: decimal">
 <li>
-<strong>Write the claim</strong>, the conclusion you intend to report (<code><a href="reference/csdg_cards.html">csdg_claim()</a></code>).</li>
+<strong>Fit</strong> learners and a model without predictors on the same cross-validation splits with <code><a href="https://mlr3.mlr-org.com/reference/benchmark.html" class="external-link">mlr3::benchmark()</a></code> (<code><a href="reference/csdg_fit.html">csdg_fit()</a></code>).</li>
 <li>
-<strong>Specify its scope</strong> in six elements: the quantity, model, procedure, data, meaning, and use.</li>
+<strong>Look</strong> at held-out permutation feature importance (PFI), also grouped and conditional (<code><a href="reference/csdg_importance.html">csdg_importance()</a></code>), or at accumulated local effects (<code><a href="reference/csdg_effect.html">csdg_effect()</a></code>).</li>
 <li>
-<strong>Derive the required properties</strong> from the 12 gates (<code><a href="reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>, <code><a href="reference/csdg_gate_plan.html">csdg_gate_plan()</a></code>).</li>
+<strong>State a claim</strong> that the result suggests (<code><a href="reference/claim_from_results.html">claim_relies_mainly()</a></code>, <code><a href="reference/claim_from_results.html">claim_top_k()</a></code>, <code><a href="reference/claim_from_results.html">claim_order()</a></code>, <code><a href="reference/claim_from_results.html">claim_direction()</a></code>).</li>
 <li>
-<strong>Evaluate the evidence</strong> on each required property (<code><a href="reference/csdg_evidence_record.html">csdg_evidence_record()</a></code>, with diagnostics from <code><a href="reference/csdg_audit.html">csdg_audit()</a></code>).</li>
+<strong>Check it</strong>: the package derives the properties that the claim requires from the 12 gates of the article and computes the default checks (<code><a href="reference/csdg_check.html">csdg_check()</a></code>).</li>
 <li>
-<strong>Decide and report</strong> with a fixed rule (<code><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim()</a></code>).</li>
+<strong>Assess it</strong> with a fixed decision rule (<code><a href="reference/csdg_assess.html">csdg_assess()</a></code>) and test it on new data with the same criteria (<code><a href="reference/csdg_confirm.html">csdg_confirm()</a></code>).</li>
 </ol>
-<p>The package records the claim and its scope, derives the gate plan, computes diagnostics, and applies the decision rule. The researcher sets the criteria, states the relevance of each observation, and enters established counterevidence and unresolved threats. Favorable results never offset a contradicted property, and no aggregate score is computed.</p>
+<p>The package writes the claim, its scope, the criteria, and the observations from the computations. Properties that cannot be computed, such as validity evidence for a construct, are entered with <code><a href="reference/csdg_judge.html">csdg_judge()</a></code>. Favorable results never offset a contradicted property, and no aggregate score is computed. Claims, scopes, and evidence can also be recorded by hand (<code><a href="reference/csdg_cards.html">csdg_claim()</a></code>, <code><a href="reference/csdg_evidence_record.html">csdg_evidence_record()</a></code>, <code><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim()</a></code>).</p>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -113,173 +114,125 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">remotes</span><span class="fu">::</span><span class="fu"><a href="https://remotes.r-lib.org/reference/install_github.html" class="external-link">install_github</a></span><span class="op">(</span><span class="st">"coorsaa/mlr3autoiml"</span>, build_vignettes <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span></code></pre></div>
-<p>Released versions are tagged, for example <code>remotes::install_github("coorsaa/mlr3autoiml@v0.1.7")</code>.</p>
+<p>Released versions are tagged, for example <code>remotes::install_github("coorsaa/mlr3autoiml@v0.2.0")</code>.</p>
 </div>
 <div class="section level2">
-<h2 id="quick-start-the-numerical-example-of-the-article">Quick start: the numerical example of the article<a class="anchor" aria-label="anchor" href="#quick-start-the-numerical-example-of-the-article"></a>
+<h2 id="quick-start">Quick start<a class="anchor" aria-label="anchor" href="#quick-start"></a>
 </h2>
-<p>Two items carry the same information: <code>Z</code> is standard normal, and both items and the outcome equal <code>Z</code>. Model A predicts with item 1 and model B with item 2 (<code>f_A(x) = x1</code>, <code>f_B(x) = x2</code>); because the outcome equals each item, the linear fit in every fold is exact. The package computes the held-out permutation feature importance (PFI) with squared error.</p>
+<p>A simulated survey of 500 respondents has 12 items and a binary outcome. Two scale scores, <code>low_mood</code> and <code>fatigue</code>, predict it strongly; <code>worry_a</code> and <code>worry_b</code> are two wordings of one worry item; three items have weak effects and five none.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3.mlr-org.com" class="external-link">mlr3</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3learners.mlr-org.com" class="external-link">mlr3learners</a></span><span class="op">)</span></span>
-<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3pipelines.mlr-org.com" class="external-link">mlr3pipelines</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-datatable.com" class="external-link">data.table</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">20260926</span><span class="op">)</span></span>
-<span><span class="va">n</span> <span class="op">=</span> <span class="fl">10000L</span></span>
-<span><span class="va">z</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
-<span><span class="va">task</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_task_regr.html" class="external-link">as_task_regr</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>item_1 <span class="op">=</span> <span class="va">z</span>, item_2 <span class="op">=</span> <span class="va">z</span>, y <span class="op">=</span> <span class="va">z</span><span class="op">)</span>, target <span class="op">=</span> <span class="st">"y"</span>, id <span class="op">=</span> <span class="st">"numerical_example"</span><span class="op">)</span></span>
-<span><span class="va">model_using</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">item</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_learner.html" class="external-link">as_learner</a></span><span class="op">(</span><span class="fu"><a href="https://mlr3pipelines.mlr-org.com/reference/po.html" class="external-link">po</a></span><span class="op">(</span><span class="st">"select"</span>, selector <span class="op">=</span> <span class="fu"><a href="https://mlr3pipelines.mlr-org.com/reference/Selector.html" class="external-link">selector_name</a></span><span class="op">(</span><span class="va">item</span><span class="op">)</span>, id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"use_"</span>, <span class="va">item</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://mlr3pipelines.mlr-org.com/reference/grapes-greater-than-greater-than-grapes.html" class="external-link">%&gt;&gt;%</a></span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"regr.lm"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">simulate_survey</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n</span>, <span class="va">seed</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="va">seed</span><span class="op">)</span></span>
+<span>  <span class="va">items</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"low_mood"</span>, <span class="st">"fatigue"</span>, <span class="st">"worry_a"</span>, <span class="st">"worry_b"</span>, <span class="st">"poor_sleep"</span>, <span class="st">"stress"</span>, <span class="st">"loneliness"</span>, <span class="st">"inactivity"</span>,</span>
+<span>    <span class="st">"appetite"</span>, <span class="st">"concentration"</span>, <span class="st">"support"</span>, <span class="st">"optimism"</span><span class="op">)</span></span>
+<span>  <span class="va">x</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span> <span class="op">*</span> <span class="fl">12</span><span class="op">)</span>, <span class="va">n</span>, <span class="fl">12</span>, dimnames <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="cn">NULL</span>, <span class="va">items</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">worry</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
+<span>  <span class="va">x</span><span class="op">[</span>, <span class="va">worry_a</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut</a></span><span class="op">(</span><span class="va">worry</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="cn">Inf</span>, <span class="op">-</span><span class="fl">1.2</span>, <span class="op">-</span><span class="fl">0.4</span>, <span class="fl">0.4</span>, <span class="fl">1.2</span>, <span class="cn">Inf</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="va">x</span><span class="op">[</span>, <span class="va">worry_b</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmin</a></span><span class="op">(</span><span class="fl">5L</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmax</a></span><span class="op">(</span><span class="fl">1L</span>, <span class="va">worry_a</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span> <span class="op">&lt;</span> <span class="fl">0.02</span>, <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1L</span>, <span class="fl">1L</span><span class="op">)</span>, <span class="va">n</span>, <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">0L</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="va">eta</span> <span class="op">=</span> <span class="op">-</span><span class="fl">0.3</span> <span class="op">+</span> <span class="fl">1.2</span> <span class="op">*</span> <span class="va">x</span><span class="op">$</span><span class="va">low_mood</span> <span class="op">+</span> <span class="fl">1.1</span> <span class="op">*</span> <span class="va">x</span><span class="op">$</span><span class="va">fatigue</span> <span class="op">+</span> <span class="fl">0.7</span> <span class="op">*</span> <span class="va">worry</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">x</span><span class="op">$</span><span class="va">poor_sleep</span> <span class="op">+</span> <span class="fl">0.2</span> <span class="op">*</span> <span class="va">x</span><span class="op">$</span><span class="va">stress</span> <span class="op">+</span></span>
+<span>    <span class="fl">0.15</span> <span class="op">*</span> <span class="va">x</span><span class="op">$</span><span class="va">loneliness</span></span>
+<span>  <span class="va">x</span><span class="op">[</span>, <span class="va">low_wellbeing</span> <span class="op">:=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="va">n</span>, <span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="va">eta</span><span class="op">)</span><span class="op">)</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_task_classif.html" class="external-link">as_task_classif</a></span><span class="op">(</span><span class="va">x</span>, target <span class="op">=</span> <span class="st">"low_wellbeing"</span>, positive <span class="op">=</span> <span class="st">"1"</span>, id <span class="op">=</span> <span class="st">"survey"</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
-<span><span class="va">folds</span> <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">rsmp</a></span><span class="op">(</span><span class="st">"cv"</span>, folds <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span></span>
-<span><span class="va">fits</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  A <span class="op">=</span> <span class="fu"><a href="reference/csdg_resampling.html">csdg_resample</a></span><span class="op">(</span><span class="va">task</span>, <span class="fu">model_using</span><span class="op">(</span><span class="st">"item_1"</span><span class="op">)</span>, <span class="va">folds</span>, measures <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">msrs</a></span><span class="op">(</span><span class="st">"regr.mse"</span><span class="op">)</span>, seed <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span>,</span>
-<span>  B <span class="op">=</span> <span class="fu"><a href="reference/csdg_resampling.html">csdg_resample</a></span><span class="op">(</span><span class="va">task</span>, <span class="fu">model_using</span><span class="op">(</span><span class="st">"item_2"</span><span class="op">)</span>, <span class="va">folds</span>, measures <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">msrs</a></span><span class="op">(</span><span class="st">"regr.mse"</span><span class="op">)</span>, seed <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">groups</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>item_1 <span class="op">=</span> <span class="st">"item_1"</span>, item_2 <span class="op">=</span> <span class="st">"item_2"</span>, both_items <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"item_1"</span>, <span class="st">"item_2"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">pfi</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">fits</span>, <span class="va">csdg_fold_pfi</span>, feature_groups <span class="op">=</span> <span class="va">groups</span>, loss <span class="op">=</span> <span class="st">"mse"</span>, repetitions <span class="op">=</span> <span class="fl">20L</span>, seed <span class="op">=</span> <span class="fl">2L</span><span class="op">)</span></span>
-<span><span class="va">marginal</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">pfi</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">model</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">pfi</span><span class="op">[[</span><span class="va">model</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span>model <span class="op">=</span> <span class="va">model</span>, <span class="va">feature_group</span>, <span class="va">mean_importance</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/dcast.data.table.html" class="external-link">dcast</a></span><span class="op">(</span><span class="va">marginal</span>, <span class="va">model</span> <span class="op">~</span> <span class="va">feature_group</span>, value.var <span class="op">=</span> <span class="st">"mean_importance"</span><span class="op">)</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">.SD</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">is.numeric</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">2</span><span class="op">)</span> <span class="kw">else</span> <span class="va">x</span></span>
-<span><span class="op">}</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co">#&gt; Key: &lt;model&gt;</span></span>
-<span><span class="co">#&gt;     model both_items item_1 item_2</span></span>
-<span><span class="co">#&gt;    &lt;char&gt;      &lt;num&gt;  &lt;num&gt;  &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:      A       1.98   1.98   0.00</span></span>
-<span><span class="co">#&gt; 2:      B       1.98   0.00   1.99</span></span></code></pre></div>
-<p>The exact population values are 2 and 0 in model A and 0 and 2 in model B; permuting both items together (grouped PFI) gives 2 in both models. Conditional PFI, which draws the permuted item from its distribution given the other item, is 0 for both items in both models; here the permutation within strata of <code>Z</code> implements it, because each item equals the other.</p>
+<span><span class="va">task</span> <span class="op">=</span> <span class="fu">simulate_survey</span><span class="op">(</span><span class="fl">500L</span>, seed <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span></code></pre></div>
+<p><strong>Fit and look.</strong> XGBoost and ridge logistic regression are fitted on the same five folds as a model without predictors; held-out PFI is the increase in held-out log loss when one predictor is permuted. Common learners are labeled by their method in all generated text.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">conditional</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="va">fits</span>, <span class="va">csdg_fold_pfi</span>, feature_groups <span class="op">=</span> <span class="va">groups</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span>, loss <span class="op">=</span> <span class="st">"mse"</span>, repetitions <span class="op">=</span> <span class="fl">5L</span>,</span>
-<span>  strata <span class="op">=</span> <span class="va">z</span>, seed <span class="op">=</span> <span class="fl">3L</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/rbindlist.html" class="external-link">rbindlist</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">conditional</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">model</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">conditional</span><span class="op">[[</span><span class="va">model</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">summary</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span>model <span class="op">=</span> <span class="va">model</span>, <span class="va">feature_group</span>, <span class="va">mean_importance</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt;     model feature_group mean_importance</span></span>
-<span><span class="co">#&gt;    &lt;char&gt;        &lt;char&gt;           &lt;num&gt;</span></span>
-<span><span class="co">#&gt; 1:      A        item_1               0</span></span>
-<span><span class="co">#&gt; 2:      A        item_2               0</span></span>
-<span><span class="co">#&gt; 3:      B        item_1               0</span></span>
-<span><span class="co">#&gt; 4:      B        item_2               0</span></span></code></pre></div>
-<p><strong>Steps 1 and 2: the claim and its scope.</strong> The claim covers both models.</p>
+<code class="sourceCode R"><span><span class="va">learners</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  xgboost <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"classif.xgboost"</span>, nrounds <span class="op">=</span> <span class="fl">100</span>, eta <span class="op">=</span> <span class="fl">0.1</span>, max_depth <span class="op">=</span> <span class="fl">3</span>, predict_type <span class="op">=</span> <span class="st">"prob"</span><span class="op">)</span>,</span>
+<span>  ridge <span class="op">=</span> <span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"classif.cv_glmnet"</span>, alpha <span class="op">=</span> <span class="fl">0</span>, nfolds <span class="op">=</span> <span class="fl">5</span>, predict_type <span class="op">=</span> <span class="st">"prob"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">fits</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_fit.html">csdg_fit</a></span><span class="op">(</span><span class="va">task</span>, <span class="va">learners</span>, folds <span class="op">=</span> <span class="fl">5</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">imp</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_importance.html">csdg_importance</a></span><span class="op">(</span><span class="va">fits</span>, repetitions <span class="op">=</span> <span class="fl">10</span>, seed <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">imp</span></span>
+<span><span class="co">#&gt; &lt;CSDGImportance&gt; held-out PFI, increase in log loss; 5 folds x 10 permutations</span></span>
+<span><span class="co">#&gt; XGBoost: held-out log loss 0.607 versus 0.681 for the model without predictors (improvement 0.0743)</span></span>
+<span><span class="co">#&gt;   predictor    mean PFI   relative to improvement   folds in top 2</span></span>
+<span><span class="co">#&gt;   fatigue         0.181                      244%              5/5</span></span>
+<span><span class="co">#&gt;   low_mood        0.180                      242%              5/5</span></span>
+<span><span class="co">#&gt;   worry_a        0.0149                       20%              0/5</span></span>
+<span><span class="co">#&gt;   stress         0.0123                       17%              0/5</span></span>
+<span><span class="co">#&gt;   poor_sleep     0.0069                      9.3%              0/5</span></span>
+<span><span class="co">#&gt;   loneliness     0.0030                      4.1%              0/5</span></span>
+<span><span class="co">#&gt;   ... 6 more predictors</span></span>
+<span><span class="co">#&gt; ridge logistic regression: held-out log loss 0.560 versus 0.681 for the model without predictors (improvement 0.121)</span></span>
+<span><span class="co">#&gt;   predictor    mean PFI   relative to improvement   folds in top 2</span></span>
+<span><span class="co">#&gt;   low_mood       0.0950                       79%              5/5</span></span>
+<span><span class="co">#&gt;   fatigue        0.0860                       71%              5/5</span></span>
+<span><span class="co">#&gt;   stress         0.0055                      4.5%              0/5</span></span>
+<span><span class="co">#&gt;   poor_sleep     0.0048                      4.0%              0/5</span></span>
+<span><span class="co">#&gt;   worry_a        0.0046                      3.8%              0/5</span></span>
+<span><span class="co">#&gt;   worry_b        0.0025                      2.1%              0/5</span></span>
+<span><span class="co">#&gt;   ... 6 more predictors</span></span>
+<span><span class="co">#&gt; Folds in top 2: folds in which the predictor has one of the 2 largest PFI values (print(imp, k = )).</span></span>
+<span><span class="co">#&gt; PFI values are not parts of the improvement, so PFI relative to the improvement can exceed 100%.</span></span></code></pre></div>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">claim_both</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_cards.html">csdg_claim</a></span><span class="op">(</span></span>
-<span>  id <span class="op">=</span> <span class="st">"both_models"</span>,</span>
-<span>  statement <span class="op">=</span> <span class="st">"Under marginal permutation, both models rely more on item 1 than on item 2."</span>,</span>
-<span>  claim_type <span class="op">=</span> <span class="st">"global_explanation"</span>,</span>
-<span>  quantity <span class="op">=</span> <span class="st">"marginal PFI with squared error: increase in expected squared error when one item is permuted"</span>,</span>
-<span>  model <span class="op">=</span> <span class="st">"several_models"</span>,</span>
-<span>  procedure <span class="op">=</span> <span class="st">"each item permuted independently of the other item and the outcome; 20 permutations per fold"</span>,</span>
-<span>  data <span class="op">=</span> <span class="st">"Z standard normal; item 1 = item 2 = outcome = Z; 10,000 simulated observations"</span>,</span>
-<span>  meaning <span class="op">=</span> <span class="st">"model_description"</span>,</span>
-<span>  use <span class="op">=</span> <span class="st">"scientific description"</span>,</span>
-<span>  provenance <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>origin <span class="op">=</span> <span class="st">"specified_before_results"</span>, date <span class="op">=</span> <span class="st">"2026-09-26"</span>,</span>
-<span>    time_basis <span class="op">=</span> <span class="st">"date of the example"</span>, selection_basis <span class="op">=</span> <span class="st">"written before the PFI values were computed"</span>,</span>
-<span>    evidence_ids <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/character.html" class="external-link">character</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">measurement</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_cards.html">csdg_measurement</a></span><span class="op">(</span>outcome <span class="op">=</span> <span class="st">"y"</span>, predictors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"item_1"</span>, <span class="st">"item_2"</span><span class="op">)</span>, data_source <span class="op">=</span> <span class="st">"simulation"</span>,</span>
-<span>  sample_definition <span class="op">=</span> <span class="st">"all simulated observations"</span>, missingness <span class="op">=</span> <span class="st">"none"</span>, preprocessing <span class="op">=</span> <span class="st">"none"</span><span class="op">)</span></span>
-<span><span class="va">explanation</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_cards.html">csdg_explanation</a></span><span class="op">(</span>method_ids <span class="op">=</span> <span class="st">"pfi"</span>, feature_groups <span class="op">=</span> <span class="va">groups</span><span class="op">)</span></span></code></pre></div>
-<p><strong>Step 3: the required properties.</strong> Besides G0a and G0b, the claim requires G2 (it interprets PFI values), G5 (it states an ordering), and G6a (it covers two models). Held-out performance (G1) is context, because a model description holds whatever the model’s accuracy.</p>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">imp</span><span class="op">)</span></span></code></pre></div>
+<p><img src="reference/figures/README-quick-start-plot-1.png" width="100%"></p>
+<p><strong>Claim, check, and assess.</strong> The result suggests that XGBoost relies mainly on <code>low_mood</code> and <code>fatigue</code>. <code><a href="reference/claim_from_results.html">claim_relies_mainly()</a></code> states the claim, <code><a href="reference/csdg_check.html">csdg_check()</a></code> computes the properties that it requires, and <code><a href="reference/csdg_assess.html">csdg_assess()</a></code> applies the decision rule.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">plan</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_gate_plan.html">csdg_gate_plan</a></span><span class="op">(</span><span class="va">claim_both</span>, <span class="va">measurement</span>, <span class="va">explanation</span><span class="op">)</span></span>
-<span><span class="va">plan</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">gate_id</span>, <span class="va">gate_name</span>, <span class="va">required</span>, <span class="va">plan_role</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co">#&gt;     gate_id              gate_name required    plan_role</span></span>
-<span><span class="co">#&gt;      &lt;char&gt;                 &lt;char&gt;   &lt;lgcl&gt;       &lt;char&gt;</span></span>
-<span><span class="co">#&gt;  1:     G0a          Specification     TRUE     required</span></span>
-<span><span class="co">#&gt;  2:     G0b   Measurement and data     TRUE     required</span></span>
-<span><span class="co">#&gt;  3:      G1 Predictive performance    FALSE      context</span></span>
-<span><span class="co">#&gt;  4:      G2              Procedure     TRUE     required</span></span>
-<span><span class="co">#&gt;  5:     G3a            Calibration    FALSE not_required</span></span>
-<span><span class="co">#&gt;  6:     G3b              Decisions    FALSE not_required</span></span>
-<span><span class="co">#&gt;  7:      G4         Local fidelity    FALSE not_required</span></span>
-<span><span class="co">#&gt;  8:      G5              Stability     TRUE     required</span></span>
-<span><span class="co">#&gt;  9:     G6a                 Models     TRUE     required</span></span>
-<span><span class="co">#&gt; 10:     G6b               Settings    FALSE not_required</span></span>
-<span><span class="co">#&gt; 11:     G7a              Subgroups    FALSE not_required</span></span>
-<span><span class="co">#&gt; 12:     G7b                  Users    FALSE not_required</span></span></code></pre></div>
-<p><strong>Step 4: the evidence.</strong> In model A, the difference between the two items is far beyond the error due to random permutation (Monte Carlo rule, per fold). The decisive property is G6a: model B reverses the ordering.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="reference/csdg_pfi_mc_difference.html">csdg_pfi_mc_difference</a></span><span class="op">(</span><span class="va">pfi</span><span class="op">$</span><span class="va">A</span>, <span class="st">"item_1"</span>, <span class="st">"item_2"</span><span class="op">)</span><span class="op">[</span>, <span class="fu">.</span><span class="op">(</span><span class="va">iteration</span>, <span class="va">estimate</span>, <span class="va">threshold</span>, <span class="va">beyond_monte_carlo_error</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co">#&gt;    iteration estimate   threshold beyond_monte_carlo_error</span></span>
-<span><span class="co">#&gt;        &lt;int&gt;    &lt;num&gt;       &lt;num&gt;                   &lt;lgcl&gt;</span></span>
-<span><span class="co">#&gt; 1:         1 1.965369 0.009051588                     TRUE</span></span>
-<span><span class="co">#&gt; 2:         2 1.995245 0.009445336                     TRUE</span></span>
-<span></span>
-<span><span class="va">property</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">gate_id</span>, <span class="va">status</span>, <span class="va">required_property</span>, <span class="va">observation</span>, <span class="va">relevance</span>, <span class="va">criterion</span> <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="reference/csdg_evidence_record.html">csdg_evidence_record</a></span><span class="op">(</span></span>
-<span>    <span class="va">gate_id</span>, <span class="cn">TRUE</span>, <span class="st">"required_property"</span>, status <span class="op">=</span> <span class="va">status</span>,</span>
-<span>    criterion <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">criterion</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>value <span class="op">=</span> <span class="va">criterion</span>, direction <span class="op">=</span> <span class="st">"qualitative"</span><span class="op">)</span>,</span>
-<span>    criterion_source <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">criterion</span><span class="op">)</span><span class="op">)</span> <span class="st">"translated from the claim"</span>,</span>
-<span>    criterion_rationale <span class="op">=</span> <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">criterion</span><span class="op">)</span><span class="op">)</span> <span class="va">required_property</span>,</span>
-<span>    rationale <span class="op">=</span> <span class="va">observation</span>, required_property <span class="op">=</span> <span class="va">required_property</span>, observation <span class="op">=</span> <span class="va">observation</span>,</span>
-<span>    relevance_to_proposition <span class="op">=</span> <span class="va">relevance</span></span>
-<span>  <span class="op">)</span></span>
-<span><span class="op">}</span></span>
-<span><span class="va">foundation</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>  <span class="fu">property</span><span class="op">(</span><span class="st">"G0a"</span>, <span class="st">"supported"</span>, <span class="st">"The claim and its six scope elements are stated."</span>,</span>
-<span>    <span class="st">"All six elements are recorded."</span>, <span class="st">"They fix the quantity, the models, and the procedure."</span><span class="op">)</span>,</span>
-<span>  <span class="fu">property</span><span class="op">(</span><span class="st">"G0b"</span>, <span class="st">"supported"</span>, <span class="st">"The data cover what the claim names."</span>,</span>
-<span>    <span class="st">"The population is defined exactly; there is no measurement error or preprocessing."</span>,</span>
-<span>    <span class="st">"The claim names no construct and no other population."</span><span class="op">)</span>,</span>
-<span>  <span class="fu">property</span><span class="op">(</span><span class="st">"G2"</span>, <span class="st">"supported"</span>, <span class="st">"Marginal permutation computes the PFI that the claim names."</span>,</span>
-<span>    <span class="st">"Squared error and marginal permutation; both models are defined for all inputs."</span>,</span>
-<span>    <span class="st">"The claim names the perturbation, so the unrealistic permuted inputs are part of what it describes."</span><span class="op">)</span>,</span>
-<span>  <span class="fu">property</span><span class="op">(</span><span class="st">"G5"</span>, <span class="st">"supported"</span>, <span class="st">"The ordering persists when the quantity is estimated again."</span>,</span>
-<span>    <span class="st">"Exact values do not vary."</span>, <span class="st">"The same quantity is computed again."</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">g6a</span> <span class="op">=</span> <span class="fu">property</span><span class="op">(</span><span class="st">"G6a"</span>, <span class="st">"contradicted"</span>, <span class="st">"Item 1 has the larger marginal PFI in A and in B."</span>,</span>
-<span>  <span class="st">"PFI of item 1 versus item 2: 2 versus 0 in A, 0 versus 2 in B."</span>,</span>
-<span>  <span class="st">"Only the model differs between the two computations, and the claim covers both models."</span>,</span>
-<span>  criterion <span class="op">=</span> <span class="st">"strict ordering in both models"</span><span class="op">)</span></span></code></pre></div>
-<p><strong>Step 5: decide and report.</strong> The original claim is not met and is revised to model A.</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">assessment_both</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">foundation</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">g6a</span><span class="op">)</span><span class="op">)</span>, claim_applicable <span class="op">=</span> <span class="cn">TRUE</span>, plan <span class="op">=</span> <span class="va">plan</span><span class="op">)</span></span>
-<span><span class="va">assessment_both</span></span>
-<span><span class="co">#&gt; &lt;CSDGClaimAdjudication&gt;</span></span>
-<span><span class="co">#&gt;   Assessment: not met </span></span>
-<span><span class="co">#&gt;   Decision options: revise or withhold </span></span>
-<span><span class="co">#&gt;   Required properties:</span></span>
-<span><span class="co">#&gt;    G0a: supported (record)</span></span>
-<span><span class="co">#&gt;    G0b: supported (record)</span></span>
-<span><span class="co">#&gt;    G2: supported (record)</span></span>
-<span><span class="co">#&gt;    G5: supported (record)</span></span>
-<span><span class="co">#&gt;    G6a: contradicted (record)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;   A required property is contradicted; favorable results never offset it.</span></span>
-<span></span>
-<span><span class="va">claim_a</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_claim_revision.html">csdg_claim_revision</a></span><span class="op">(</span></span>
-<span>  <span class="va">claim_both</span>, id <span class="op">=</span> <span class="st">"model_a"</span>, claim_version <span class="op">=</span> <span class="st">"C1"</span>, revision_relation <span class="op">=</span> <span class="st">"narrower"</span>,</span>
-<span>  statement <span class="op">=</span> <span class="st">"Under marginal permutation, model A relies more on item 1 than on item 2."</span>,</span>
-<span>  model <span class="op">=</span> <span class="st">"fitted_model"</span>,</span>
-<span>  provenance <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>origin <span class="op">=</span> <span class="st">"retrospective_exploratory"</span>, date <span class="op">=</span> <span class="st">"2026-09-26"</span>, time_basis <span class="op">=</span> <span class="st">"date of the example"</span>,</span>
-<span>    selection_basis <span class="op">=</span> <span class="st">"restriction chosen after the comparison of A and B"</span>, evidence_ids <span class="op">=</span> <span class="st">"both_models_G6a"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="va">plan_a</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_gate_plan.html">csdg_gate_plan</a></span><span class="op">(</span><span class="va">claim_a</span>, <span class="va">measurement</span>, <span class="va">explanation</span><span class="op">)</span></span>
-<span><span class="va">plan_a</span><span class="op">[</span><span class="va">required</span> <span class="op">==</span> <span class="cn">TRUE</span>, <span class="va">gate_id</span><span class="op">]</span></span>
-<span><span class="co">#&gt; [1] "G0a" "G0b" "G2"  "G5"</span></span>
-<span><span class="va">g2_a</span> <span class="op">=</span> <span class="fu">property</span><span class="op">(</span><span class="st">"G2"</span>, <span class="st">"supported"</span>,</span>
-<span>  <span class="st">"Marginal PFI with squared error in model A is larger for item 1, and the wording names the perturbation."</span>,</span>
-<span>  <span class="st">"2 versus 0; conditional PFI 0 versus 0."</span>,</span>
-<span>  <span class="st">"The computation uses the model, perturbation, and loss that the claim names."</span>,</span>
-<span>  criterion <span class="op">=</span> <span class="st">"strict ordering of the exact values; qualifier in the wording"</span><span class="op">)</span></span>
-<span><span class="va">assessment_a</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_adjudicate_claim.html">csdg_adjudicate_claim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">foundation</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1L</span>, <span class="fl">2L</span>, <span class="fl">4L</span><span class="op">)</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">g2_a</span><span class="op">)</span><span class="op">)</span>, claim_applicable <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  plan <span class="op">=</span> <span class="va">plan_a</span><span class="op">)</span></span>
-<span><span class="va">assessment_a</span><span class="op">$</span><span class="va">assessment</span></span>
-<span><span class="co">#&gt; [1] "met"</span></span>
-<span><span class="va">assessment_a</span><span class="op">$</span><span class="va">decision_options</span></span>
-<span><span class="co">#&gt; [1] "retain"</span></span></code></pre></div>
-<p>The revised claim is met (exploratory; it was written after the results were seen) and retained.</p>
+<code class="sourceCode R"><span><span class="va">claim</span> <span class="op">=</span> <span class="fu"><a href="reference/claim_from_results.html">claim_relies_mainly</a></span><span class="op">(</span><span class="va">imp</span>, k <span class="op">=</span> <span class="fl">2</span>, factor <span class="op">=</span> <span class="fl">2</span>, learners <span class="op">=</span> <span class="st">"xgboost"</span><span class="op">)</span></span>
+<span><span class="va">chk</span> <span class="op">=</span> <span class="fu"><a href="reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim</span>, <span class="va">imp</span><span class="op">)</span></span>
+<span><span class="va">chk</span></span>
+<span><span class="co">#&gt; &lt;CSDG check&gt; XGBoost relies mainly on fatigue and low_mood.</span></span>
+<span><span class="co">#&gt; Criteria (defaults, see ?csdg_check): minimum importance 1% of the improvement;</span></span>
+<span><span class="co">#&gt; at least 5 of 5 folds; Monte Carlo rule; corrected 95% interval must clear the</span></span>
+<span><span class="co">#&gt; smallest relevant difference.</span></span>
+<span><span class="co">#&gt; gate  check               status        observation</span></span>
+<span><span class="co">#&gt; G0a/b scope               supported     The six scope elements are generated</span></span>
+<span><span class="co">#&gt;                                         from the analysis; the claim names</span></span>
+<span><span class="co">#&gt;                                         analyzed variables, not constructs.</span></span>
+<span><span class="co">#&gt; G1    performance         context       Held-out log loss 0.607 versus 0.681</span></span>
+<span><span class="co">#&gt;                                         for the model without predictors</span></span>
+<span><span class="co">#&gt;                                         (improvement 0.0743, 11%); 4 of 5 folds</span></span>
+<span><span class="co">#&gt;                                         improve.</span></span>
+<span><span class="co">#&gt; G2    content             supported     fatigue 0.181 and low_mood 0.180 versus</span></span>
+<span><span class="co">#&gt;                                         0.0149 for worry_a, the largest other</span></span>
+<span><span class="co">#&gt;                                         predictor (12.2 and 12.0 times); margin</span></span>
+<span><span class="co">#&gt;                                         (PFI minus 2 x PFI of worry_a) 0.152</span></span>
+<span><span class="co">#&gt;                                         [0.0576, 0.246] and 0.150 [0.0779,</span></span>
+<span><span class="co">#&gt;                                         0.222]. Against the largest other</span></span>
+<span><span class="co">#&gt;                                         predictor of each fold, which can</span></span>
+<span><span class="co">#&gt;                                         differ between folds: 0.134 [0.0448,</span></span>
+<span><span class="co">#&gt;                                         0.223] and 0.133 [0.0432, 0.222].</span></span>
+<span><span class="co">#&gt; G2    minimum importance  supported     fatigue 0.181 (244%) and low_mood 0.180</span></span>
+<span><span class="co">#&gt;                                         (242%) of the improvement of 0.0743</span></span>
+<span><span class="co">#&gt;                                         (0.681 to 0.607).</span></span>
+<span><span class="co">#&gt; G2    procedure           supported     Held-out marginal PFI with log loss, 10</span></span>
+<span><span class="co">#&gt;                                         permutations per fold in 5 folds, as</span></span>
+<span><span class="co">#&gt;                                         the scope names. No grouped or</span></span>
+<span><span class="co">#&gt;                                         conditional comparison was requested.</span></span>
+<span><span class="co">#&gt; G5    stability           supported     Selected anew in each fold: 5 of 5</span></span>
+<span><span class="co">#&gt;                                         folds reproduce the result (cutoff 1: 0</span></span>
+<span><span class="co">#&gt;                                         of 5; cutoff 3: 1 of 5).</span></span>
+<span><span class="co">#&gt; G6a   other learner       context       ridge logistic regression: the result</span></span>
+<span><span class="co">#&gt;                                         also holds (fatigue 0.0860 and low_mood</span></span>
+<span><span class="co">#&gt;                                         0.0950 versus 0.0055 for stress).</span></span>
+<span><span class="fu"><a href="reference/csdg_assess.html">csdg_assess</a></span><span class="op">(</span><span class="va">chk</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;CSDG assessment&gt; XGBoost relies mainly on fatigue and low_mood.</span></span>
+<span><span class="co">#&gt;   Met (exploratory)</span></span>
+<span><span class="co">#&gt;   Specification (G0a) supported | Measurement (G0b) supported | Content (G2)</span></span>
+<span><span class="co">#&gt;   supported | Minimum importance (G2) supported | Procedure (G2) supported |</span></span>
+<span><span class="co">#&gt;   Stability (G5) supported</span></span>
+<span><span class="co">#&gt;   On average, fatigue and low_mood have 12.2 and 12.0 times the PFI of the</span></span>
+<span><span class="co">#&gt;   largest other predictor, worry_a; the result recurs in 5 of 5 folds. The</span></span>
+<span><span class="co">#&gt;   claim was formulated after the explanation was inspected; it is established</span></span>
+<span><span class="co">#&gt;   only after a test on new data (csdg_confirm()).</span></span>
+<span><span class="co">#&gt;   Decision options: retain</span></span></code></pre></div>
+<p>The claim was formulated after the explanation was inspected, so its assessment is exploratory; <code>csdg_confirm(chk, new_task)</code> fits the same learners to new data and applies the claim with the same criteria.</p>
 </div>
 <div class="section level2">
 <h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
 <ul>
 <li>
-<strong><a href="https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html">The CSDG walkthrough</a></strong> (<code><a href="articles/claim_scoped_diagnostic_gates.html">vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")</a></code>) follows the five steps with the numerical example, an unresolved claim with an unresolved threat, and a met claim assessed with <code><a href="reference/csdg_audit.html">csdg_audit()</a></code>.</li>
+<strong><a href="https://stefancoors.de/mlr3autoiml/articles/exploratory_workflow.html">Checking what an explanation shows</a></strong> (<code><a href="articles/exploratory_workflow.html">vignette("exploratory_workflow", package = "mlr3autoiml")</a></code>) works through the simulated survey with 1,000 respondents: a claim that is met, a claim about the two wordings that conditional PFI contradicts, a direction, and the test on new data.</li>
+<li>
+<strong><a href="https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></strong> (<code><a href="articles/claim_scoped_diagnostic_gates.html">vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")</a></code>) assesses the three claims of the article’s numerical example.</li>
 <li>
 <strong><a href="https://stefancoors.de/mlr3autoiml/reference/index.html">The function reference</a></strong> documents every function, including the diagnostics of <code><a href="reference/csdg_audit.html">csdg_audit()</a></code> and the local surrogate described in <code><a href="reference/csdg_diagnostics.html">?csdg_diagnostics</a></code>.</li>
 <li>

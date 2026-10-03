@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,7 +35,8 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
     <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
@@ -78,9 +79,9 @@ separate from the CSDG gate registry
 (<code><a href="../reference/csdg_gate_registry.html">csdg_gate_registry()</a></code>), the property statuses, and the
 claim assessments. Printing a legacy <code>GateResult</code> emits a
 targeted deprecation warning. New analyses start from the CSDG interface
-described in <a href="https://stefancoors.de/mlr3autoiml/articles/claim_scoped_diagnostic_gates.html">the
-CSDG walkthrough</a>
-(<code><a href="../articles/claim_scoped_diagnostic_gates.html">vignette("claim_scoped_diagnostic_gates", package = "mlr3autoiml")</a></code>).</p>
+described in <a href="https://stefancoors.de/mlr3autoiml/articles/exploratory_workflow.html">Checking
+what an explanation shows</a>
+(<code><a href="../articles/exploratory_workflow.html">vignette("exploratory_workflow", package = "mlr3autoiml")</a></code>).</p>
 <p>The code in this article is shown but not run when the article is
 built, because each example fits several learners with repeated
 resampling. To run it, install the suggested packages

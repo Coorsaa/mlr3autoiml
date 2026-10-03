@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,7 +20,8 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">From a claim to evidence: a complete CSDG walkthrough</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
     <li><a class="dropdown-item" href="../articles/legacy_autoiml.html">The legacy AutoIML workflow</a></li>
@@ -41,6 +42,78 @@
     </div>
 
     <div class="section level2">
+      <h2 id="csdg-analysis">CSDG analysis<a class="anchor" aria-label="anchor" href="#csdg-analysis"></a></h2>
+
+      <div class="section-desc"><p>Fit learners, compute held-out PFI, derive a claim from the result, check it, and assess it.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="csdg_fit.html">csdg_fit()</a></code> <code><a href="csdg_fit.html">format(<i>&lt;CSDGFits&gt;</i>)</a></code> <code><a href="csdg_fit.html">print(<i>&lt;CSDGFits&gt;</i>)</a></code> <code><a href="csdg_fit.html">as.data.table(<i>&lt;CSDGFits&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Fit learners and a model without predictors on common splits</dd>
+
+        <dt>
+
+          <code><a href="csdg_importance.html">csdg_importance()</a></code> <code><a href="csdg_importance.html">format(<i>&lt;CSDGImportance&gt;</i>)</a></code> <code><a href="csdg_importance.html">print(<i>&lt;CSDGImportance&gt;</i>)</a></code> <code><a href="csdg_importance.html">as.data.table(<i>&lt;CSDGImportance&gt;</i>)</a></code> <code><a href="csdg_importance.html">summary(<i>&lt;CSDGImportance&gt;</i>)</a></code> <code><a href="csdg_importance.html">plot(<i>&lt;CSDGImportance&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Held-out permutation feature importance of fitted learners</dd>
+
+        <dt>
+
+          <code><a href="csdg_effect.html">csdg_effect()</a></code> <code><a href="csdg_effect.html">format(<i>&lt;CSDGEffect&gt;</i>)</a></code> <code><a href="csdg_effect.html">print(<i>&lt;CSDGEffect&gt;</i>)</a></code> <code><a href="csdg_effect.html">as.data.table(<i>&lt;CSDGEffect&gt;</i>)</a></code> <code><a href="csdg_effect.html">plot(<i>&lt;CSDGEffect&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Accumulated local effects of fitted learners in held-out folds</dd>
+
+        <dt>
+
+          <code><a href="claim_from_results.html">claim_relies_mainly()</a></code> <code><a href="claim_from_results.html">claim_top_k()</a></code> <code><a href="claim_from_results.html">claim_order()</a></code> <code><a href="claim_from_results.html">claim_direction()</a></code>
+
+        </dt>
+        <dd>Derive a claim from the results</dd>
+
+        <dt>
+
+          <code><a href="csdg_check.html">csdg_check()</a></code> <code><a href="csdg_check.html">format(<i>&lt;CSDGCheck&gt;</i>)</a></code> <code><a href="csdg_check.html">print(<i>&lt;CSDGCheck&gt;</i>)</a></code> <code><a href="csdg_check.html">as.data.table(<i>&lt;CSDGCheck&gt;</i>)</a></code> <code><a href="csdg_check.html">summary(<i>&lt;CSDGCheck&gt;</i>)</a></code> <code><a href="csdg_check.html">plot(<i>&lt;CSDGCheck&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Compute the default checks of a claim</dd>
+
+        <dt>
+
+          <code><a href="csdg_judge.html">csdg_judge()</a></code>
+
+        </dt>
+        <dd>Enter a judgment on a property that cannot be computed</dd>
+
+        <dt>
+
+          <code><a href="csdg_assess.html">csdg_assess()</a></code>
+
+        </dt>
+        <dd>Assess a checked claim</dd>
+
+        <dt>
+
+          <code><a href="csdg_confirm.html">csdg_confirm()</a></code>
+
+        </dt>
+        <dd>Test a claim on new data</dd>
+
+        <dt>
+
+          <code><a href="csdg_export_assessment.html">csdg_export_assessment()</a></code>
+
+        </dt>
+        <dd>Export a claim assessment</dd>
+      </dl></div><div class="section level2">
       <h2 id="csdg-cards-and-planning">CSDG cards and planning<a class="anchor" aria-label="anchor" href="#csdg-cards-and-planning"></a></h2>
 
 
