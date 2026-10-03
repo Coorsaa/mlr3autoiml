@@ -1,12 +1,9 @@
 ^\.github$
-^\.claude$
 ^\.cspell$
 ^\.DS_Store$
 ^\.Rproj\.user$
 ^\.venv.*$
 ^_pkgdown\.yml$
-^AGENTS\.md$
-^CLAUDE\.md$
 ^README\.Rmd$
 ^.*\.pdf$
 ^.*\.zip$

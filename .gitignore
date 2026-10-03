@@ -56,9 +56,6 @@ paper_artifacts/
 IML_ARTICLE/
 *.pdf
 
-# AI assistant configuration
-CLAUDE.md
-.claude/
 README.html
 
 # Built vignettes and archives
