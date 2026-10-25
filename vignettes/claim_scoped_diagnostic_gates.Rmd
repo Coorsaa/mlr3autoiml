@@ -11,6 +11,9 @@ vignette: >
 run = all(vapply(c("mlr3learners", "mlr3pipelines"), requireNamespace, logical(1L), quietly = TRUE))
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = run)
 txt = function(x) if (run) x else "?"
+# mlr3::benchmark() evaluates the fits with the future framework, which attaches the package future; attaching it
+# here keeps messages about the installation, such as a package built under another R version, out of the output.
+if (run) suppressWarnings(suppressPackageStartupMessages(library(future)))
 ```
 
 The article illustrates Claim-Scoped Diagnostic Gates (CSDG) with two items that carry the same information. Let `Z`
@@ -20,8 +23,9 @@ an independent draw `Z'`, so the expected squared error rises from 0 to `E[(Z - 
 the prediction unchanged, so its permutation feature importance (PFI) is 0. Model B reverses the values. Grouped
 PFI, which shuffles both items together, is 2 in both models; conditional PFI, which draws the permuted item given
 the other item, is 0, because that draw equals the original value. This vignette computes these values from 10,000
-simulated observations and assesses the three claims of the article with the functions introduced in
-`vignette("exploratory_workflow", package = "mlr3autoiml")`.
+simulated observations with the functions introduced in `vignette("exploratory_workflow", package = "mlr3autoiml")`
+and assesses the two claims of the article's numerical example and the unqualified variant that shows why the
+qualifier is needed.
 `r if (!run) "The code is not run because the suggested packages mlr3learners or mlr3pipelines are not installed."`
 
 ```{r packages, message = FALSE, warning = FALSE}
@@ -53,16 +57,25 @@ imp = csdg_importance(fits, repetitions = 20, groups = list(both_items = c("item
 imp
 ```
 
-The estimates are close to the exact values; relative to the improvement over the model without predictors, they
-are about 200%, because PFI values are not parts of the improvement. The claims below are derived from these results, so
-the package labels their assessments exploratory.
+The estimates are close to the exact values. They are about twice the improvement over the model without
+predictors, because PFI values are not parts of the improvement: shuffling the item that a model uses doubles the
+expected squared error of the model without predictors. The claims below are derived from these results, so the
+package labels their assessments exploratory.
+
+Whether the data cover what the claims name (G0b, measurement and data) cannot be computed; the package leaves it
+open until the researcher judges it. Here the items and the outcome are simulated without error, and the judgment is
+passed to every check.
+
+```{r judge}
+g0b = csdg_judge("G0b", supported(), note = "Items and outcome simulated without measurement error.")
+```
 
 ## The original claim covers both models
 
 ```{r claim-both}
 items = c(item_1 = "item 1", item_2 = "item 2")
 claim_both = claim_order(imp, "item_1", "item_2", learners = c("A", "B"), marginal_only = TRUE, labels = items)
-res_both = csdg_assess(csdg_check(claim_both, imp))
+res_both = csdg_assess(csdg_check(claim_both, imp, judgments = g0b))
 res_both
 ```
 
@@ -81,7 +94,7 @@ shows.
 
 ```{r claim-a}
 claim_a = claim_order(imp, "item_1", "item_2", learners = "A", labels = items)
-res_a = csdg_assess(csdg_check(claim_a, imp))
+res_a = csdg_assess(csdg_check(claim_a, imp, judgments = g0b))
 res_a
 ```
 
@@ -98,7 +111,7 @@ The revised claim names model A and the marginal permutation.
 
 ```{r claim-revised}
 claim_revised = claim_order(imp, "item_1", "item_2", learners = "A", marginal_only = TRUE, labels = items)
-chk_revised = csdg_check(claim_revised, imp)
+chk_revised = csdg_check(claim_revised, imp, judgments = g0b)
 chk_revised
 res_revised = csdg_assess(chk_revised)
 res_revised

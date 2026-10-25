@@ -72,7 +72,7 @@ vector lengths must be one or equal to the number of scenarios.}
 
 \item{tolerance_rationale}{Rationale linking the supplied tolerance to the claim.}
 
-\item{reference_learner}{Optional learner name around which the tolerance is defined.
+\item{reference_learner}{Optional name of the explained learner, around whose score the tolerance is defined.
 When omitted, the direction-specific best candidate is the reference.}
 
 \item{seed}{Random seed.}

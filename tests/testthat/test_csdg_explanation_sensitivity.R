@@ -112,7 +112,7 @@ test_that("explanation sensitivity validates rank coverage and focal membership"
       ranks[!(learner_name == "reverse" & feature_group == "d")],
       focal_learner = "focal"
     ),
-    "same feature groups"
+    "same feature groups as the explained learner"
   )
   expect_error(
     csdg_explanation_sensitivity(rashomon, rbind(ranks, ranks[1L]), focal_learner = "focal"),

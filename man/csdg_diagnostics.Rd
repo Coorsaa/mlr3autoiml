@@ -184,13 +184,13 @@ For regression, \code{calibration_in_the_large} is the mean observed-minus-predi
 \code{calibration_intercept} and \code{calibration_slope} come from regressing observed outcomes on predictions.
 
 For \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()}, \code{weighted_r2}, \code{weighted_rmse}, \code{weighted_mae},
-and \code{maximum_absolute_error} are cross-fitted over the perturbed points, \code{target_case_absolute_error} scores the
-case with a surrogate fitted without it, and \code{apparent_weighted_r2}, \code{apparent_weighted_rmse}, and the returned
-coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
+and \code{maximum_absolute_error} are cross-validated over the perturbed points, \code{target_case_absolute_error} scores
+the case with a surrogate fitted without it, and \code{apparent_weighted_r2}, \code{apparent_weighted_rmse}, and the
+returned coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
 }
 \description{
 These functions compute mixed-type dependence, calibration, decision curves, held-out permutation
-feature importance (PFI), cross-fitted local fidelity of local surrogates, and subgroup diagnostics.
+feature importance (PFI), cross-validated local fidelity of local surrogates, and subgroup diagnostics.
 }
 \details{
 \code{csdg_fold_pfi()} computes held-out marginal PFI in each resampling iteration: the increase in the chosen loss on
@@ -235,7 +235,7 @@ fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.
 
-Fidelity is cross-fitted: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
+Fidelity is cross-validated: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
 size (default 5; \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()} always use 5); each fold is predicted
 by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
 by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
@@ -244,8 +244,8 @@ MAE, and the maximum absolute error are computed over the perturbed points only.
 (\code{target_case_absolute_error}) is computed from a separate surrogate fitted to the perturbed points without the
 case. Apparent metrics (\verb{apparent_*}) and the reported coefficients come from one surrogate fitted to the case and
 all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
-and cross-fit seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds; cross-fit seeds
-default to the perturbation seed plus 100000), and kernel widths can be varied (\code{kernel_widths}, default 0.50,
-0.75, 1.00; primary 0.75).
+and cross-validation seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds;
+cross-validation seeds default to the perturbation seed plus 100000), and kernel widths can be varied
+(\code{kernel_widths}, default 0.50, 0.75, 1.00; primary 0.75).
 }
 

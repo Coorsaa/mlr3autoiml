@@ -2,7 +2,8 @@
 #'
 #' @description
 #' Third step of the analysis-first interface: after inspecting the held-out permutation feature importance (PFI) of
-#' [csdg_importance()] or the accumulated local effects (ALE) of [csdg_effect()], state what they show as a claim.
+#' [csdg_importance()], the leave-one-covariate-out (LOCO) importance of [csdg_loco()], or the accumulated local
+#' effects (ALE) of [csdg_effect()], state what they show as a claim.
 #' The package writes the claim statement, its six scope elements (quantity, model, procedure, data, meaning, and
 #' use), and the selection basis, and records the claim with [csdg_claim()] as exploratory
 #' (`provenance$origin = "retrospective_exploratory"`), because it was formulated after the results were seen.
@@ -16,7 +17,15 @@
 #' * `claim_order()`: "XGBoost relies more on `first` than on `second`"; with two predictors in `first` and no
 #'   `second`, the pair is ordered by the average PFI of the first learner.
 #' * `claim_direction()`: "The predictions of XGBoost rise with `feature`": the ALE changes by at least a minimum
-#'   change between two percentiles of the predictor (default 10th and 90th) in held-out data.
+#'   change between two percentiles of the predictor (default 10th and 90th) in held-out data, and between adjacent
+#'   grid points in this range it decreases by no more than the minimum change, as the article's default criterion
+#'   for "rise" requires (for "fall", it increases by no more than the minimum change).
+#'   With `monotone = FALSE`, the claim states only that the predictions are higher (or lower) at the upper than at
+#'   the lower percentile, and the adjacent grid points are not checked.
+#'
+#' A claim derived from a [csdg_loco()] result begins with "In refits without each predictor (LOCO)," and its
+#' scope names LOCO; `claim_relies_mainly()` and `claim_top_k()` need LOCO of every predictor.
+#' Every derived claim is added to the claim log ([csdg_claim_log()]).
 #'
 #' The claim covers the learners in `learners` (names or labels); selections (the top `k`, the order of a pair, the
 #' direction) are made on the first.
@@ -24,7 +33,7 @@
 #' the results that the claim does not cover are reported as context.
 #' Arguments follow the order object, specifics, learners.
 #'
-#' @param imp A [csdg_importance()] result.
+#' @param imp A [csdg_importance()] or [csdg_loco()] result.
 #' @param x For `claim_direction()`: a [csdg_effect()] result (recommended, after looking at it) or a [csdg_fit()]
 #'   or [csdg_importance()] result, from which the ALE is computed.
 #' @param k Number of named predictors.
@@ -39,9 +48,15 @@
 #' @param probs Two increasing probabilities: the percentiles between which the change is measured (ignored for a
 #'   [csdg_effect()] result, which fixes them).
 #' @param intervals Number of quantile intervals of the ALE (ignored for a [csdg_effect()] result).
+#' @param monotone If `TRUE` (default), the claim states that the predictions rise (or fall) with `feature`;
+#'   [csdg_check()] then requires in each fold that the change between the percentiles reach the minimum change and
+#'   that no decrease (for "fall", no increase) of the ALE between adjacent grid points in this range exceed it.
+#'   If `FALSE`, the claim states that the predictions are higher (or lower) at the upper than at the lower
+#'   percentile, which needs only the change between the percentiles.
 #' @param marginal_only If `TRUE`, the statement begins with "Under marginal permutation,"; grouped or conditional
-#'   PFI that reverses the result then no longer contradicts the procedure property, and a strong correlation of a
-#'   named predictor is context rather than an unresolved threat.
+#'   PFI that reverses the result then no longer contradicts the procedure property, and a flag of the dependence
+#'   screen of [csdg_check()] is context rather than an unresolved threat.
+#'   Not available for LOCO, whose wording always names the refits.
 #' @param refers_to `"variables"` if the claim names the analyzed variables, `"constructs"` if it names constructs
 #'   measured by them (then validity evidence must be entered with [csdg_judge()]).
 #' @param labels Optional named character vector, predictor -> wording in the statement.
@@ -75,9 +90,11 @@ claim_relies_mainly = function(imp, k = 2L, factor = 2, learners = NULL, predict
   assert_class(imp, "CSDGImportance", .var.name = "imp")
   assert_number(factor, lower = 1, finite = TRUE, .var.name = "factor")
   if (missing(k) && !is.null(predictors)) k = length(predictors)
-  .csdg_ranking_claim(imp, kind = "relies_mainly", learners = learners, k = k, factor = factor,
+  claim = .csdg_ranking_claim(imp, kind = "relies_mainly", learners = learners, k = k, factor = factor,
     predictors = predictors, marginal_only = marginal_only, refers_to = refers_to, labels = labels, id = id,
     note = note)
+  .csdg_log_claim("claim_relies_mainly", claim, imp$fits)
+  claim
 }
 
 #' @rdname claim_from_results
@@ -86,8 +103,10 @@ claim_top_k = function(imp, k = 3L, learners = NULL, predictors = NULL, marginal
                        refers_to = c("variables", "constructs"), labels = NULL, id = NULL, note = NULL) {
   assert_class(imp, "CSDGImportance", .var.name = "imp")
   if (missing(k) && !is.null(predictors)) k = length(predictors)
-  .csdg_ranking_claim(imp, kind = "top_k", learners = learners, k = k, factor = 1, predictors = predictors,
+  claim = .csdg_ranking_claim(imp, kind = "top_k", learners = learners, k = k, factor = 1, predictors = predictors,
     marginal_only = marginal_only, refers_to = refers_to, labels = labels, id = id, note = note)
+  .csdg_log_claim("claim_top_k", claim, imp$fits)
+  claim
 }
 
 #' @rdname claim_from_results
@@ -95,7 +114,8 @@ claim_top_k = function(imp, k = 3L, learners = NULL, predictors = NULL, marginal
 claim_order = function(imp, first, second = NULL, learners = NULL, marginal_only = FALSE,
                        refers_to = c("variables", "constructs"), labels = NULL, id = NULL, note = NULL) {
   assert_class(imp, "CSDGImportance", .var.name = "imp")
-  features = imp$fits$features
+  features = if (.csdg_is_loco(imp)) imp$predictors else imp$fits$features
+  q = .csdg_quantity_label(imp)
   learners = .csdg_claim_learners(imp$fits, learners)
   learner = learners[[1L]]
   averages = .csdg_marginal_averages(imp, learner)
@@ -112,26 +132,35 @@ claim_order = function(imp, first, second = NULL, learners = NULL, marginal_only
   if (identical(first, second)) .csdg_stop("`first` and `second` must be different predictors.")
   larger = averages[[first]] > averages[[second]]
   if (!larger) {
-    .csdg_warn("`first` (%s) does not have the larger average PFI of the two; the content check will show this.",
-      first)
+    .csdg_warn("`first` (%s) does not have the larger average %s of the two; the content check will show this.",
+      first, q)
   }
   base = .csdg_claim_base(imp$fits, "order", learners, marginal_only, refers_to, labels, id, note,
-    parts = c(first, second))
-  selection = sprintf("Formulated after inspecting the held-out PFI of %s; %s has the %s average PFI of the two%s.",
-    .csdg_learner_label(imp$fits, learner), .csdg_feature_label(base, first), if (larger) "larger" else
-      "smaller", if (ordered_by_results) " (the pair was ordered by these averages)" else "")
-  .csdg_new_derived_claim(base, imp$fits, imp, params = list(first = first, second = second), selection = selection)
+    parts = c(first, second), imp = imp)
+  selection = sprintf("Formulated after inspecting the %s of %s; %s has the %s average %s of the two%s.",
+    .csdg_inspected_text(imp), .csdg_learner_label(imp$fits, learner), .csdg_feature_label(base, first),
+    if (larger) "larger" else "smaller", q, if (ordered_by_results) " (the pair was ordered by these averages)" else
+      "")
+  claim = .csdg_new_derived_claim(base, imp$fits, imp, params = list(first = first, second = second),
+    selection = selection)
+  .csdg_log_claim("claim_order", claim, imp$fits)
+  claim
 }
+
+# What was inspected: "held-out PFI" or "LOCO importance".
+.csdg_inspected_text = function(imp) if (.csdg_is_loco(imp)) "LOCO importance" else "held-out PFI"
 
 #' @rdname claim_from_results
 #' @export
 claim_direction = function(x, feature, direction = NULL, learners = NULL, probs = c(0.1, 0.9), intervals = 20L,
-                           refers_to = c("variables", "constructs"), labels = NULL, id = NULL, note = NULL) {
+                           monotone = TRUE, refers_to = c("variables", "constructs"), labels = NULL, id = NULL,
+                           note = NULL) {
   assert_multi_class(x, c("CSDGEffect", "CSDGFits", "CSDGImportance"), .var.name = "x")
   effect_object = if (inherits(x, "CSDGEffect")) x else NULL
   imp = if (inherits(x, "CSDGImportance")) x else NULL
   fits = if (inherits(x, "CSDGFits")) x else x$fits
   assert_string(feature, .var.name = "feature")
+  assert_flag(monotone, .var.name = "monotone")
   if (!is.null(effect_object)) {
     if (!feature %in% effect_object$features) {
       .csdg_stop("The effects contain no ALE of %s; compute it with csdg_effect(fits, \"%s\").", feature, feature)
@@ -162,7 +191,10 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
       .csdg_learner_label(fits, learner), .csdg_num(mean_change), direction)
   }
   direction = direction %||% observed
-  base = .csdg_claim_base(fits, "direction", learners, FALSE, refers_to, labels, id, note, parts = feature)
+  # A claim about the two percentiles only gets its own identifier, so that it differs from the claim of a rise.
+  percentiles_part = if (monotone) NULL else if (identical(direction, "rise")) "higher" else "lower"
+  base = .csdg_claim_base(fits, "direction", learners, FALSE, refers_to, labels, id, note,
+    parts = c(feature, percentiles_part))
   sign_word = if (mean_change > 0) "positive" else if (mean_change < 0) "negative" else "zero"
   between = sprintf("between the %s and %s percentiles of %s", .csdg_ordinal(probs[[1L]]), .csdg_ordinal(probs[[2L]]),
     .csdg_feature_label(base, feature))
@@ -173,9 +205,12 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
     sprintf("Formulated after inspecting the ALE of %s (csdg_effect()); the average change %s is %s (%s).",
       .csdg_learner_label(fits, learner), between, .csdg_num(mean_change), sign_word)
   }
-  .csdg_new_derived_claim(base, fits, imp,
-    params = list(feature = feature, direction = direction, probs = probs, intervals = as.integer(intervals)),
+  claim = .csdg_new_derived_claim(base, fits, imp,
+    params = list(feature = feature, direction = direction, monotone = monotone, probs = probs,
+      intervals = as.integer(intervals)),
     selection = selection, effect = effect)
+  .csdg_log_claim("claim_direction", claim, fits)
+  claim
 }
 
 .csdg_claim_learners = function(fits, learners) {
@@ -184,9 +219,10 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   .csdg_resolve_learner_names(fits, learners %||% known[[1L]], "learners")
 }
 
-# Average marginal PFI of one learner, named by predictor, in the order of the task's features.
+# Average single-predictor importance (marginal PFI or LOCO) of one learner, named by predictor, in the order of the
+# task's features.
 .csdg_marginal_averages = function(imp, learner) {
-  rows = which(imp$summary$learner == learner & imp$summary$type == "marginal")
+  rows = which(imp$summary$learner == learner & imp$summary$type == .csdg_single_type(imp))
   tab = imp$summary[rows]
   out = stats::setNames(tab$mean_importance, tab$feature_group)
   out[intersect(imp$fits$features, names(out))]
@@ -202,9 +238,12 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   k < length(sorted) && isTRUE(all.equal(sorted[[k]], sorted[[k + 1L]], tolerance = 1e-12))
 }
 
-.csdg_claim_base = function(fits, kind, learners, marginal_only, refers_to, labels, id, note, parts) {
+.csdg_claim_base = function(fits, kind, learners, marginal_only, refers_to, labels, id, note, parts, imp = NULL) {
   refers_to = match.arg(refers_to, c("variables", "constructs"))
   assert_flag(marginal_only, .var.name = "marginal_only")
+  if (marginal_only && !is.null(imp) && .csdg_is_loco(imp)) {
+    .csdg_stop("`marginal_only` applies to PFI; a claim derived from LOCO names the refits in its wording.")
+  }
   if (!is.null(labels)) {
     assert_character(labels, any.missing = FALSE, min.chars = 1L, names = "unique", .var.name = "labels")
     unknown = setdiff(names(labels), fits$features)
@@ -214,9 +253,10 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   assert_string(note, min.chars = 1L, null.ok = TRUE, .var.name = "note")
   all_learners = names(fits$resamples) %||% names(fits$labels)
   learner_part = if (length(learners) > 1L && setequal(learners, all_learners)) "all" else learners
-  id = id %||% .safe_name(paste(c(kind, parts, learner_part), collapse = "_"))
+  loco = !is.null(imp) && .csdg_is_loco(imp)
+  id = id %||% .safe_name(paste(c(kind, parts, learner_part, if (loco) "loco"), collapse = "_"))
   list(id = id, kind = kind, learner = learners[[1L]], covered = learners, marginal_only = marginal_only,
-    refers_to = refers_to, labels = labels, note = note)
+    refers_to = refers_to, labels = labels, note = note, loco = loco)
 }
 
 .csdg_ranking_claim = function(imp, kind, learners, k, factor, predictors, marginal_only, refers_to, labels, id,
@@ -224,6 +264,11 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   features = imp$fits$features
   p = length(features)
   if (p < 2L) .csdg_stop("A ranking claim needs at least two predictors.")
+  q = .csdg_quantity_label(imp)
+  if (.csdg_is_loco(imp) && length(setdiff(features, imp$predictors))) {
+    .csdg_stop(paste("A ranking claim compares every predictor; the LOCO result covers %d of %d predictors.",
+      "Compute LOCO of every predictor with csdg_loco(fits)."), length(imp$predictors), p)
+  }
   if (is.character(k)) .csdg_stop("`k` must be a number; name the learners with `learners = \"%s\"`.", k[[1L]])
   assert_int(k, lower = 1L, upper = p - 1L, .var.name = "k")
   k = as.integer(k)
@@ -232,7 +277,7 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   averages = .csdg_marginal_averages(imp, learner)
   top = .csdg_top(averages, k)
   if (.csdg_tie_at_cutoff(averages, k)) {
-    .csdg_warn("The average PFI of %s ties at the cutoff k = %d; the selection is not unique.",
+    .csdg_warn("The average %s of %s ties at the cutoff k = %d; the selection is not unique.", q,
       .csdg_learner_label(imp$fits, learner), k)
   }
   if (is.null(predictors)) {
@@ -248,16 +293,18 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
       ), if (k == 1L) "one" else .csdg_number_word(k))
     }
   }
-  base = .csdg_claim_base(imp$fits, kind, learners, marginal_only, refers_to, labels, id, note, parts = predictors)
+  base = .csdg_claim_base(imp$fits, kind, learners, marginal_only, refers_to, labels, id, note, parts = predictors,
+    imp = imp)
   learner_label = .csdg_learner_label(imp$fits, learner)
   named = .csdg_and(.csdg_feature_label(base, predictors))
   leading = if (k == 1L) "its leading predictor" else sprintf("its %s leading predictors", .csdg_number_word(k))
+  inspected = .csdg_inspected_text(imp)
   selection = if (setequal(predictors, top)) {
-    sprintf("Formulated after inspecting the held-out PFI of %s; %s %s %s on average.", learner_label, named,
+    sprintf("Formulated after inspecting the %s of %s; %s %s %s on average.", inspected, learner_label, named,
       if (k == 1L) "is" else "are", leading)
   } else {
-    sprintf("Formulated after inspecting the held-out PFI of %s; the claim names %s, which %s not %s on average.",
-      learner_label, named, if (k == 1L) "is" else "are", leading)
+    sprintf("Formulated after inspecting the %s of %s; the claim names %s, which %s not %s on average.",
+      inspected, learner_label, named, if (k == 1L) "is" else "are", leading)
   }
   .csdg_new_derived_claim(base, imp$fits, imp, params = list(predictors = predictors, k = k, factor = factor),
     selection = selection)
@@ -266,14 +313,15 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
 .csdg_new_derived_claim = function(base, fits, imp, params, selection, effect = NULL) {
   claim = c(base, list(
     predictors = params$predictors, k = params$k, factor = params$factor, first = params$first,
-    second = params$second, feature = params$feature, direction = params$direction, probs = params$probs,
-    intervals = params$intervals, labels_learner = fits$labels[base$covered], selection = selection,
-    effect = effect
+    second = params$second, feature = params$feature, direction = params$direction, monotone = params$monotone,
+    probs = params$probs, intervals = params$intervals, labels_learner = fits$labels[base$covered],
+    selection = selection, effect = effect
   ))
   claim$statement = .csdg_derived_statement(claim, fits)
   claim$scope = .csdg_derived_scope(claim, fits, imp)
   claim$source = list(task_id = fits$task_id, features = fits$features, loss = if (is.null(imp)) fits$loss else
-    imp$loss, K = fits$K, R = if (is.null(imp)) NA_integer_ else imp$repetitions, data_hash = fits$data_hash)
+    imp$loss, K = fits$K, R = if (is.null(imp)) NA_integer_ else imp$repetitions, data_hash = fits$data_hash,
+    quantity = if (identical(claim$kind, "direction")) "ale" else .csdg_quantity(imp))
   claim$origin = "retrospective_exploratory"
   claim$record = .csdg_derived_record(claim, origin = "retrospective_exploratory", date = format(Sys.Date()),
     time_basis = "date the claim was derived from the results", selection_basis = selection,
@@ -324,9 +372,20 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
     } else {
       sprintf("%s relies more on %s than on %s.", subject, feature(claim$first), feature(claim$second))
     },
-    direction = sprintf("The predictions of %s %s with %s.", subject, claim$direction, feature(claim$feature))
+    direction = if (.csdg_is_monotone(claim)) {
+      sprintf("The predictions of %s %s with %s.", subject, claim$direction, feature(claim$feature))
+    } else {
+      sprintf("The predictions of %s are %s at the %s than at the %s percentile of %s.", subject,
+        .csdg_direction_word(claim), .csdg_ordinal(claim$probs[[2L]]), .csdg_ordinal(claim$probs[[1L]]),
+        feature(claim$feature))
+    }
   )
-  if (isTRUE(claim$marginal_only)) statement = paste0("Under marginal permutation, ", statement)
+  prefix = if (isTRUE(claim$loco)) {
+    "In refits without each predictor (LOCO), "
+  } else if (isTRUE(claim$marginal_only)) {
+    "Under marginal permutation, "
+  }
+  if (!is.null(prefix)) statement = paste0(prefix, sub("^The ", "the ", statement))
   .csdg_sentence(statement)
 }
 
@@ -372,15 +431,26 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
   training = .csdg_training_text(fits)
   if (identical(claim$kind, "direction")) {
     target = if (identical(fits$task_type, "classif")) "predicted probability" else "prediction"
+    shape = if (.csdg_is_monotone(claim)) {
+      sprintf(" and its largest %s between adjacent grid points in this range", .csdg_reversal_word(claim))
+    } else {
+      ""
+    }
     quantity = sprintf(paste(
-      "Learner ALE of %s: the change of the %s between its %s and %s percentiles in held-out data, for %s fitted",
+      "Learner ALE of %s: the change of the %s between its %s and %s percentiles in held-out data%s, for %s fitted",
       "to %s."
     ), .csdg_feature_label(claim, claim$feature), target, .csdg_ordinal(claim$probs[[1L]]),
-    .csdg_ordinal(claim$probs[[2L]]), learner_text, training)
+    .csdg_ordinal(claim$probs[[2L]]), shape, learner_text, training)
     procedure = sprintf(paste(
       "%s with the same splits for all learners: one fit per training set; ALE on %d quantile intervals of the",
       "held-out fold, averaged over folds."
     ), fits$resampling_label, claim$intervals)
+  } else if (.csdg_is_loco(imp)) {
+    quantity = sprintf(paste(
+      "Learner LOCO of each predictor: the expected increase in held-out %s when %s is refitted without the",
+      "predictor, for training sets of %s."
+    ), .csdg_loss_label(imp$loss), learner_text, sub("^training sets of ", "", training))
+    procedure = .csdg_procedure_text(fits, imp)
   } else {
     quantity = sprintf(paste(
       "Learner PFI of each predictor under marginal permutation, which includes combinations absent from the data:",
@@ -411,12 +481,21 @@ claim_direction = function(x, feature, direction = NULL, learners = NULL, probs 
 }
 
 .csdg_procedure_text = function(fits, imp) {
-  text = sprintf(paste(
-    "%s with the same splits for all learners: one fit per training set; each predictor permuted %d times in the",
-    "held-out fold; increases averaged over permutations and folds"
-  ), fits$resampling_label, imp$repetitions)
+  loco = .csdg_is_loco(imp)
+  text = if (loco) {
+    sprintf(paste(
+      "%s with the same splits for all learners: one fit per training set with all predictors and one refit without",
+      "each predictor; increases in held-out loss averaged over folds"
+    ), fits$resampling_label)
+  } else {
+    sprintf(paste(
+      "%s with the same splits for all learners: one fit per training set; each predictor permuted %d times in the",
+      "held-out fold; increases averaged over permutations and folds"
+    ), fits$resampling_label, imp$repetitions)
+  }
   for (group in base::names(imp$groups)) {
-    text = paste0(text, sprintf("; grouped PFI for %s (%s)", group, paste(imp$groups[[group]], collapse = ", ")))
+    text = paste0(text, sprintf("; grouped %s for %s (%s)", if (loco) "LOCO" else "PFI", group,
+      paste(imp$groups[[group]], collapse = ", ")))
   }
   for (feature in imp$strata_features) {
     text = paste0(text, sprintf("; conditional PFI of %s within %s", feature, imp$strata_definition[[feature]]))

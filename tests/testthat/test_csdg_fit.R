@@ -52,7 +52,7 @@ test_that("numerical example: exact PFI, improvement, and the three assessments"
   expect_identical(res$assessment, "not_met")
   expect_identical(unique(res$decisive$gate), "G6a")
   model_a = claim_order(imp, "item_1", "item_2", learners = "A", marginal_only = TRUE)
-  expect_identical(csdg_assess(csdg_check(model_a, imp))$assessment, "met")
+  expect_identical(csdg_assess(csdg_check(model_a, imp, judgments = g0b_judged()))$assessment, "met")
 
   expect_warning(strata <- csdg_importance(imp, strata = list(item_1 = ex$z, item_2 = ex$z)),
     "median stratum size in the held-out folds is 1")

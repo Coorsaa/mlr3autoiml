@@ -509,7 +509,8 @@ csdg_evidence_record = function(
 #' csdg_adjudicate_claim(list(supported), claim_applicable = TRUE)
 #' csdg_adjudicate_claim(list(), claim_applicable = TRUE)
 #' csdg_adjudicate_claim(
-#'   list(), claim_applicable = FALSE, applicability_rationale = "This claim is outside the evaluation."
+#'   list(), claim_applicable = FALSE,
+#'   applicability_rationale = "This claim is outside the evaluation."
 #' )
 #' @export
 csdg_adjudicate_claim = function(evidence = list(), claim_applicable = TRUE, applicability_rationale = NULL,

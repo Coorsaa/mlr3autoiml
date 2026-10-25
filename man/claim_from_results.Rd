@@ -52,6 +52,7 @@ claim_direction(
   learners = NULL,
   probs = c(0.1, 0.9),
   intervals = 20L,
+  monotone = TRUE,
   refers_to = c("variables", "constructs"),
   labels = NULL,
   id = NULL,
@@ -59,7 +60,7 @@ claim_direction(
 )
 }
 \arguments{
-\item{imp}{A \code{\link[=csdg_importance]{csdg_importance()}} result.}
+\item{imp}{A \code{\link[=csdg_importance]{csdg_importance()}} or \code{\link[=csdg_loco]{csdg_loco()}} result.}
 
 \item{k}{Number of named predictors.}
 
@@ -71,8 +72,9 @@ Defaults to the first learner; \code{names(imp$pfi)} covers all.}
 \item{predictors}{Optional predictors to name; defaults to the \code{k} predictors with the largest average PFI.}
 
 \item{marginal_only}{If \code{TRUE}, the statement begins with "Under marginal permutation,"; grouped or conditional
-PFI that reverses the result then no longer contradicts the procedure property, and a strong correlation of a
-named predictor is context rather than an unresolved threat.}
+PFI that reverses the result then no longer contradicts the procedure property, and a flag of the dependence
+screen of \code{\link[=csdg_check]{csdg_check()}} is context rather than an unresolved threat.
+Not available for LOCO, whose wording always names the refits.}
 
 \item{refers_to}{\code{"variables"} if the claim names the analyzed variables, \code{"constructs"} if it names constructs
 measured by them (then validity evidence must be entered with \code{\link[=csdg_judge]{csdg_judge()}}).}
@@ -97,6 +99,12 @@ or \code{\link[=csdg_importance]{csdg_importance()}} result, from which the ALE 
 \code{\link[=csdg_effect]{csdg_effect()}} result, which fixes them).}
 
 \item{intervals}{Number of quantile intervals of the ALE (ignored for a \code{\link[=csdg_effect]{csdg_effect()}} result).}
+
+\item{monotone}{If \code{TRUE} (default), the claim states that the predictions rise (or fall) with \code{feature};
+\code{\link[=csdg_check]{csdg_check()}} then requires in each fold that the change between the percentiles reach the minimum change and
+that no decrease (for "fall", no increase) of the ALE between adjacent grid points in this range exceed it.
+If \code{FALSE}, the claim states that the predictions are higher (or lower) at the upper than at the lower
+percentile, which needs only the change between the percentiles.}
 }
 \value{
 A \code{CSDGDerivedClaim} list with \code{id}, \code{kind}, \code{statement}, \code{note}, \code{learner} (the first learner),
@@ -106,7 +114,8 @@ results it was derived from).
 }
 \description{
 Third step of the analysis-first interface: after inspecting the held-out permutation feature importance (PFI) of
-\code{\link[=csdg_importance]{csdg_importance()}} or the accumulated local effects (ALE) of \code{\link[=csdg_effect]{csdg_effect()}}, state what they show as a claim.
+\code{\link[=csdg_importance]{csdg_importance()}}, the leave-one-covariate-out (LOCO) importance of \code{\link[=csdg_loco]{csdg_loco()}}, or the accumulated local
+effects (ALE) of \code{\link[=csdg_effect]{csdg_effect()}}, state what they show as a claim.
 The package writes the claim statement, its six scope elements (quantity, model, procedure, data, meaning, and
 use), and the selection basis, and records the claim with \code{\link[=csdg_claim]{csdg_claim()}} as exploratory
 (\code{provenance$origin = "retrospective_exploratory"}), because it was formulated after the results were seen.
@@ -120,8 +129,16 @@ largest PFI values (\code{k = 1}: "relies most on").
 \item \code{claim_order()}: "XGBoost relies more on \code{first} than on \code{second}"; with two predictors in \code{first} and no
 \code{second}, the pair is ordered by the average PFI of the first learner.
 \item \code{claim_direction()}: "The predictions of XGBoost rise with \code{feature}": the ALE changes by at least a minimum
-change between two percentiles of the predictor (default 10th and 90th) in held-out data.
+change between two percentiles of the predictor (default 10th and 90th) in held-out data, and between adjacent
+grid points in this range it decreases by no more than the minimum change, as the article's default criterion
+for "rise" requires (for "fall", it increases by no more than the minimum change).
+With \code{monotone = FALSE}, the claim states only that the predictions are higher (or lower) at the upper than at
+the lower percentile, and the adjacent grid points are not checked.
 }
+
+A claim derived from a \code{\link[=csdg_loco]{csdg_loco()}} result begins with "In refits without each predictor (LOCO)," and its
+scope names LOCO; \code{claim_relies_mainly()} and \code{claim_top_k()} need LOCO of every predictor.
+Every derived claim is added to the claim log (\code{\link[=csdg_claim_log]{csdg_claim_log()}}).
 
 The claim covers the learners in \code{learners} (names or labels); selections (the top \code{k}, the order of a pair, the
 direction) are made on the first.

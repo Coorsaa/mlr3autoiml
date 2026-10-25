@@ -17,6 +17,7 @@ A \code{CSDGAssessment} list with \code{claim}, \code{check}, \code{assessment} 
 open ones), \code{also_open}, \code{hints}, \code{decision_options}, \code{report} (a few sentences), \code{adjudication} (the
 \code{\link[=csdg_adjudicate_claim]{csdg_adjudicate_claim()}} result), and \code{note}.
 \code{as.data.table()} returns one row for reports.
+Each call is added to the claim log (\code{\link[=csdg_claim_log]{csdg_claim_log()}}).
 }
 \description{
 Fifth step of the analysis-first interface: applies the decision rule of the article to the records of a
@@ -28,6 +29,9 @@ inspected and is established only after a test on new data with \code{\link[=csd
 The report names each decisive property by its check and gate, for example "Content (G2)" or "Procedure (G2)";
 for a claim that is not met or unresolved, it adds the other open properties and, where the results suggest one,
 the closest claim that the averages satisfy (exploratory, to be checked before it is reported).
+
+G0b (measurement and data) is open until the researcher judges it with \code{\link[=csdg_judge]{csdg_judge()}}; if it is the only open
+property, the report says that the computed properties are supported.
 }
 \examples{
 set.seed(1)
@@ -37,7 +41,8 @@ x$y = 2 * x$a + x$b + rnorm(n)
 task = mlr3::as_task_regr(x, target = "y", id = "toy")
 fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3, seed = 1)
 imp = csdg_importance(fits, repetitions = 5, seed = 2)
-res = csdg_assess(csdg_check(claim_order(imp, c("a", "b")), imp))
+g0b = csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")
+res = csdg_assess(csdg_check(claim_order(imp, c("a", "b")), imp, judgments = g0b))
 res
 }
 \seealso{

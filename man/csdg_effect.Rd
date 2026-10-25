@@ -45,8 +45,9 @@ measured.}
 }
 \value{
 A \code{CSDGEffect} list with \code{fits}, \code{features}, \code{probs}, \code{intervals}, \code{changes} (one row per learner,
-predictor, and fold), \code{curves} (the ALE per fold), and \code{summary} (mean change, corrected interval, and the
-number of folds with a positive change per learner and predictor).
+predictor, and fold, with the change, the two percentiles, \code{max_decrease}, and \code{max_increase}), \code{curves} (the ALE
+per fold), and \code{summary} (mean change, corrected interval, the number of folds with a positive change, and the
+largest \code{max_decrease} and \code{max_increase} over folds, per learner and predictor).
 \code{as.data.table()} returns one of the tables.
 }
 \description{
@@ -57,9 +58,18 @@ Look at the result with \code{print()} and \code{plot()} before stating a direct
 The ALE is computed on \code{intervals} quantile intervals of the predictor in the held-out fold: within each interval,
 the predictions at its upper and lower boundary are differenced and averaged over the rows in the interval, and
 the averages are accumulated.
+The accumulated curve is centered by its data-weighted mean, so that its mean over the rows of the held-out fold
+is zero: each interval contributes the average of the accumulated effect at its two boundaries, weighted by the
+number of rows in the interval (Apley and Zhu, 2020).
 For classification, the predictions are probabilities of the positive class.
-The change is the difference of the accumulated effect between the two percentiles; the summary averages it over
-folds and reports the corrected resampled 95\% interval (\code{\link[=csdg_learner_pfi_interval]{csdg_learner_pfi_interval()}}) descriptively.
+The change is the difference of the accumulated effect between the two percentiles, which the centering does not
+affect; the summary averages it over folds and reports the corrected resampled 95\% interval
+(\code{\link[=csdg_learner_pfi_interval]{csdg_learner_pfi_interval()}}) descriptively.
+In each fold, the result also records the largest decrease (\code{max_decrease}) and the largest increase
+(\code{max_increase}) of the accumulated effect between adjacent grid points in the range between the two percentiles,
+which the percentiles themselves bound.
+For a claim that the predictions rise (or fall) with a predictor, \code{\link[=csdg_check]{csdg_check()}} compares the largest decrease (or
+increase) with the minimum change.
 }
 \examples{
 set.seed(1)
@@ -70,6 +80,10 @@ task = mlr3::as_task_regr(x, target = "y", id = "toy")
 fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3, seed = 1)
 eff = csdg_effect(fits)
 eff
+}
+\references{
+Apley, D. W., and Zhu, J. (2020). Visualizing the effects of predictor variables in black box supervised learning
+models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 82(4), 1059-1086.
 }
 \seealso{
 \code{\link[=claim_direction]{claim_direction()}}, \code{\link[=csdg_check]{csdg_check()}}

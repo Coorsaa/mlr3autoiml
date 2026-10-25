@@ -70,7 +70,7 @@ A \code{CSDGResult} object.
 \description{
 Derives the gate plan of the claim (\code{\link[=csdg_gate_plan]{csdg_gate_plan()}}) and computes the diagnostics of the gates in the plan:
 held-out performance (G1), dependence and observed support (G2), calibration (G3a), decision curves (G3b),
-cross-fitted local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
+cross-validated local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
 (G6a), leave-one-setting-out refits (G6b), and subgroup results (G7a); G0a and G0b check the claim and
 measurement cards, and G7b records user evidence supplied in \code{evidence}.
 Required gates are computed; held-out performance is also computed when it is context for the claim (a model

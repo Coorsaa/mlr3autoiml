@@ -11,8 +11,8 @@ csdg_judge(gate, status, note, property = NULL)
 
 \item{status}{\code{supported()}, \code{contradicted()}, or \code{open_status()}.}
 
-\item{note}{The observation and its basis, for example "Reliability .86 and scalar invariance across waves
-(Table S4)".}
+\item{note}{The observation and its basis, for example "Items as in the codebook; outcome coded from item W3;
+no out-of-range values" or "Reliability .86 and scalar invariance across waves (Table S4)".}
 
 \item{property}{Optional property text; defaults to the package's text for the gate.}
 }
@@ -20,14 +20,22 @@ csdg_judge(gate, status, note, property = NULL)
 A \code{CSDGJudgment} list with \code{gate}, \code{status}, \code{note}, \code{property}, and \code{date}.
 }
 \description{
-Records the analyst's judgment on a property of a claim that the package cannot compute, such as validity evidence
-for a construct named by the claim (G0b) or a coding error found in the data.
-Pass the result to \code{\link[=csdg_check]{csdg_check()}} (\code{judgments}).
+Records the researcher's judgment on a property of a claim that the package cannot compute.
+The most common one is G0b (measurement and data): whether the variables were measured, coded, and sampled so that
+they cover what the claim names.
+The data alone cannot show this, so \code{\link[=csdg_check]{csdg_check()}} leaves G0b open until it is judged, and the assessment stays
+unresolved.
+The judgment rests on the codebook, the data collection, and checks of the data, such as the coding of the outcome,
+missing values, and out-of-range values; a claim that names constructs also needs validity evidence for them.
+Other judgments record, for example, a coding error found in the data.
+Pass the result to \code{\link[=csdg_check]{csdg_check()}} (\code{judgments}); \code{\link[=csdg_confirm]{csdg_confirm()}} carries the judgments of the check over to new
+data unless its \code{judgments} replace them.
 A judgment on G0b replaces the package's G0b entry; a judgment on any other gate is added as a further required
 property.
 Because the decision rule keeps the worst status per gate, a judgment can make a computed property open or
 contradicted but never offsets a computed contradiction.
 }
 \examples{
+csdg_judge("G0b", supported(), note = "Items as in the codebook; no out-of-range values.")
 csdg_judge("G0b", supported(), note = "Reliability .86 and scalar invariance across the two waves.")
 }

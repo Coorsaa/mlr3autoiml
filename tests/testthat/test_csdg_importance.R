@@ -122,3 +122,15 @@ test_that("csdg_importance() validates its input", {
   expect_error(csdg_importance(list()), "CSDGFits")
   expect_error(csdg_importance(fits, conditional = list(nope = "cyl")), "Unknown predictors")
 })
+
+test_that("print() shows the minimum importance in loss units and no share of the improvement", {
+  imp = make_importance_fixture(centers = list(m1 = fixture_centers() * 4))
+  out = format(imp)
+  expect_true(any(grepl("improvement 0.400; minimum importance \\(1% of the improvement\\) 0.0040", out)))
+  expect_true(any(grepl("mean PFI   corrected 95% interval   folds in top 2", out)))
+  expect_false(any(grepl("[0-9]{3,}%", out)))
+  chk = csdg_check(claim_relies_mainly(imp, k = 2), imp)
+  observation = chk$table[check == "minimum_importance", observation]
+  expect_match(observation, "a 1.20 and b 0.800 versus the minimum importance 0.0040")
+  expect_false(grepl("%\\)", observation))
+})

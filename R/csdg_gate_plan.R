@@ -63,7 +63,7 @@
     ),
     "Calibration curve, intercept, and slope",
     "Decision curves; prospective evaluation",
-    "Cross-fitted fidelity",
+    "Cross-validated fidelity",
     "Share of seeds, folds, refits, or plausible values in which the result holds",
     "Comparison with named or similarly accurate models",
     "External data",

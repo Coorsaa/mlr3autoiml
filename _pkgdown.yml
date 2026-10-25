@@ -4,10 +4,11 @@ template:
 
 reference:
 - title: CSDG analysis
-  desc: Fit learners, compute held-out PFI, derive a claim from the result, check it, and assess it.
+  desc: Fit learners, compute held-out PFI or LOCO, derive a claim from the result, check it, assess it, and log it.
   contents:
   - csdg_fit
   - csdg_importance
+  - csdg_loco
   - csdg_effect
   - claim_relies_mainly
   - claim_top_k
@@ -18,6 +19,7 @@ reference:
   - csdg_assess
   - csdg_confirm
   - csdg_export_assessment
+  - csdg_claim_log
 - title: CSDG cards and planning
   contents:
   - csdg_claim

@@ -4,39 +4,62 @@
 \alias{csdg_confirm}
 \title{Test a claim on new data}
 \usage{
-csdg_confirm(chk, new, claim = NULL, note = NULL)
+csdg_confirm(
+  chk,
+  new,
+  claim = NULL,
+  note = NULL,
+  judgments = NULL,
+  duplicates = c("warn", "error")
+)
 }
 \arguments{
 \item{chk}{The \code{\link[=csdg_check]{csdg_check()}} result on the data that suggested the claim.}
 
-\item{new}{A new \link[mlr3:Task]{mlr3::Task} or a \code{\link[=csdg_importance]{csdg_importance()}} result on new data; see Description.}
+\item{new}{A new \link[mlr3:Task]{mlr3::Task} or a \code{\link[=csdg_importance]{csdg_importance()}} or \code{\link[=csdg_loco]{csdg_loco()}} result on new data; see Description.}
 
 \item{claim}{Optional; the claim of \code{chk}, checked for identity if given.}
 
 \item{note}{Optional note stored with the assessment.}
+
+\item{judgments}{Optional \code{\link[=csdg_judge]{csdg_judge()}} result or list of them for the new data; a judgment replaces the judgment
+of \code{chk} on the same gate, and the other judgments of \code{chk} are carried over.}
+
+\item{duplicates}{\code{"warn"} (default) or \code{"error"}: what happens if rows of the new data duplicate rows of the data
+of the check.}
 }
 \value{
-A \code{CSDGConfirmation} (a \code{CSDGAssessment}) with the additional element \code{exploratory}, the one-row summary
-of the exploratory assessment.
+A \code{CSDGConfirmation} (a \code{CSDGAssessment}) with the additional elements \code{exploratory}, the one-row summary
+of the exploratory assessment, and \code{duplicated_rows}, the number of new rows that duplicate rows of the data of
+the check.
+Each call is added to the claim log (\code{\link[=csdg_claim_log]{csdg_claim_log()}}).
 }
 \description{
 Applies a checked claim, with its criteria fixed, to new data: the named predictors, the order, or the direction
 are not selected again, the criteria of \code{chk} are reused (relative criteria such as the minimum importance are
 recomputed on the new improvement; an absolute smallest relevant difference or minimum change is reused), and
 the selection rule is still applied in each new fold for the stability property.
-Judgments entered in \code{chk} are carried over, and the learner labels are those of the claim.
+Judgments entered in \code{chk}, such as the judgment of G0b, are carried over unless \code{judgments} replaces them, and the
+learner labels are those of the claim.
 The claim record is rebuilt with \code{provenance$origin = "independently_confirmed"}, and the assessment is labeled
 "(tested on new data)".
+The origin \code{"independently_confirmed"} marks a test on new data with criteria fixed before the test, whatever its
+outcome: the assessment on the new data can be met, not met, or unresolved, so the value does not mean that the
+claim was confirmed.
 
 \code{new} is either a new \link[mlr3:Task]{mlr3::Task}, which is fitted with the learners, resampling, measure, and seeds of the
-check and analyzed with the same PFI settings (repetitions, groups, conditional PFI), or a \code{\link[=csdg_importance]{csdg_importance()}}
-result on new data computed by the analyst (for direction claims, also a \code{\link[=csdg_effect]{csdg_effect()}} or \code{\link[=csdg_fit]{csdg_fit()}}
-result).
+check and analyzed with the same settings (PFI with the same repetitions, groups, and conditional PFI, or LOCO for
+the same predictors and groups), or a \code{\link[=csdg_importance]{csdg_importance()}} or \code{\link[=csdg_loco]{csdg_loco()}} result on new data computed by the
+analyst (for direction claims, also a \code{\link[=csdg_effect]{csdg_effect()}} or \code{\link[=csdg_fit]{csdg_fit()}} result).
 A result with another loss, other groups, or without the conditional PFI used in the check is an error; other
 numbers of folds or permutations give a warning.
 
-The new data must not share rows with the data of the check: every row of predictors and outcome is hashed, and
-any overlap is an error.
+Every row of predictors and outcome is hashed, and rows of the new data that duplicate rows of the data of the
+check are counted.
+Duplicates give a warning with their number, because independent samples of discrete data (for example items with
+few categories) can share rows legitimately; if the duplicates are the same records, the test is not on new data.
+With \code{duplicates = "error"}, any duplicate is an error.
+New data identical to the data of the check are always an error.
 Whether the new data were sampled independently cannot be checked by the package.
 }
 \examples{
@@ -48,8 +71,10 @@ simulate = function(seed) {
   mlr3::as_task_regr(x, target = "y", id = paste0("toy_", seed))
 }
 learners = list(tree = mlr3::lrn("regr.rpart"))
-imp = csdg_importance(csdg_fit(simulate(1), learners, folds = 3, seed = 1), repetitions = 5, seed = 2)
-chk = csdg_check(claim_order(imp, c("a", "b")), imp)
+fits = csdg_fit(simulate(1), learners, folds = 3, seed = 1)
+imp = csdg_importance(fits, repetitions = 5, seed = 2)
+g0b = csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")
+chk = csdg_check(claim_order(imp, c("a", "b")), imp, judgments = g0b)
 csdg_confirm(chk, simulate(2))
 }
 \seealso{

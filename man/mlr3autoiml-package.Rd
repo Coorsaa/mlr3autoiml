@@ -52,7 +52,7 @@ Monte Carlo rule.
 
 Authors:
 \itemize{
-  \item Clara Vetter
+  \item Clara S. Vetter
   \item Jonas Hauck
   \item Bernd Bischl
   \item Sven Hilbert

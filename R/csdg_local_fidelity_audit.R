@@ -519,7 +519,7 @@ csdg_local_support = function(
   summary[, uncertainty_semantics := paste(
     "Descriptive distributions only. Variation across perturbation seeds jointly reflects synthetic-neighborhood",
     paste(
-      "draws and deterministic surrogate cross-fit partitions, not model-fit or sampling uncertainty;",
+      "draws and deterministic surrogate cross-validation partitions, not model-fit or sampling uncertainty;",
       "no confidence intervals or hypothesis tests."
     )
   )]
@@ -711,7 +711,7 @@ csdg_summarize_local_fidelity = function(
   if (any(replicates$perturbation_seed > .Machine$integer.max - 100000L) ||
       any(replicates$n_crossfit_folds > replicates$n_perturb) ||
       any(replicates$n_active_design_terms > replicates$n_design_terms)) {
-    .csdg_stop("`replicates` contains invalid perturbation, cross-fitting, or design-term counts.")
+    .csdg_stop("`replicates` contains invalid perturbation, cross-validation, or design-term counts.")
   }
   assert_numeric(
     replicates$kernel_width,
@@ -749,7 +749,7 @@ csdg_summarize_local_fidelity = function(
     )
   }
   if (any(replicates$crossfit_effective_n_min > replicates$crossfit_effective_n_max)) {
-    .csdg_stop("`replicates` has cross-fit effective-sample-size minima above maxima.")
+    .csdg_stop("`replicates` has cross-validation effective-sample-size minima above maxima.")
   }
   assert_character(
     replicates$analysis_role,
@@ -841,7 +841,7 @@ csdg_summarize_local_fidelity = function(
     replicates[, c(case_keys, "perturbation_replicate", "crossfit_seed"), with = FALSE]
   )
   if (nrow(crossfit_seed_grid) != nrow(case_seeds)) {
-    .csdg_stop("Each case and perturbation replicate must use one cross-fit seed across kernel widths.")
+    .csdg_stop("Each case and perturbation replicate must use one cross-validation seed across kernel widths.")
   }
   stable_columns = c(
     "n_perturb", "n_crossfit_folds", "n_design_terms", "n_active_design_terms", "n_case_values_imputed"
@@ -950,7 +950,7 @@ csdg_summarize_local_fidelity = function(
 #' Evaluates multiple prespecified held-out cases with their corresponding fold models across multiple perturbation
 #' seeds and kernel widths.
 #'
-#' Synthetic or empirical-neighbor neighborhoods, mixed-type distances, weighted ridge fitting, cross-fitting,
+#' Synthetic or empirical-neighbor neighborhoods, mixed-type distances, weighted ridge fitting, cross-validation,
 #' relative and absolute errors, target-case error, coefficient stability, and support diagnostics are reported.
 #' The section "Local surrogate" states exactly what is fitted.
 #'
@@ -959,12 +959,12 @@ csdg_summarize_local_fidelity = function(
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param seeds Either a vector of at least two distinct perturbation seeds, reused for every case, or an integer-like
 #'   matrix with one row per case and one distinct seed per replicate column.
-#' @param crossfit_seeds Optional vector or case-by-replicate matrix of cross-fit partition seeds.
+#' @param crossfit_seeds Optional vector or case-by-replicate matrix of cross-validation partition seeds.
 #'   When `NULL`, seeds distinct from `seeds` are generated deterministically.
 #' @param kernel_widths Unique positive kernel widths.
 #' @param primary_kernel_width The prespecified primary width, which must occur in `kernel_widths`.
 #' @param n_perturb Number of synthetic perturbations per case and seed.
-#' @param crossfit_folds Number of deterministic surrogate cross-fitting folds.
+#' @param crossfit_folds Number of deterministic surrogate cross-validation folds.
 #' @param fidelity_threshold Optional, claim- and use-specific weighted R-squared criterion used only for descriptive
 #'   classification.
 #'   When `NULL`, no binary fidelity label is created.
@@ -1118,7 +1118,7 @@ csdg_local_fidelity_audit = function(
       crossfit_folds = as.integer(crossfit_folds),
       fold_assignment = "balanced seeded permutation, independently generated for each case and seed",
       score_scope = paste(
-        "Cross-fitted metrics score perturbations; target-case error is scored from a surrogate fitted",
+        "Cross-validated metrics score perturbations; target-case error is scored from a surrogate fitted",
         "without the original case"
       ),
       target_scale = target_scale,
@@ -1151,12 +1151,12 @@ csdg_local_fidelity_audit = function(
     limitations = c(
       "Each diagnostic uses a fold model that did not train on the evaluated case.",
       paste(
-        "Each perturbation is scored by a cross-fitted surrogate that did not fit that perturbation;",
+        "Each perturbation is scored by a cross-validation surrogate that did not fit that perturbation;",
         "target-case error is scored using a surrogate fitted without the original held-out case."
       ),
       "Neighborhoods are generated from the corresponding fold-training data and remain perturbation-dependent.",
       paste(
-        "Perturbation and cross-fit seeds are recorded separately so their variation can be isolated;",
+        "Perturbation and cross-validation seeds are recorded separately so their variation can be isolated;",
         "neither source represents model-training or sampling uncertainty."
       ),
       paste(

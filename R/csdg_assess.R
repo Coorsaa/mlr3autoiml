@@ -11,6 +11,9 @@
 #' for a claim that is not met or unresolved, it adds the other open properties and, where the results suggest one,
 #' the closest claim that the averages satisfy (exploratory, to be checked before it is reported).
 #'
+#' G0b (measurement and data) is open until the researcher judges it with [csdg_judge()]; if it is the only open
+#' property, the report says that the computed properties are supported.
+#'
 #' @param x A [csdg_check()] result.
 #' @param note Optional note stored with the assessment.
 #'
@@ -19,6 +22,7 @@
 #'   open ones), `also_open`, `hints`, `decision_options`, `report` (a few sentences), `adjudication` (the
 #'   [csdg_adjudicate_claim()] result), and `note`.
 #'   `as.data.table()` returns one row for reports.
+#'   Each call is added to the claim log ([csdg_claim_log()]).
 #' @seealso [csdg_check()], [csdg_confirm()], [csdg_export_assessment()]
 #' @examples
 #' set.seed(1)
@@ -28,12 +32,19 @@
 #' task = mlr3::as_task_regr(x, target = "y", id = "toy")
 #' fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3, seed = 1)
 #' imp = csdg_importance(fits, repetitions = 5, seed = 2)
-#' res = csdg_assess(csdg_check(claim_order(imp, c("a", "b")), imp))
+#' g0b = csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")
+#' res = csdg_assess(csdg_check(claim_order(imp, c("a", "b")), imp, judgments = g0b))
 #' res
 #' @export
 csdg_assess = function(x, note = NULL) {
   assert_class(x, "CSDGCheck", .var.name = "x")
   assert_string(note, min.chars = 1L, null.ok = TRUE, .var.name = "note")
+  out = .csdg_assess(x, note)
+  .csdg_log_claim("csdg_assess", x$claim, x, result = out$label)
+  out
+}
+
+.csdg_assess = function(x, note = NULL) {
   adjudication = csdg_adjudicate_claim(x$records, claim_applicable = TRUE, plan = x$plan)
   assessment = adjudication$assessment
   suffix = if (identical(x$origin, "independently_confirmed")) "(tested on new data)" else "(exploratory)"
@@ -47,7 +58,8 @@ csdg_assess = function(x, note = NULL) {
     bearing[0L]
   }
   also_open = if (identical(assessment, "not_met")) bearing[bearing$status == "open"] else bearing[0L]
-  hints = if (identical(assessment, "met")) character() else .csdg_hints(x, decisive)
+  hints = if (identical(assessment, "met") || .csdg_g0b_only(assessment, decisive)) character() else
+    .csdg_hints(x, decisive)
   report = .csdg_report(x, assessment, label, decisive, also_open)
   structure(
     list(
@@ -92,7 +104,9 @@ csdg_assess = function(x, note = NULL) {
         required[required$learner %in% l & required$check == "stability"])
       text = paste(vapply(seq_len(nrow(rows)), function(i) .csdg_row_summary(x, rows[i]), character(1L)),
         collapse = "; ")
-      if (length(x$claim$covered) > 1L) sprintf("%s: %s", unname(x$claim$labels_learner[l]), text) else text
+      # Each part starts a sentence, also when the learner label is lowercase (for example "decision tree").
+      if (length(x$claim$covered) > 1L) .csdg_sentence(sprintf("%s: %s", unname(x$claim$labels_learner[l]), text)) else
+        text
     }, character(1L))
     return(paste(parts, collapse = ". "))
   }
@@ -108,9 +122,17 @@ csdg_assess = function(x, note = NULL) {
   paste(parts, collapse = "; ")
 }
 
+# TRUE if the only open required property is the unjudged G0b entry.
+.csdg_g0b_only = function(assessment, decisive) {
+  identical(assessment, "unresolved") && nrow(decisive) > 0L &&
+    all(decisive$gate == "G0b" & decisive$check == "measurement")
+}
+
 .csdg_report = function(x, assessment, label, decisive, also_open) {
   confirmed = identical(x$origin, "independently_confirmed")
-  next_text = switch(assessment,
+  next_text = if (.csdg_g0b_only(assessment, decisive)) {
+    "The computed properties are supported; pass a judgment of G0b with `judgments =` to complete the assessment."
+  } else switch(assessment,
     met = if (confirmed) {
       "The claim and its criteria were fixed before these data were analyzed."
     } else {
@@ -118,9 +140,9 @@ csdg_assess = function(x, note = NULL) {
         "new data (csdg_confirm()).")
     },
     not_met = paste("Revise the claim to what the evidence supports, or withhold it; where the claim matters,",
-      "report it as not supported."),
+      "report it as not met."),
     unresolved = paste("Withhold the claim or supply the missing evidence, for example new data; where the claim",
-      "matters, report it as not established.")
+      "matters, report it as unresolved.")
   )
   open_text = if (nrow(also_open)) {
     sprintf(" Also open: %s.", .csdg_and(unique(vapply(seq_len(nrow(also_open)), function(i) {
@@ -149,11 +171,11 @@ csdg_assess = function(x, note = NULL) {
     k = length(S)
     need = x$criteria$need
     if (identical(claim$kind, "relies_mainly") && all(is.finite(content$ratios))) {
-      hints = c(hints, sprintf("on average, %s %s %s times the PFI of the largest other predictor (claimed: %s)",
+      hints = c(hints, sprintf("on average, %s %s %s times the %s of the largest other predictor (claimed: %s)",
         .csdg_and(lab(S)), if (k == 1L) "has" else "have at least", .csdg_ratio(min(content$ratios)),
-        format(claim$factor)))
-      if (!is.null(P) && all(content$margins$estimate + (claim$factor - 1) * content$averages[[content$largest_other]]
-        > 0)) {
+        toupper(x$source$quantity %||% "pfi"), format(claim$factor)))
+      # The top k hold on average if each named predictor exceeds the other predictor with the largest average.
+      if (!is.null(P) && all(content$averages[S] > content$averages[[content$largest_other]])) {
         folds = sum(vapply(seq_len(nrow(P)), function(i) .csdg_fold_ranking(P[i, ], S, 1, "top_k")$holds,
           logical(1L)))
         wording = if (k == 1L) sprintf("relies most on %s", lab(S)) else sprintf("the %s predictors it relies on most",
@@ -171,21 +193,44 @@ csdg_assess = function(x, note = NULL) {
       }
     }
   }
+  if (identical(claim$kind, "direction") && .csdg_is_monotone(claim) && any(checks == "stability")) {
+    st = x$details$stability[[l]]
+    n_change = if (is.null(st$folds$change_holds)) NA_integer_ else sum(st$folds$change_holds)
+    if (!is.na(n_change) && n_change > st$n_holds) {
+      hints = c(hints, sprintf(paste("'%s at the %s than at the %s percentile' (claim_direction(monotone = FALSE))",
+        "holds in %d of %d folds"), if (identical(claim$direction, "rise")) "higher" else "lower",
+        .csdg_ordinal(claim$probs[[2L]]), .csdg_ordinal(claim$probs[[1L]]), n_change, st$K))
+    }
+  }
   if (any(checks == "procedure") && !isTRUE(claim$marginal_only)) {
     hints = c(hints, "marginal_only = TRUE limits the wording to marginal permutation")
   }
-  if (any(checks == "correlation")) {
-    pairs = x$details$correlation
-    example = if (!is.null(pairs) && nrow(pairs)) {
-      sprintf("csdg_importance(imp, conditional = list(%s = \"%s\", %s = \"%s\"))", pairs$predictor[[1L]],
-        pairs$partner[[1L]], pairs$partner[[1L]], pairs$predictor[[1L]])
+  if (any(checks == "dependence")) {
+    screen = x$details$dependence
+    flagged = if (is.null(screen)) NULL else screen[screen$flagged]
+    row = if (!is.null(flagged) && nrow(flagged)) flagged[1L]
+    group = if (is.null(row)) "" else row$group %||% ""
+    # For a predictor in a group of grouped PFI, the predictor outside the group on which it depends most.
+    partner = if (is.null(row)) NA_character_ else if (nzchar(group)) row$partner_outside else row$partner
+    example = if (!is.na(partner)) {
+      sprintf("csdg_importance(imp, conditional = list(%s = \"%s\", %s = \"%s\"))", row$predictor, partner, partner,
+        row$predictor)
     } else {
       "csdg_importance(imp, conditional = list(...))"
     }
-    hints = c(hints, sprintf("compute conditional PFI (%s) or reword with marginal_only = TRUE", example))
+    hints = c(hints, if (nzchar(group)) {
+      sprintf(paste("compute conditional PFI (%s), add the predictors on which %s depends to the group %s, or reword",
+        "with marginal_only = TRUE"), example, row$predictor, group)
+    } else {
+      sprintf("compute conditional PFI (%s) or reword with marginal_only = TRUE", example)
+    })
   }
   if (any(checks %in% c("measurement", "judgment") & decisive$gate == "G0b")) {
-    hints = c(hints, "enter validity evidence for the named constructs with csdg_judge(\"G0b\", ...)")
+    hints = c(hints, if (identical(claim$refers_to, "constructs")) {
+      "enter validity evidence for the named constructs with csdg_judge(\"G0b\", ...)"
+    } else {
+      "judge the measurement and data with csdg_judge(\"G0b\", supported(), note = \"...\") in csdg_check(judgments = )"
+    })
   }
   if (!length(hints)) return(character())
   sprintf("Options on these results (exploratory; check before reporting): %s.", paste(hints, collapse = "; "))
@@ -202,6 +247,10 @@ format.CSDGAssessment = function(x, width = getOption("width", 80L), ...) {
     .csdg_wrap(sprintf("<CSDG assessment> %s", x$claim$statement), width = width),
     paste0("  ", .csdg_sentence(x$label)),
     if (inherits(x, "CSDGConfirmation")) paste0("  Exploratory result: ", x$exploratory$label, "."),
+    if (inherits(x, "CSDGConfirmation") && isTRUE(x$duplicated_rows > 0L)) {
+      .csdg_wrap(sprintf("New data: %s of the rows duplicate rows of the data of the check.",
+        .csdg_count(x$duplicated_rows)), indent = 2L, width = width)
+    },
     .csdg_wrap(statuses, indent = 2L, width = width),
     .csdg_wrap(x$report_body, indent = 2L, width = width),
     if (length(x$hints)) .csdg_wrap(x$hints, indent = 2L, width = width),
@@ -244,28 +293,42 @@ as.data.table.CSDGAssessment = function(x, keep.rownames = FALSE, ...) {
 #' are not selected again, the criteria of `chk` are reused (relative criteria such as the minimum importance are
 #' recomputed on the new improvement; an absolute smallest relevant difference or minimum change is reused), and
 #' the selection rule is still applied in each new fold for the stability property.
-#' Judgments entered in `chk` are carried over, and the learner labels are those of the claim.
+#' Judgments entered in `chk`, such as the judgment of G0b, are carried over unless `judgments` replaces them, and the
+#' learner labels are those of the claim.
 #' The claim record is rebuilt with `provenance$origin = "independently_confirmed"`, and the assessment is labeled
 #' "(tested on new data)".
+#' The origin `"independently_confirmed"` marks a test on new data with criteria fixed before the test, whatever its
+#' outcome: the assessment on the new data can be met, not met, or unresolved, so the value does not mean that the
+#' claim was confirmed.
 #'
 #' `new` is either a new [mlr3::Task], which is fitted with the learners, resampling, measure, and seeds of the
-#' check and analyzed with the same PFI settings (repetitions, groups, conditional PFI), or a [csdg_importance()]
-#' result on new data computed by the analyst (for direction claims, also a [csdg_effect()] or [csdg_fit()]
-#' result).
+#' check and analyzed with the same settings (PFI with the same repetitions, groups, and conditional PFI, or LOCO for
+#' the same predictors and groups), or a [csdg_importance()] or [csdg_loco()] result on new data computed by the
+#' analyst (for direction claims, also a [csdg_effect()] or [csdg_fit()] result).
 #' A result with another loss, other groups, or without the conditional PFI used in the check is an error; other
 #' numbers of folds or permutations give a warning.
 #'
-#' The new data must not share rows with the data of the check: every row of predictors and outcome is hashed, and
-#' any overlap is an error.
+#' Every row of predictors and outcome is hashed, and rows of the new data that duplicate rows of the data of the
+#' check are counted.
+#' Duplicates give a warning with their number, because independent samples of discrete data (for example items with
+#' few categories) can share rows legitimately; if the duplicates are the same records, the test is not on new data.
+#' With `duplicates = "error"`, any duplicate is an error.
+#' New data identical to the data of the check are always an error.
 #' Whether the new data were sampled independently cannot be checked by the package.
 #'
 #' @param chk The [csdg_check()] result on the data that suggested the claim.
-#' @param new A new [mlr3::Task] or a [csdg_importance()] result on new data; see Description.
+#' @param new A new [mlr3::Task] or a [csdg_importance()] or [csdg_loco()] result on new data; see Description.
 #' @param claim Optional; the claim of `chk`, checked for identity if given.
 #' @param note Optional note stored with the assessment.
+#' @param judgments Optional [csdg_judge()] result or list of them for the new data; a judgment replaces the judgment
+#'   of `chk` on the same gate, and the other judgments of `chk` are carried over.
+#' @param duplicates `"warn"` (default) or `"error"`: what happens if rows of the new data duplicate rows of the data
+#'   of the check.
 #'
-#' @return A `CSDGConfirmation` (a `CSDGAssessment`) with the additional element `exploratory`, the one-row summary
-#'   of the exploratory assessment.
+#' @return A `CSDGConfirmation` (a `CSDGAssessment`) with the additional elements `exploratory`, the one-row summary
+#'   of the exploratory assessment, and `duplicated_rows`, the number of new rows that duplicate rows of the data of
+#'   the check.
+#'   Each call is added to the claim log ([csdg_claim_log()]).
 #' @seealso [csdg_check()], [csdg_assess()]
 #' @examples
 #' simulate = function(seed) {
@@ -276,20 +339,24 @@ as.data.table.CSDGAssessment = function(x, keep.rownames = FALSE, ...) {
 #'   mlr3::as_task_regr(x, target = "y", id = paste0("toy_", seed))
 #' }
 #' learners = list(tree = mlr3::lrn("regr.rpart"))
-#' imp = csdg_importance(csdg_fit(simulate(1), learners, folds = 3, seed = 1), repetitions = 5, seed = 2)
-#' chk = csdg_check(claim_order(imp, c("a", "b")), imp)
+#' fits = csdg_fit(simulate(1), learners, folds = 3, seed = 1)
+#' imp = csdg_importance(fits, repetitions = 5, seed = 2)
+#' g0b = csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")
+#' chk = csdg_check(claim_order(imp, c("a", "b")), imp, judgments = g0b)
 #' csdg_confirm(chk, simulate(2))
 #' @export
-csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
+csdg_confirm = function(chk, new, claim = NULL, note = NULL, judgments = NULL, duplicates = c("warn", "error")) {
   if (inherits(chk, "CSDGDerivedClaim") && inherits(new, "CSDGCheck")) {
     .csdg_stop("The arguments are csdg_confirm(chk, new); the claim is taken from `chk`.")
   }
   assert_class(chk, "CSDGCheck", .var.name = "chk")
   assert_string(note, min.chars = 1L, null.ok = TRUE, .var.name = "note")
+  judgments = .csdg_normalize_judgments(judgments)
+  duplicates = match.arg(duplicates)
   if (!is.null(claim)) {
     assert_class(claim, "CSDGDerivedClaim", .var.name = "claim")
     fixed_fields = c("id", "kind", "covered", "predictors", "k", "factor", "first", "second", "feature",
-      "direction", "probs", "intervals", "marginal_only", "refers_to")
+      "direction", "monotone", "probs", "intervals", "marginal_only", "refers_to")
     if (!identical(unclass(claim)[fixed_fields], unclass(chk$claim)[fixed_fields])) {
       .csdg_stop("`claim` must be the claim of `chk`.")
     }
@@ -302,20 +369,33 @@ csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
   }
   overlap = sum(new_imp$fits$row_hashes %in% chk$source$row_hashes)
   if (overlap > 0L) {
-    .csdg_stop(paste("%s of the new rows also %s in the data of the check (identical predictors and outcome);",
-      "a test on new data needs new rows."), .csdg_count(overlap), if (overlap == 1L) "occurs" else "occur")
+    text = sprintf(paste("%s of the %s new rows %s rows of the data of the check (identical predictors and outcome).",
+      "Independent samples of discrete data can share rows legitimately; if these are the same records, this is",
+      "not a test on new data."), .csdg_count(overlap), .csdg_count(length(new_imp$fits$row_hashes)),
+      if (overlap == 1L) "duplicates" else "duplicate")
+    if (identical(duplicates, "error")) .csdg_stop("%s", text)
+    .csdg_warn("%s Use duplicates = \"error\" to stop instead.", text)
   }
   .csdg_confirm_settings(chk, new_imp)
   .csdg_check_compatible(claim, new_imp, new_data = TRUE)
   new_imp$fits$labels[claim$covered] = claim$labels_learner[claim$covered]
   new_claim = .csdg_confirmation_claim(claim, chk, new_imp)
-  criteria = chk$criteria[c("min_importance", "stability", "min_difference_supplied", "min_difference_value",
-    "min_change", "max_cor", "factor", "level", "interval_rule", "fixed", "sources")]
-  new_chk = .csdg_check_impl(new_claim, new_imp, criteria, chk$judgments, chk$note,
+  criteria = chk$criteria
+  # Checks of versions before 0.3.0 stored the pairwise correlation cutoff.
+  criteria$max_r2 = criteria$max_r2 %||% if (is.null(criteria$max_cor)) 0.5 else criteria$max_cor^2
+  criteria$sources$max_r2 = criteria$sources$max_r2 %||% criteria$sources$max_cor %||% "package default"
+  keep = c("min_importance", "stability", "min_difference_supplied", "min_difference_value", "min_change", "max_r2",
+    "dependent_groups", "factor", "level", "interval_rule", "fixed", "sources")
+  criteria = stats::setNames(lapply(keep, function(field) criteria[[field]]), keep)
+  replaced = vapply(judgments, `[[`, character(1L), "gate")
+  carried = Filter(function(j) !j$gate %in% replaced, chk$judgments %||% list())
+  new_chk = .csdg_check_impl(new_claim, new_imp, criteria, c(carried, judgments), chk$note,
     origin = "independently_confirmed")
-  out = csdg_assess(new_chk, note = note)
-  out$exploratory = as.data.table(csdg_assess(chk))
+  out = .csdg_assess(new_chk, note = note)
+  out$exploratory = as.data.table(.csdg_assess(chk))
+  out$duplicated_rows = as.integer(overlap)
   class(out) = c("CSDGConfirmation", class(out))
+  .csdg_log_claim("csdg_confirm", new_claim, new_chk, result = out$label)
   out
 }
 
@@ -334,6 +414,9 @@ csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
     labels = refit$labels, seed = if (is.na(refit$seed)) NULL else refit$seed)
   if (identical(chk$claim$kind, "direction")) return(fits)
   src = chk$source
+  if (identical(src$quantity, "loco")) {
+    return(csdg_loco(fits, predictors = src$loco_predictors, groups = src$groups))
+  }
   csdg_importance(fits, repetitions = src$R, groups = src$groups,
     conditional = if (length(src$conditional_on)) src$conditional_on, batch_size = src$batch_size,
     seed = src$seed)
@@ -377,7 +460,7 @@ csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
   }
   out$scope = .csdg_derived_scope(out, fits, new_imp)
   out$source = list(task_id = fits$task_id, features = fits$features, loss = claim$source$loss, K = fits$K,
-    R = new_imp$repetitions, data_hash = fits$data_hash)
+    R = new_imp$repetitions, data_hash = fits$data_hash, quantity = claim$source$quantity)
   out$origin = "independently_confirmed"
   out$selection = "Claim and criteria fixed in the exploratory check."
   out$record = .csdg_derived_record(out, origin = "independently_confirmed", date = format(Sys.Date()),
@@ -393,13 +476,18 @@ csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
 #' Writes the records of a [csdg_assess()] or [csdg_confirm()] result to a directory
 #' `<path>/<prefix>_csdg_assessment`: the claim card (`claim.json`), the criteria (`criteria.json`), the check table
 #' (`check.csv`), the evidence records (`records.json`), the gate plan (`gate_plan.csv`), the assessment
-#' (`assessment.json`), and, for a confirmation, the exploratory assessment (`exploratory.csv`).
+#' (`assessment.json`), for a confirmation the exploratory assessment (`exploratory.csv`), and the claim log of the
+#' session (`claim_log.csv`, see [csdg_claim_log()]).
+#' The article asks researchers to report every claim they checked, not only the claims that were met; the claim log
+#' lists every claim derived and every check, assessment, and test on new data of the session, so that it can be
+#' reported with the assessment.
 #' No models, predictions, or row-level data are written.
 #' The directory is replaced atomically.
 #'
 #' @param x A [csdg_assess()] or [csdg_confirm()] result.
 #' @param path Directory in which the export directory is created.
 #' @param prefix Name prefix of the export directory; defaults to the claim id.
+#' @param claim_log If `TRUE` (default), the claim log of the session is written as `claim_log.csv`.
 #'
 #' @return The path of the export directory, invisibly.
 #' @examples
@@ -408,15 +496,17 @@ csdg_confirm = function(chk, new, claim = NULL, note = NULL) {
 #' x = data.frame(a = rnorm(n), b = rnorm(n), c = rnorm(n))
 #' x$y = 2 * x$a + x$b + rnorm(n)
 #' task = mlr3::as_task_regr(x, target = "y", id = "toy")
-#' imp = csdg_importance(csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3), repetitions = 5)
+#' fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3)
+#' imp = csdg_importance(fits, repetitions = 5)
 #' res = csdg_assess(csdg_check(claim_order(imp, "a", "b"), imp))
 #' dir = csdg_export_assessment(res, tempdir())
 #' list.files(dir)
 #' @export
-csdg_export_assessment = function(x, path, prefix = NULL) {
+csdg_export_assessment = function(x, path, prefix = NULL, claim_log = TRUE) {
   assert_class(x, "CSDGAssessment", .var.name = "x")
   assert_string(path, min.chars = 1L, .var.name = "path")
   assert_string(prefix, min.chars = 1L, null.ok = TRUE, .var.name = "prefix")
+  assert_flag(claim_log, .var.name = "claim_log")
   prefix = .safe_name(prefix %||% x$claim$id)
   target = file.path(path, paste0(prefix, "_csdg_assessment"))
   chk = x$check
@@ -425,6 +515,7 @@ csdg_export_assessment = function(x, path, prefix = NULL) {
   criteria$tau = as.list(criteria$tau)
   plan = as.data.table(chk$plan)
   plan[, required_components := as.character(required_components)]
+  log = if (claim_log) csdg_claim_log()
   .atomic_dir(target, function(dir) {
     .write_json(.card_to_list(x$claim$record), file.path(dir, "claim.json"))
     .write_json(criteria, file.path(dir, "criteria.json"))
@@ -433,6 +524,7 @@ csdg_export_assessment = function(x, path, prefix = NULL) {
     .write_csv(plan, file.path(dir, "gate_plan.csv"))
     .write_json(as.list(as.data.table(x)), file.path(dir, "assessment.json"))
     if (inherits(x, "CSDGConfirmation")) .write_csv(x$exploratory, file.path(dir, "exploratory.csv"))
+    if (claim_log) .write_csv(log, file.path(dir, "claim_log.csv"))
   })
   invisible(target)
 }

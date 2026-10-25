@@ -119,9 +119,9 @@
   list(cases = cases[], summary = summary[])
 }
 
-#' Separate perturbation and cross-fit variation in a local-fidelity audit
+#' Separate perturbation and cross-validation variation in a local-fidelity audit
 #'
-#' Evaluates a complete crossed grid of perturbation seeds and surrogate cross-fit seeds for held-out cases.
+#' Evaluates a complete crossed grid of perturbation seeds and surrogate cross-validation seeds for held-out cases.
 #' The balanced grid separates marginal variation attributable to neighborhood generation, marginal variation
 #' attributable to surrogate fold assignment, and their interaction without treating any component as sampling or
 #' model-training uncertainty.
@@ -131,10 +131,11 @@
 #' @param x A `CSDGResample` with stored fold models.
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param perturbation_seeds Vector or case-by-seed matrix containing at least two distinct perturbation seeds per case.
-#' @param crossfit_seeds Vector or case-by-seed matrix containing at least two distinct cross-fit seeds per case.
+#' @param crossfit_seeds Vector or case-by-seed matrix containing at least two distinct cross-validation seeds per
+#'   case.
 #' @param kernel_width Positive kernel width.
 #' @param n_perturb Number of perturbations generated for each crossed seed cell.
-#' @param crossfit_folds Number of deterministic surrogate cross-fitting folds.
+#' @param crossfit_folds Number of deterministic surrogate cross-validation folds.
 #' @param target_scale For classification, either `"response"` for probability or `"link"` for logit scale.
 #' @param neighborhood_method Either synthetic independent perturbations or empirical k-nearest-neighbor resampling.
 #' @param empirical_neighbors Number of nearest training rows eligible for empirical-neighbor resampling.
@@ -236,7 +237,7 @@ csdg_local_fidelity_randomness_audit = function(
   keys = grid[, .N, by = .(case_label, perturbation_seed_index, crossfit_seed_index)]
   if (nrow(grid) != expected_cells || nrow(keys) != expected_cells || any(keys$N != 1L) ||
       nrow(support) != nrow(case_map) || anyDuplicated(support$case_label)) {
-    .csdg_stop("The case-by-perturbation-seed-by-cross-fit-seed grid is incomplete or duplicated.")
+    .csdg_stop("The case-by-perturbation-seed-by-cross-validation-seed grid is incomplete or duplicated.")
   }
   summaries = .summarize_local_fidelity_randomness(grid, case_map)
 
@@ -261,7 +262,8 @@ csdg_local_fidelity_randomness_audit = function(
     limitations = c(
       "The decomposition describes computation under the declared seeds, neighborhood, and surrogate design.",
       "Seed effects are fixed deterministic contrasts, not random-effect estimates or confidence intervals.",
-      "The interaction component includes nonadditivity between the selected perturbation and cross-fit seed grids.",
+      paste("The interaction component includes nonadditivity between the selected perturbation and cross-validation",
+        "seed grids."),
       "No component includes predictive-model refitting, population sampling, or model-selection uncertainty.",
       "Results do not generalize beyond the audited held-out cases or establish causal or actionable explanations."
     )

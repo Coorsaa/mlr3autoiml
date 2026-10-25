@@ -5,7 +5,7 @@
 #' learner from a [csdg_fit()] result, together with the held-out loss of each learner and of the model without
 #' predictors, and the improvement over that model.
 #' The loss is the measure of [csdg_fit()], so PFI and the improvement are in the same units.
-#' PFI values are not parts of the improvement; PFI relative to the improvement can exceed 100%.
+#' PFI values are not parts of the improvement: a single PFI value, or their sum, can exceed it.
 #'
 #' Marginal PFI permutes each predictor in the held-out fold ([csdg_fold_pfi()], one call per learner, single
 #' predictors first so that their values do not change when groups are added).
@@ -39,12 +39,14 @@
 #'   and stored in the result.
 #'
 #' @return A `CSDGImportance` list with `fits`, `learners`, the settings (`loss`, `measure`, `repetitions`,
-#'   `batch_size`, `seed`, `groups`, `strata_features`, `strata_definition`, `conditional_on`), `pfi` and
-#'   `conditional` ([csdg_fold_pfi()] results per learner), and the tables `performance` (held-out loss per learner
-#'   and fold, with the model without predictors and the improvement), `fold_pfi` (PFI per learner, fold, and
+#'   `batch_size`, `seed`, `groups`, `strata_features`, `strata_definition`, `conditional_on`), `quantity` (`"pfi"`),
+#'   `pfi` and `conditional` ([csdg_fold_pfi()] results per learner), and the tables `performance` (held-out loss per
+#'   learner and fold, with the model without predictors and the improvement), `fold_pfi` (PFI per learner, fold, and
 #'   predictor or group, with `type` `"marginal"`, `"grouped"`, or `"conditional"`), `summary` (means over folds with
-#'   PFI relative to the improvement, the rank, and the number of folds with positive PFI), and `improvement` (per
+#'   the ratio of PFI to the improvement, the rank, and the number of folds with positive PFI), and `improvement` (per
 #'   learner).
+#'   `print()` shows, per learner, the improvement and the default minimum importance of [csdg_check()] (1% of the
+#'   improvement) in loss units, and per predictor the mean PFI with its corrected 95% interval.
 #' @seealso [csdg_fit()], [claim_relies_mainly()], [csdg_check()]
 #' @examples
 #' set.seed(1)
@@ -60,6 +62,7 @@
 csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NULL, strata = NULL,
                            batch_size = 20L, seed = NULL) {
   assert_multi_class(x, c("CSDGFits", "CSDGImportance"), .var.name = "x")
+  if (inherits(x, "CSDGLoco")) .csdg_stop("`x` is a csdg_loco() result; pass the csdg_fit() result to compute PFI.")
   if (inherits(x, "CSDGImportance")) {
     supplied = c(repetitions = !missing(repetitions), batch_size = !missing(batch_size), seed = !missing(seed))
     if (any(supplied)) {
@@ -297,8 +300,10 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
 
 # Builds a CSDGImportance object from csdg_fold_pfi() results and fold losses (also used by the test fixture).
 .csdg_new_importance = function(fits, loss, repetitions, batch_size, seed, groups, strata_features, strata_definition,
-                                pfi, conditional, losses, conditional_on = list(), strata_values = list()) {
+                                pfi, conditional, losses, conditional_on = list(), strata_values = list(),
+                                quantity = "pfi") {
   learners = names(pfi)
+  single = if (identical(quantity, "loco")) "loco" else "marginal"
   features = fits$features
   fold_of = unique(as.data.table(pfi[[1L]]$per_iteration)[, .(iteration, fold)])
   tables = .csdg_performance_tables(fits, losses, learners, fold_of)
@@ -311,7 +316,7 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
     tab[, `:=`(learner = learner, type = type_fun(feature_group, features))]
     tab
   }
-  marginal_type = function(group, members) fifelse(group %in% features & members == group, "marginal", "grouped")
+  marginal_type = function(group, members) fifelse(group %in% features & members == group, single, "grouped")
   fold_pfi = rbindlist(c(
     lapply(learners, function(l) fold_rows(pfi[[l]], l, marginal_type)),
     unlist(lapply(learners, function(l) {
@@ -320,10 +325,10 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
   ))
   # Ties count against a predictor: with PFI exactly 0, several predictors are not all "in the top k".
   fold_pfi[, rank_in_fold := NA_integer_]
-  fold_pfi[type == "marginal", rank_in_fold := as.integer(frank(-importance, ties.method = "max")),
+  fold_pfi[type == single, rank_in_fold := as.integer(frank(-importance, ties.method = "max")),
     by = .(learner, iteration)]
   fold_pfi[, `:=`(learner_order__ = match(learner, learners),
-    type_order__ = match(type, c("marginal", "grouped", "conditional")))]
+    type_order__ = match(type, c(single, "grouped", "conditional")))]
   setorder(fold_pfi, learner_order__, type_order__, iteration, rank_in_fold)
   setcolorder(fold_pfi, c("learner", "iteration", "fold", "feature_group", "features", "type", "importance",
     "monte_carlo_se", "n_permutations", "rank_in_fold"))
@@ -339,7 +344,7 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
   summary[, relative_to_improvement := mean_importance /
     improvement$improvement[match(learner, improvement$learner)]]
   summary[, rank := NA_integer_]
-  summary[type == "marginal", rank := as.integer(frank(-mean_importance, ties.method = "min")), by = learner]
+  summary[type == single, rank := as.integer(frank(-mean_importance, ties.method = "min")), by = learner]
   setorder(summary, learner_order__, type_order__, -mean_importance)
   summary[, c("learner_order__", "type_order__") := NULL]
   fold_pfi[, c("learner_order__", "type_order__") := NULL]
@@ -360,6 +365,7 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
       strata_definition = strata_definition %||% character(),
       conditional_on = conditional_on %||% list(),
       strata_values = strata_values %||% list(),
+      quantity = quantity,
       pfi = pfi,
       conditional = conditional,
       performance = performance[],
@@ -407,8 +413,9 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
   matrix(rows$importance, nrow = length(iterations), byrow = TRUE, dimnames = list(iterations, NULL))
 }
 
-# K x p matrix of fold values of one type (columns: predictors or groups).
-.csdg_fold_matrix = function(imp, learner, type = "marginal") {
+# K x p matrix of fold values of one type (columns: predictors or groups); by default the single-predictor values.
+.csdg_fold_matrix = function(imp, learner, type = NULL) {
+  type = type %||% .csdg_single_type(imp)
   rows = which(imp$fold_pfi$learner == learner & imp$fold_pfi$type == type)
   tab = imp$fold_pfi[rows]
   if (!nrow(tab)) return(NULL)
@@ -416,7 +423,7 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
   setorder(wide, iteration)
   out = as.matrix(wide[, -1L, with = FALSE])
   rownames(out) = wide$iteration
-  if (identical(type, "marginal")) out = out[, intersect(imp$fits$features, colnames(out)), drop = FALSE]
+  if (identical(type, .csdg_single_type(imp))) out = out[, intersect(imp$fits$features, colnames(out)), drop = FALSE]
   out
 }
 
@@ -434,61 +441,94 @@ csdg_importance = function(x, repetitions = 20L, groups = NULL, conditional = NU
 
 #' @rdname csdg_importance
 #' @param k For `print()`: the column "folds in top k" counts the folds in which a predictor has one of the `k`
-#'   largest PFI values (at most the number of predictors minus 1).
+#'   largest values (at most the number of predictors minus 1).
 #' @param n For `print()` and `plot()`: number of predictors shown per learner.
 #' @param learner For `print()` and `plot()`: names of the learners shown; defaults to all.
+#' @param width For `print()`: line width of the notes.
 #' @param ... Ignored.
 #' @export
-format.CSDGImportance = function(x, k = 2L, n = 6L, learner = NULL, ...) {
+format.CSDGImportance = function(x, k = 2L, n = 6L, learner = NULL, width = getOption("width", 80L), ...) {
   learners = .csdg_resolve_learner_names(x$fits, learner %||% .csdg_learners(x))
   K = x$fits$K
-  p = length(x$fits$features)
+  q = .csdg_quantity_label(x)
+  single = .csdg_single_type(x)
+  p = length(unique(x$summary$feature_group[x$summary$type == single]))
   k = max(1L, min(as.integer(k), p - 1L))
   loss_label = .csdg_loss_label(x$loss)
-  lines = sprintf("<CSDGImportance> held-out PFI, increase in %s; %d folds x %d permutations", loss_label, K,
-    x$repetitions)
+  header = if (.csdg_is_loco(x)) {
+    sprintf("<CSDGLoco> LOCO, increase in held-out %s after refitting without the predictor; %d folds", loss_label, K)
+  } else {
+    sprintf("<CSDGImportance> held-out PFI, increase in %s; %d folds x %d permutations", loss_label, K,
+      x$repetitions)
+  }
+  bounds = .csdg_summary_intervals(x)
+  interval_of = function(rows) {
+    hit = merge(rows[, .(learner, feature_group, type)], bounds, by = c("learner", "feature_group", "type"),
+      sort = FALSE)
+    sprintf("[%s, %s]", .csdg_num(hit$lower), .csdg_num(hit$upper))
+  }
+  lines = header
   for (l in learners) {
     imp_row = x$improvement[x$improvement$learner == l]
-    lines = c(lines, sprintf("%s: held-out %s %s versus %s for the model without predictors (improvement %s)",
-      .csdg_learner_label(x$fits, l), loss_label, .csdg_num(imp_row$loss), .csdg_num(imp_row$loss_baseline),
-      .csdg_num(imp_row$improvement)))
-    marginal = x$summary[x$summary$learner == l & x$summary$type == "marginal"][order(rank)]
+    lines = c(lines,
+      sprintf("%s: held-out %s %s; model without predictors %s", .csdg_learner_label(x$fits, l), loss_label,
+        .csdg_num(imp_row$loss), .csdg_num(imp_row$loss_baseline)),
+      sprintf("  improvement %s; minimum importance (1%% of the improvement) %s", .csdg_num(imp_row$improvement),
+        .csdg_num(0.01 * imp_row$improvement)))
+    marginal = x$summary[x$summary$learner == l & x$summary$type == single][order(rank)]
     top = utils::head(marginal, n)
-    in_top = x$fold_pfi[x$fold_pfi$learner == l & x$fold_pfi$type == "marginal" & x$fold_pfi$rank_in_fold <= k,
+    in_top = x$fold_pfi[x$fold_pfi$learner == l & x$fold_pfi$type == single & x$fold_pfi$rank_in_fold <= k,
       .N, by = feature_group]
     folds_top = in_top$N[match(top$feature_group, in_top$feature_group)]
     folds_top[is.na(folds_top)] = 0L
-    width = max(nchar(c("predictor", top$feature_group)))
+    name_width = max(nchar(c("predictor", top$feature_group)))
+    intervals = interval_of(top)
+    interval_width = max(nchar(c("corrected 95% interval", intervals)))
     lines = c(lines,
-      sprintf("  %s   mean PFI   relative to improvement   folds in top %d", formatC("predictor", width = -width),
-        k),
-      sprintf("  %s %10s %25s %16s", formatC(top$feature_group, width = -width), .csdg_num(top$mean_importance),
-        .csdg_pct(top$relative_to_improvement), sprintf("%d/%d", folds_top, K)))
+      sprintf("  %s  %9s   %*s   folds in top %d", formatC("predictor", width = -name_width), paste("mean", q),
+        interval_width, "corrected 95% interval", k),
+      sprintf("  %s  %9s   %*s   %14s", formatC(top$feature_group, width = -name_width),
+        .csdg_num(top$mean_importance), interval_width, intervals, sprintf("%d/%d", folds_top, K)))
     if (nrow(marginal) > n) lines = c(lines, sprintf("  ... %d more predictors", nrow(marginal) - n))
     grouped = x$summary[x$summary$learner == l & x$summary$type == "grouped"]
     for (i in seq_len(nrow(grouped))) {
-      lines = c(lines, sprintf("  grouped: %s (%s) %s (%s)", grouped$feature_group[[i]],
+      lines = c(lines, sprintf("  grouped: %s (%s) %s %s", grouped$feature_group[[i]],
         paste(strsplit(grouped$features[[i]], "|", fixed = TRUE)[[1L]], collapse = ", "),
-        .csdg_num(grouped$mean_importance[[i]]), .csdg_pct(grouped$relative_to_improvement[[i]])))
+        .csdg_num(grouped$mean_importance[[i]]), interval_of(grouped[i])))
     }
     conditional = x$summary[x$summary$learner == l & x$summary$type == "conditional"]
     for (i in seq_len(nrow(conditional))) {
       feature = conditional$feature_group[[i]]
-      lines = c(lines, sprintf("  conditional: %s, %s: %s (%s)", feature, .csdg_conditional_text(x, feature),
-        .csdg_num(conditional$mean_importance[[i]]), .csdg_pct(conditional$relative_to_improvement[[i]])))
+      lines = c(lines, sprintf("  conditional: %s, %s: %s %s", feature, .csdg_conditional_text(x, feature),
+        .csdg_num(conditional$mean_importance[[i]]), interval_of(conditional[i])))
     }
   }
-  c(lines,
-    if (k == 1L) "Folds in top 1: folds in which the predictor has the largest PFI value (print(imp, k = ))." else
-      sprintf("Folds in top %d: folds in which the predictor has one of the %d largest PFI values (print(imp, k = )).",
-        k, k),
-    "PFI values are not parts of the improvement, so PFI relative to the improvement can exceed 100%.")
+  notes = c(
+    if (k == 1L) {
+      sprintf("Folds in top 1: folds in which the predictor has the largest %s value (print(x, k = )).", q)
+    } else {
+      sprintf("Folds in top %d: folds in which the predictor has one of the %d largest %s values (print(x, k = )).", k,
+        k, q)
+    },
+    sprintf(paste("Intervals are reported descriptively. The minimum importance, the default criterion of",
+      "csdg_check(), is given in %s units, because %s values are not parts of the improvement."), loss_label, q)
+  )
+  c(lines, vapply(notes, .csdg_wrap, character(1L), width = width, USE.NAMES = FALSE))
+}
+
+# Corrected resampled 95% intervals of the mean of every row of `summary`.
+.csdg_summary_intervals = function(x) {
+  fits = x$fits
+  x$fold_pfi[, {
+    ci = csdg_learner_pfi_interval(importance[order(iteration)], n_train = fits$n_train, n_test = fits$n_test)
+    list(lower = ci$lower, upper = ci$upper)
+  }, by = .(learner, feature_group, type)]
 }
 
 #' @rdname csdg_importance
 #' @export
-print.CSDGImportance = function(x, k = 2L, n = 6L, learner = NULL, ...) {
-  cat(format(x, k = k, n = n, learner = learner, ...), sep = "\n")
+print.CSDGImportance = function(x, k = 2L, n = 6L, learner = NULL, width = getOption("width", 80L), ...) {
+  cat(format(x, k = k, n = n, learner = learner, width = width, ...), sep = "\n")
   invisible(x)
 }
 
@@ -507,12 +547,7 @@ as.data.table.CSDGImportance = function(x, keep.rownames = FALSE, ...,
   out = copy(switch(level, summary = x$summary, fold = x$fold_pfi, performance = x$performance,
     improvement = x$improvement))
   if (interval && identical(level, "summary")) {
-    fits = x$fits
-    bounds = x$fold_pfi[, {
-      ci = csdg_learner_pfi_interval(importance[order(iteration)], n_train = fits$n_train, n_test = fits$n_test)
-      list(lower = ci$lower, upper = ci$upper)
-    }, by = .(learner, feature_group, type)]
-    out = merge(out, bounds, by = c("learner", "feature_group", "type"), sort = FALSE)
+    out = merge(out, .csdg_summary_intervals(x), by = c("learner", "feature_group", "type"), sort = FALSE)
     setcolorder(out, c("learner", "feature_group", "features", "type", "mean_importance", "lower", "upper"))
   }
   out[]
@@ -528,7 +563,8 @@ summary.CSDGImportance = function(object, ...) {
 #' @rdname csdg_importance
 #' @param features For `plot()`: optional predictors (or group names) to show instead of the `n` leading predictors
 #'   of each learner, for example two correlated items with small PFI.
-#' @param scale For `plot()`: `"loss"` (PFI in loss units) or `"relative"` (PFI relative to the improvement).
+#' @param scale For `plot()`: `"loss"` (in loss units) or `"relative"` (as a multiple of the improvement, which a
+#'   single value can exceed).
 #' @param min_importance For `plot()`: the dashed line marks this share of each learner's improvement (default 1%,
 #'   the default minimum importance of [csdg_check()]).
 #' @export
@@ -542,12 +578,14 @@ plot.CSDGImportance = function(x, learner = NULL, n = 10L, features = NULL, scal
   if (!is.null(features)) assert_subset(features, units, .var.name = "features")
   labels = x$fits$labels
   facet_levels = unname(labels[learners])
+  single = .csdg_single_type(x)
+  q = .csdg_quantity_label(x)
   shown = rbindlist(lapply(learners, function(l) {
     rows = x$summary[x$summary$learner == l]
-    marginal = rows[rows$type == "marginal"][order(-mean_importance)]
+    marginal = rows[rows$type == single][order(-mean_importance)]
     keep = features %||% c(utils::head(marginal$feature_group, n), rows$feature_group[rows$type == "grouped"])
     rows = rows[rows$feature_group %in% keep]
-    order_value = rows[, .(value = mean_importance[type %in% c("marginal", "grouped")][1L]), by = feature_group]
+    order_value = rows[, .(value = mean_importance[type %in% c(single, "grouped")][1L]), by = feature_group]
     order_value = order_value[order(value)]
     rows[, key__ := factor(paste(feature_group, l, sep = "___"), levels = paste(order_value$feature_group, l,
       sep = "___"))]
@@ -566,12 +604,15 @@ plot.CSDGImportance = function(x, learner = NULL, n = 10L, features = NULL, scal
   shown[, learner_label__ := factor(unname(labels[learner]), levels = facet_levels)]
   folds[, learner_label__ := factor(unname(labels[learner]), levels = facet_levels)]
   thresholds[, learner_label__ := factor(unname(labels[learner]), levels = facet_levels)]
-  shown[, type := factor(type, levels = c("marginal", "grouped", "conditional"))]
-  folds[, type := factor(type, levels = c("marginal", "grouped", "conditional"))]
+  shown[, type := factor(type, levels = c(single, "grouped", "conditional"))]
+  folds[, type := factor(type, levels = c(single, "grouped", "conditional"))]
   colors = autoiml_palette()$metric
-  fills = c(marginal = colors[["primary"]], grouped = colors[["tertiary"]], conditional = colors[["secondary"]])
+  fills = stats::setNames(c(colors[["primary"]], colors[["tertiary"]], colors[["secondary"]]),
+    c(single, "grouped", "conditional"))
   xlab = if (scale == "relative") {
-    "PFI relative to the improvement over the model without predictors"
+    sprintf("%s as a multiple of the improvement over the model without predictors", q)
+  } else if (.csdg_is_loco(x)) {
+    sprintf("LOCO (increase in held-out %s after refitting without the predictor)", .csdg_loss_label(x$loss))
   } else {
     sprintf("Held-out PFI (increase in %s)", .csdg_loss_label(x$loss))
   }

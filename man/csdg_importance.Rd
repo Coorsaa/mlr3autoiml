@@ -19,9 +19,9 @@ csdg_importance(
   seed = NULL
 )
 
-\method{format}{CSDGImportance}(x, k = 2L, n = 6L, learner = NULL, ...)
+\method{format}{CSDGImportance}(x, k = 2L, n = 6L, learner = NULL, width = getOption("width", 80L), ...)
 
-\method{print}{CSDGImportance}(x, k = 2L, n = 6L, learner = NULL, ...)
+\method{print}{CSDGImportance}(x, k = 2L, n = 6L, learner = NULL, width = getOption("width", 80L), ...)
 
 \method{as.data.table}{CSDGImportance}(
   x,
@@ -63,11 +63,13 @@ The permutations do not depend on batching; use 1 for learners whose prediction 
 and stored in the result.}
 
 \item{k}{For \code{print()}: the column "folds in top k" counts the folds in which a predictor has one of the \code{k}
-largest PFI values (at most the number of predictors minus 1).}
+largest values (at most the number of predictors minus 1).}
 
 \item{n}{For \code{print()} and \code{plot()}: number of predictors shown per learner.}
 
 \item{learner}{For \code{print()} and \code{plot()}: names of the learners shown; defaults to all.}
+
+\item{width}{For \code{print()}: line width of the notes.}
 
 \item{...}{Ignored.}
 
@@ -84,26 +86,29 @@ interval of each mean PFI (\code{\link[=csdg_learner_pfi_interval]{csdg_learner_
 \item{features}{For \code{plot()}: optional predictors (or group names) to show instead of the \code{n} leading predictors
 of each learner, for example two correlated items with small PFI.}
 
-\item{scale}{For \code{plot()}: \code{"loss"} (PFI in loss units) or \code{"relative"} (PFI relative to the improvement).}
+\item{scale}{For \code{plot()}: \code{"loss"} (in loss units) or \code{"relative"} (as a multiple of the improvement, which a
+single value can exceed).}
 
 \item{min_importance}{For \code{plot()}: the dashed line marks this share of each learner's improvement (default 1\%,
 the default minimum importance of \code{\link[=csdg_check]{csdg_check()}}).}
 }
 \value{
 A \code{CSDGImportance} list with \code{fits}, \code{learners}, the settings (\code{loss}, \code{measure}, \code{repetitions},
-\code{batch_size}, \code{seed}, \code{groups}, \code{strata_features}, \code{strata_definition}, \code{conditional_on}), \code{pfi} and
-\code{conditional} (\code{\link[=csdg_fold_pfi]{csdg_fold_pfi()}} results per learner), and the tables \code{performance} (held-out loss per learner
-and fold, with the model without predictors and the improvement), \code{fold_pfi} (PFI per learner, fold, and
+\code{batch_size}, \code{seed}, \code{groups}, \code{strata_features}, \code{strata_definition}, \code{conditional_on}), \code{quantity} (\code{"pfi"}),
+\code{pfi} and \code{conditional} (\code{\link[=csdg_fold_pfi]{csdg_fold_pfi()}} results per learner), and the tables \code{performance} (held-out loss per
+learner and fold, with the model without predictors and the improvement), \code{fold_pfi} (PFI per learner, fold, and
 predictor or group, with \code{type} \code{"marginal"}, \code{"grouped"}, or \code{"conditional"}), \code{summary} (means over folds with
-PFI relative to the improvement, the rank, and the number of folds with positive PFI), and \code{improvement} (per
+the ratio of PFI to the improvement, the rank, and the number of folds with positive PFI), and \code{improvement} (per
 learner).
+\code{print()} shows, per learner, the improvement and the default minimum importance of \code{\link[=csdg_check]{csdg_check()}} (1\% of the
+improvement) in loss units, and per predictor the mean PFI with its corrected 95\% interval.
 }
 \description{
 Second step of the analysis-first interface: computes held-out permutation feature importance (PFI) per fold and
 learner from a \code{\link[=csdg_fit]{csdg_fit()}} result, together with the held-out loss of each learner and of the model without
 predictors, and the improvement over that model.
 The loss is the measure of \code{\link[=csdg_fit]{csdg_fit()}}, so PFI and the improvement are in the same units.
-PFI values are not parts of the improvement; PFI relative to the improvement can exceed 100\%.
+PFI values are not parts of the improvement: a single PFI value, or their sum, can exceed it.
 
 Marginal PFI permutes each predictor in the held-out fold (\code{\link[=csdg_fold_pfi]{csdg_fold_pfi()}}, one call per learner, single
 predictors first so that their values do not change when groups are added).

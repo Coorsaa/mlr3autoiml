@@ -16,11 +16,13 @@ csdg_check(
   stability = 0.9,
   min_difference = NULL,
   min_change = NULL,
-  max_cor = 0.7,
+  max_r2 = 0.5,
+  dependent_groups = NULL,
   level = 0.95,
   interval_rule = c("open_if_inconclusive", "report_only"),
   judgments = NULL,
-  note = NULL
+  note = NULL,
+  max_cor = NULL
 )
 
 \method{format}{CSDGCheck}(x, width = getOption("width", 80L), details = FALSE, ...)
@@ -37,7 +39,7 @@ csdg_check(
 \item{claim}{A claim from \code{\link[=claim_relies_mainly]{claim_relies_mainly()}}, \code{\link[=claim_top_k]{claim_top_k()}}, \code{\link[=claim_order]{claim_order()}}, or \code{\link[=claim_direction]{claim_direction()}}.}
 
 \item{x}{For \code{csdg_check()}: a \code{\link[=csdg_importance]{csdg_importance()}} result on the same data, with the same loss and the learners
-the claim covers.
+the claim covers, or a \code{\link[=csdg_loco]{csdg_loco()}} result for a claim derived from LOCO.
 It may differ from the result the claim was derived from, for example by added conditional PFI.
 For direction claims, a \code{\link[=csdg_effect]{csdg_effect()}} or \code{\link[=csdg_fit]{csdg_fit()}} result also works.
 Use \code{\link[=csdg_confirm]{csdg_confirm()}} for new data.
@@ -51,20 +53,32 @@ without predictors (default 1\%).}
 \item{min_difference}{Smallest relevant difference in loss units; defaults to \code{min_importance} times each
 learner's improvement.}
 
-\item{min_change}{For direction claims: smallest relevant change of the prediction between the two percentiles;
-defaults to 0.02 on the probability scale (classification) or 0.1 times the standard deviation of the outcome
-(regression).}
+\item{min_change}{For direction claims: smallest relevant change of the prediction between the two percentiles,
+which for a claim that the predictions rise (or fall) also bounds the decrease (or increase) between adjacent grid
+points; defaults to 0.02 on the probability scale (classification) or 0.1 times the standard deviation of the
+outcome (regression).}
 
-\item{max_cor}{Absolute correlation from which a named predictor without grouped or conditional PFI is flagged
-(default 0.7).}
+\item{max_r2}{\eqn{R^2} of a named predictor on all other predictors from which it is flagged by the dependence
+screen (default 0.5, a package default; for two predictors, it corresponds to an absolute correlation of about
+.71).}
+
+\item{dependent_groups}{Optional named list of character vectors: groups of predictors that the researcher knows
+to be dependent (for example items of one scale or recodings of one variable).
+A named predictor in such a group is flagged whatever its \eqn{R^2}, unless conditional PFI covers it or grouped
+PFI of a group that contains the whole declared group covers it.}
 
 \item{level}{Confidence level of the corrected interval and of the Monte Carlo quantile.}
 
 \item{interval_rule}{\code{"open_if_inconclusive"} (default; see Description) or \code{"report_only"}.}
 
-\item{judgments}{Optional \code{\link[=csdg_judge]{csdg_judge()}} result or list of them, for properties that cannot be computed.}
+\item{judgments}{Optional \code{\link[=csdg_judge]{csdg_judge()}} result or list of them, for properties that cannot be computed, such as
+G0b.}
 
 \item{note}{Optional note stored with the check.}
+
+\item{max_cor}{Deprecated since version 0.3.0; replaced by \code{max_r2}.
+If given, \code{max_r2 = max_cor^2} is used with a deprecation warning, which flags at least the predictors that the
+pairwise screen of earlier versions flagged.}
 
 \item{width}{For \code{print()}: line width.}
 
@@ -79,11 +93,16 @@ defaults to 0.02 on the probability scale (classification) or 0.1 times the stan
 \value{
 A \code{CSDGCheck} list with \code{claim}, \code{criteria} (fixed values, their sources, and the date they were fixed),
 \code{table} (one row per property or context entry: \code{gate}, \code{gate_name}, \code{check}, \code{learner}, \code{role}, \code{property},
-\code{criterion}, \code{observation}, \code{relevance}, \code{status}, and \code{summary}), \code{details} (the computed numbers per check),
-\code{records} (one \code{\link[=csdg_evidence_record]{csdg_evidence_record()}} per row), \code{plan} (\code{\link[=csdg_gate_plan]{csdg_gate_plan()}}), \code{measurement}, \code{explanation},
-\code{judgments}, \code{note}, \code{origin}, and \code{source}.
+\code{criterion}, \code{observation}, \code{relevance}, \code{status}, and \code{summary}), \code{details} (the computed numbers per check;
+per learner, \code{details$content} holds every comparison of a named with another predictor in \code{comparisons}, the
+weakest comparison of each named predictor in \code{margins}, and the other predictor with the largest mean PFI in
+\code{largest_other}; \code{details$dependence} holds the dependence screen, with the \eqn{R^2} of each named predictor on
+all other predictors, the group of grouped PFI that contains it with its \eqn{R^2} on the predictors outside the
+group (\code{r2_outside}), \code{covered}, and \code{flagged}), \code{records} (one \code{\link[=csdg_evidence_record]{csdg_evidence_record()}} per row),
+\code{plan} (\code{\link[=csdg_gate_plan]{csdg_gate_plan()}}), \code{measurement}, \code{explanation}, \code{judgments}, \code{note}, \code{origin}, and \code{source}.
 \code{print()} shows gate, check, status, and observation (\code{details = TRUE} adds criterion and relevance), \code{plot()}
 draws the fold values against the criterion, and \code{as.data.table()} returns \code{table}.
+Each call is added to the claim log (\code{\link[=csdg_claim_log]{csdg_claim_log()}}).
 }
 \description{
 Fourth step of the analysis-first interface: computes the properties that a claim derived with
@@ -93,29 +112,58 @@ criteria described in the article, and records each as a \code{\link[=csdg_evide
 
 The checks are:
 \itemize{
-\item G0a (specification): the claim and its six scope elements, generated from the analysis.
-\item G0b (measurement): supported when the claim names the analyzed variables; open when it names constructs, until
-validity evidence is entered with \code{\link[=csdg_judge]{csdg_judge()}}.
+\item G0a (specification): the claim and its six scope elements, generated from the analysis (supported).
+\item G0b (measurement and data): open until the researcher judges it with \code{\link[=csdg_judge]{csdg_judge()}}, for example
+\code{csdg_check(claim, imp, judgments = csdg_judge("G0b", supported(), note = "..."))}.
+Whether the variables were measured, coded, and sampled so that they cover what the claim names cannot be
+computed from the data, so an assessment stays unresolved until G0b is judged.
+A claim that names constructs (\code{refers_to = "constructs"}) also needs validity evidence for them.
 \item G1 (predictive performance, context): held-out loss of each covered learner versus the model without
 predictors.
-\item G2 (content): the claim's words translated into a margin on the learner average, for example "PFI of each named
-predictor minus \code{factor} times the PFI of the largest other predictor".
+\item G2 (content): the claim's words translated into margins on the learner average.
+For \code{\link[=claim_relies_mainly]{claim_relies_mainly()}} and \code{\link[=claim_top_k]{claim_top_k()}}, each named predictor is compared with every predictor that the
+claim does not name, with the margin "PFI of the named predictor minus \code{factor} times the PFI of the other
+predictor" (\code{factor = 1} for \code{\link[=claim_top_k]{claim_top_k()}}) and with its own Monte Carlo threshold and corrected interval.
+The content is supported only if every comparison is supported, contradicted if any is contradicted, and open
+otherwise, because a predictor with a smaller mean PFI than the largest other predictor can vary more across
+folds.
+The observation reports the ratios and margins against the other predictor with the largest mean PFI and the
+weakest comparison: a contradicted one before an open one before a supported one, and among these the one with
+the smallest lower bound of its corrected interval.
 A claim that covers several learners records its content under G6a instead, one row per learner.
 \item G2 (minimum importance): each named predictor has a mean PFI of at least \code{min_importance} times the learner's
 improvement over the model without predictors, in the same loss (under G6a for several learners).
+The observation compares the mean PFI with the minimum in loss units.
 \item G2 (procedure): the claim names marginal PFI; if grouped or conditional PFI was computed
 (\code{\link[=csdg_importance]{csdg_importance()}} with \code{groups}, \code{conditional}, or \code{strata}), a reversal of the claim's content contradicts
 this property unless the claim was worded with \code{marginal_only = TRUE} ("Under marginal permutation").
 A comparison counts only if the marginal result holds for that learner; otherwise the perturbation changes
 nothing.
-\item G2 (correlation): if a named predictor correlates at least \code{max_cor} (in absolute value) with another
-predictor and no grouped or conditional PFI covers it, marginal PFI may be redistributed between the two; this
-is an unresolved threat that leaves G2 open, or context with \code{marginal_only = TRUE}.
+For a ranking claim, as for the content, each named predictor is compared with every group of grouped PFI that
+contains no named predictor and, with conditional PFI, with every other predictor if either of the two is
+conditioned; the observation shows the weakest comparison of each named predictor.
+\item G2 (dependence): for each named predictor, the \eqn{R^2} of a linear regression of that predictor on all other
+predictors (factors one-hot encoded; for a factor predictor, the largest \eqn{R^2} over its level indicators),
+computed on the data of the importance (the rows of the task, complete cases).
+A named predictor is flagged if its \eqn{R^2} is at least \code{max_r2} or if it belongs to a group in
+\code{dependent_groups}, unless conditional or grouped PFI covers it; marginal PFI may then be redistributed between
+dependent predictors.
+Conditional PFI of the predictor covers it.
+Grouped PFI covers it only if its group also contains the predictors on which it depends: the \eqn{R^2} of the
+predictor on the predictors outside the group must stay below \code{max_r2}, and the group must contain the other
+members of its groups in \code{dependent_groups}.
+A group that leaves out such predictors permutes the predictor without them, so marginal PFI can still be
+redistributed to them, as with a block of indices that omits offsetting indices.
+A flag is an unresolved threat that leaves G2 open, or context with \code{marginal_only = TRUE}; without a flag, the
+\eqn{R^2} values are reported as context.
+Unlike a pairwise correlation, the \eqn{R^2} also detects a predictor that other predictors determine jointly.
 \item G5 (stability): in each fold, the claim's selection rule is applied again (for example, the top \code{k} and the
 ratio are recomputed; ties at the cutoff do not count as reproduced), and the share of folds that reproduce the
 result must be at least \code{stability}; neighboring cutoffs are reported.
-A failing fold counts only if it fails beyond Monte Carlo error (Holm-adjusted when every fold is required) and
-by at least the smallest relevant difference; otherwise it is undecided.
+For a direction claim, the change between the percentiles and, for a claim that the predictions rise or fall,
+the adjacent grid points of the ALE are checked in each fold (see below).
+A failing fold counts only if it fails beyond Monte Carlo error (with a two-sided Holm adjustment when every fold
+is required) and by at least the smallest relevant difference; otherwise it is undecided.
 The property is supported if enough folds hold, contradicted if too few would hold even if every undecided fold
 held, and open otherwise.
 \item G6a (models): when the claim covers several learners, its content and minimum importance are required for each;
@@ -135,14 +183,32 @@ Monte Carlo error, and contradicted if it is below beyond Monte Carlo error and 
 corrected interval is below the minimum.
 For direction claims, the change must reach \code{min_change} with its lower bound, and a contradiction needs a change
 in the opposite direction whose upper bound is at most \code{-min_change}.
+A fold reproduces a claim that the predictions rise with a predictor (\code{\link[=claim_direction]{claim_direction()}} with \code{monotone = TRUE},
+the default) only if the change between the percentiles is at least \code{min_change} and no decrease of the ALE
+between adjacent grid points in the range between the percentiles exceeds \code{min_change}, as the article's default
+criterion for "rise" requires (for "fall", no increase exceeds it); the stability property counts the folds in
+which both hold, and its observation reports the largest such decrease (or increase).
+A claim that the predictions are higher (or lower) at the upper than at the lower percentile (\code{monotone = FALSE})
+needs only the change in each fold.
 
 The Monte Carlo rule compares a difference with the .975 quantile (for \code{level = 0.95}) of the t distribution with
 R - 1 degrees of freedom times its Monte Carlo standard error (\code{\link[=csdg_pfi_mc_difference]{csdg_pfi_mc_difference()}}); a decisive difference
 within Monte Carlo error leaves the property open.
+When every fold is required, failing folds are compared in a two-sided Holm step-down, as in the article: ordered
+by the ratio of the difference to its Monte Carlo standard error, the i-th failing fold is compared with
+\code{qt(1 - (1 - level) / (2 * (K - i + 1)), R - 1)} times its standard error (with \code{level = 0.95},
+\code{qt(1 - 0.025 / K, R - 1)} for the largest reversal), and from the first fold within its threshold on, the
+remaining failing folds count as within Monte Carlo error.
+
+A claim derived from a \code{\link[=csdg_loco]{csdg_loco()}} result is checked in the same way on LOCO: the content, the minimum
+importance, and the stability use the LOCO fold values, and the Monte Carlo rule does not apply, because LOCO is
+computed once per fold.
+Its wording names refits without single predictors, so grouped LOCO is reported with the procedure but does not
+contradict it, and the dependence screen is context.
 
 Sources of the default criteria: 1\% of the improvement (minimum importance), 9 of 10 folds (stability), and a
 factor of 2 for "relies mainly on" are conventions of the article; the corrected interval rule is its
-recommendation; \code{min_change} and \code{max_cor} are package defaults.
+recommendation; \code{min_change} and \code{max_r2} are package defaults.
 Each record states the source of its criterion.
 }
 \examples{
@@ -154,7 +220,10 @@ task = mlr3::as_task_regr(x, target = "y", id = "toy")
 fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3, seed = 1)
 imp = csdg_importance(fits, repetitions = 5, seed = 2)
 claim = claim_relies_mainly(imp, k = 1)
-chk = csdg_check(claim, imp)
+# G0b stays open until the researcher judges the measurement and the data
+csdg_assess(csdg_check(claim, imp))
+g0b = csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")
+chk = csdg_check(claim, imp, judgments = g0b)
 chk
 csdg_assess(chk)
 }

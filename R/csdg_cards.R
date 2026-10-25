@@ -480,7 +480,7 @@ csdg_explanation = function(
   checkmate::assert_character(case_selection, any.missing = FALSE, min.len = 1L)
   case_selection = match.arg(case_selection)
   allowed_methods = c(
-    "ale", "coefficients", "counterfactual", "decision_curve", "ice", "local_surrogate",
+    "ale", "coefficients", "counterfactual", "decision_curve", "ice", "local_surrogate", "loco",
     "marginal_shap", "other", "path_attribution", "pdp", "pfi", "shapley"
   )
   checkmate::assert_character(method_ids, any.missing = FALSE)

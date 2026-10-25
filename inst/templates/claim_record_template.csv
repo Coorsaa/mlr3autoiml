@@ -1,7 +1,7 @@
 "field","section","enter","package_field","entry"
 "Claim","claim","The conclusion as it will appear in the article; identifier","csdg_claim(id, statement)",""
 "Quantity","scope","Computed quantity; fitted model or learner; scale; observed or also perturbed inputs","csdg_claim(quantity)",""
-"Model","scope","Fitted model, learner, or learners (names or admission rule)","csdg_claim(model)",""
+"Model","scope","Fitted model, learner, or learners (names or tolerance)","csdg_claim(model)",""
 "Procedure","scope","Resampling, perturbation or reference data, repetitions, aggregation","csdg_claim(procedure); csdg_explanation()",""
 "Data","scope","Sample and population, measures, outcome coding, missing values, weights, clustering","csdg_claim(data); csdg_measurement()",""
 "Meaning","scope","Model description, population claim, or causal claim","csdg_claim(meaning)",""

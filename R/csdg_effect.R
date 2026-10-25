@@ -8,9 +8,18 @@
 #' The ALE is computed on `intervals` quantile intervals of the predictor in the held-out fold: within each interval,
 #' the predictions at its upper and lower boundary are differenced and averaged over the rows in the interval, and
 #' the averages are accumulated.
+#' The accumulated curve is centered by its data-weighted mean, so that its mean over the rows of the held-out fold
+#' is zero: each interval contributes the average of the accumulated effect at its two boundaries, weighted by the
+#' number of rows in the interval (Apley and Zhu, 2020).
 #' For classification, the predictions are probabilities of the positive class.
-#' The change is the difference of the accumulated effect between the two percentiles; the summary averages it over
-#' folds and reports the corrected resampled 95% interval ([csdg_learner_pfi_interval()]) descriptively.
+#' The change is the difference of the accumulated effect between the two percentiles, which the centering does not
+#' affect; the summary averages it over folds and reports the corrected resampled 95% interval
+#' ([csdg_learner_pfi_interval()]) descriptively.
+#' In each fold, the result also records the largest decrease (`max_decrease`) and the largest increase
+#' (`max_increase`) of the accumulated effect between adjacent grid points in the range between the two percentiles,
+#' which the percentiles themselves bound.
+#' For a claim that the predictions rise (or fall) with a predictor, [csdg_check()] compares the largest decrease (or
+#' increase) with the minimum change.
 #'
 #' @param fits A [csdg_fit()] result.
 #' @param features Numeric predictors; defaults to all numeric predictors.
@@ -19,9 +28,13 @@
 #' @param intervals Number of quantile intervals of the ALE.
 #'
 #' @return A `CSDGEffect` list with `fits`, `features`, `probs`, `intervals`, `changes` (one row per learner,
-#'   predictor, and fold), `curves` (the ALE per fold), and `summary` (mean change, corrected interval, and the
-#'   number of folds with a positive change per learner and predictor).
+#'   predictor, and fold, with the change, the two percentiles, `max_decrease`, and `max_increase`), `curves` (the ALE
+#'   per fold), and `summary` (mean change, corrected interval, the number of folds with a positive change, and the
+#'   largest `max_decrease` and `max_increase` over folds, per learner and predictor).
 #'   `as.data.table()` returns one of the tables.
+#' @references
+#' Apley, D. W., and Zhu, J. (2020). Visualizing the effects of predictor variables in black box supervised learning
+#' models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 82(4), 1059-1086.
 #' @seealso [claim_direction()], [csdg_check()]
 #' @examples
 #' set.seed(1)
@@ -50,7 +63,8 @@ csdg_effect = function(fits, features = NULL, probs = c(0.1, 0.9), intervals = 2
   curves = rbindlist(lapply(parts, `[[`, "curves"))
   summary = changes[, {
     ci = csdg_learner_pfi_interval(change[order(iteration)], n_train = fits$n_train, n_test = fits$n_test)
-    list(mean_change = mean(change), lower = ci$lower, upper = ci$upper, folds_positive = sum(change > 0), K = .N)
+    list(mean_change = mean(change), lower = ci$lower, upper = ci$upper, folds_positive = sum(change > 0), K = .N,
+      max_decrease = max(max_decrease), max_increase = max(max_increase))
   }, by = .(learner, feature)]
   structure(
     list(fits = fits, features = features, probs = probs, intervals = as.integer(intervals), changes = changes,
@@ -67,7 +81,8 @@ csdg_effect = function(fits, features = NULL, probs = c(0.1, 0.9), intervals = 2
   invisible(TRUE)
 }
 
-# ALE of `feature` on the rows of `newdata`: the accumulated curve and its change between two quantiles.
+# ALE of `feature` on the rows of `newdata`: the accumulated curve, its change between two quantiles, and the largest
+# decrease and increase between adjacent grid points in the range between the two quantiles.
 .csdg_ale_change = function(model, task, newdata, feature, probs, intervals, positive) {
   newdata = as.data.table(newdata)
   x = newdata[[feature]]
@@ -77,8 +92,8 @@ csdg_effect = function(fits, features = NULL, probs = c(0.1, 0.9), intervals = 2
   quantiles = stats::quantile(x, probs, type = 7L, names = FALSE)
   breaks = unique(stats::quantile(x, seq(0, 1, length.out = intervals + 1L), type = 1L, names = FALSE))
   if (length(breaks) < 2L) {
-    return(list(change = 0, q_low = quantiles[[1L]], q_high = quantiles[[2L]], n = length(x),
-      curve = data.table(x = breaks, ale = 0)))
+    return(list(change = 0, q_low = quantiles[[1L]], q_high = quantiles[[2L]], n = length(x), max_decrease = 0,
+      max_increase = 0, curve = data.table(x = breaks, ale = 0)))
   }
   interval = pmax(1L, findInterval(x, breaks, rightmost.closed = TRUE, left.open = TRUE))
   ftype = .autoiml_feature_type(task, feature)
@@ -95,8 +110,26 @@ csdg_effect = function(fits, features = NULL, probs = c(0.1, 0.9), intervals = 2
   }, numeric(1L))
   accumulated = c(0, cumsum(effects))
   at = stats::approx(breaks, accumulated, xout = quantiles, rule = 2L, ties = "ordered")$y
+  steps = .csdg_ale_steps(breaks, accumulated, quantiles, at)
   list(change = at[[2L]] - at[[1L]], q_low = quantiles[[1L]], q_high = quantiles[[2L]], n = length(x),
-    curve = data.table(x = breaks, ale = accumulated - mean(accumulated)))
+    max_decrease = max(0, -steps), max_increase = max(0, steps),
+    curve = data.table(x = breaks, ale = accumulated - .csdg_ale_center(accumulated, interval)))
+}
+
+# Differences of the accumulated curve between adjacent grid points in the range between the two quantiles: the grid
+# points strictly inside the range, bounded by the quantiles with the interpolated values `at`.
+.csdg_ale_steps = function(breaks, accumulated, quantiles, at) {
+  inside = breaks > quantiles[[1L]] & breaks < quantiles[[2L]]
+  diff(c(at[[1L]], accumulated[inside], at[[2L]]))
+}
+
+# Data-weighted mean of an accumulated ALE curve (Apley and Zhu, 2020): each interval contributes the mean of the
+# curve at its two boundaries, weighted by the number of rows in the interval.
+.csdg_ale_center = function(accumulated, interval) {
+  counts = tabulate(interval, nbins = length(accumulated) - 1L)
+  midpoints = (accumulated[-length(accumulated)] + accumulated[-1L]) / 2
+  if (!sum(counts)) return(mean(accumulated))
+  sum(counts * midpoints) / sum(counts)
 }
 
 .csdg_direction_effects = function(fits, feature, probs, intervals) {
@@ -112,7 +145,8 @@ csdg_effect = function(fits, features = NULL, probs = c(0.1, 0.9), intervals = 2
       curve[, `:=`(learner = learner, feature = feature, iteration = i)]
       list(
         changes = data.table(learner = learner, feature = feature, iteration = i, change = ale$change,
-          q_low = ale$q_low, q_high = ale$q_high, n_test = ale$n),
+          q_low = ale$q_low, q_high = ale$q_high, n_test = ale$n, max_decrease = ale$max_decrease,
+          max_increase = ale$max_increase),
         curves = curve
       )
     })
@@ -174,8 +208,8 @@ plot.CSDGEffect = function(x, learner = NULL, features = NULL, ...) {
   curves = all_curves[all_curves$learner %in% learners & all_curves$feature %in% features]
   curves[, learner_label__ := factor(unname(fits$labels[learner]), levels = unname(fits$labels[learners]))]
   curves[, group__ := paste(learner, iteration)]
-  ylab = if (identical(fits$task_type, "classif")) "ALE (predicted probability, centered)" else
-    "ALE (prediction, centered)"
+  ylab = if (identical(fits$task_type, "classif")) "ALE (predicted probability, centered on the data)" else
+    "ALE (prediction, centered on the data)"
   ggplot(curves, aes(x = x, y = ale, group = group__)) +
     geom_line(alpha = 0.5, linewidth = 0.4, color = autoiml_palette()$metric[["primary"]]) +
     ggplot2::facet_grid(learner_label__ ~ feature, scales = "free_x") +

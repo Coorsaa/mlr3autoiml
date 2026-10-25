@@ -2,7 +2,7 @@
 % Please edit documentation in R/csdg_local_fidelity_randomness_audit.R
 \name{csdg_local_fidelity_randomness_audit}
 \alias{csdg_local_fidelity_randomness_audit}
-\title{Separate perturbation and cross-fit variation in a local-fidelity audit}
+\title{Separate perturbation and cross-validation variation in a local-fidelity audit}
 \usage{
 csdg_local_fidelity_randomness_audit(
   x,
@@ -26,13 +26,14 @@ csdg_local_fidelity_randomness_audit(
 
 \item{perturbation_seeds}{Vector or case-by-seed matrix containing at least two distinct perturbation seeds per case.}
 
-\item{crossfit_seeds}{Vector or case-by-seed matrix containing at least two distinct cross-fit seeds per case.}
+\item{crossfit_seeds}{Vector or case-by-seed matrix containing at least two distinct cross-validation seeds per
+case.}
 
 \item{kernel_width}{Positive kernel width.}
 
 \item{n_perturb}{Number of perturbations generated for each crossed seed cell.}
 
-\item{crossfit_folds}{Number of deterministic surrogate cross-fitting folds.}
+\item{crossfit_folds}{Number of deterministic surrogate cross-validation folds.}
 
 \item{target_scale}{For classification, either \code{"response"} for probability or \code{"link"} for logit scale.}
 
@@ -49,7 +50,7 @@ A named list containing the complete crossed \code{grid}, case-by-metric \code{c
 \code{summary}, fold-training \code{support}, the private \code{case_map}, and explicit evaluation and limitation metadata.
 }
 \description{
-Evaluates a complete crossed grid of perturbation seeds and surrogate cross-fit seeds for held-out cases.
+Evaluates a complete crossed grid of perturbation seeds and surrogate cross-validation seeds for held-out cases.
 The balanced grid separates marginal variation attributable to neighborhood generation, marginal variation
 attributable to surrogate fold assignment, and their interaction without treating any component as sampling or
 model-training uncertainty.
@@ -89,7 +90,7 @@ fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.
 
-Fidelity is cross-fitted: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
+Fidelity is cross-validated: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
 size (default 5; \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()} always use 5); each fold is predicted
 by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
 by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
@@ -98,8 +99,8 @@ MAE, and the maximum absolute error are computed over the perturbed points only.
 (\code{target_case_absolute_error}) is computed from a separate surrogate fitted to the perturbed points without the
 case. Apparent metrics (\verb{apparent_*}) and the reported coefficients come from one surrogate fitted to the case and
 all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
-and cross-fit seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds; cross-fit seeds
-default to the perturbation seed plus 100000), and kernel widths can be varied (\code{kernel_widths}, default 0.50,
-0.75, 1.00; primary 0.75).
+and cross-validation seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds;
+cross-validation seeds default to the perturbation seed plus 100000), and kernel widths can be varied
+(\code{kernel_widths}, default 0.50, 0.75, 1.00; primary 0.75).
 }
 

@@ -345,7 +345,7 @@ csdg_plot = function(
       ) +
       ggplot2::scale_x_continuous(limits = x_limits) +
       ggplot2::labs(
-        x = "Cross-fitted weighted local R-squared", y = NULL,
+        x = "Cross-validated weighted local R-squared", y = NULL,
         title = "Held-out local surrogate fidelity",
         subtitle = if (is.finite(threshold)) {
           paste0(

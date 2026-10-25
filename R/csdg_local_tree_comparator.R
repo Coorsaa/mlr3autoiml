@@ -40,22 +40,22 @@
 #' Compare additive local fidelity with a nonlinear tree surrogate
 #'
 #' Evaluates a pre-pruned regression-tree surrogate on the same held-out cases, model-output scale, neighborhoods,
-#' locality weights, perturbation seeds, and cross-fit partitions used by [csdg_local_fidelity_audit()].
+#' locality weights, perturbation seeds, and cross-validation partitions used by [csdg_local_fidelity_audit()].
 #' The result helps distinguish limitations of an additive ridge surrogate from limitations shared by a nonlinear
 #' local approximation under the declared neighborhood design.
-#' The tree is fitted with `rpart::rpart(method = "anova")` to the same points, kernel weights, and cross-fit folds as
-#' the ridge surrogate (section "Local surrogate"), using the non-intercept columns of the same design matrix as
-#' predictors; the default control is `rpart::rpart.control(minsplit = 20, minbucket = 7, cp = 0.001,
+#' The tree is fitted with `rpart::rpart(method = "anova")` to the same points, kernel weights, and cross-validation
+#' folds as the ridge surrogate (section "Local surrogate"), using the non-intercept columns of the same design
+#' matrix as predictors; the default control is `rpart::rpart.control(minsplit = 20, minbucket = 7, cp = 0.001,
 #' maxdepth = 6, xval = 0)`.
 #'
 #' @inheritSection csdg_diagnostics Local surrogate
 #' @param x A `CSDGResample` with stored fold models.
 #' @param cases Unique task row ids that each occur in exactly one assessment split.
 #' @param seeds Either a vector of at least two perturbation seeds or a case-by-replicate matrix.
-#' @param crossfit_seeds Optional vector or matrix of cross-fit partition seeds.
+#' @param crossfit_seeds Optional vector or matrix of cross-validation partition seeds.
 #' @param kernel_width Positive locality-kernel width.
 #' @param n_perturb Number of perturbations per case and seed.
-#' @param crossfit_folds Number of surrogate cross-fitting folds.
+#' @param crossfit_folds Number of surrogate cross-validation folds.
 #' @param target_scale For classification, either `"response"` for probability or `"link"` for logit scale.
 #' @param neighborhood_method Either `"synthetic"` or `"empirical_knn"`.
 #' @param empirical_neighbors Number of nearest training rows eligible for empirical-neighbor resampling.
@@ -239,7 +239,7 @@ csdg_local_tree_comparator = function(
           "before prediction and surrogate encoding."
         )
       },
-      "Cross-fitted perturbation error does not estimate performance on independently observed cases.",
+      "Cross-validated perturbation error does not estimate performance on independently observed cases.",
       "Local fidelity does not establish causal meaning, feasibility, or actionability."
     )
   )

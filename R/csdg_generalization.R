@@ -97,7 +97,7 @@ csdg_rashomon = function(
   } else if (is.null(reference_learner)) {
     "best candidate"
   } else {
-    "declared reference learner"
+    "declared explained learner"
   }
   best = if (identical(direction, "minimize")) {
     min(candidates$mean_score, na.rm = TRUE)

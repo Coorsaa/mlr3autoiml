@@ -124,6 +124,7 @@ test_that("Rashomon tolerance can be anchored to a declared focal learner", {
   )
   focal_score = out$candidates[learner_name == "focal", mean_score]
   expect_equal(out$acceptance_reference_learner, "focal")
+  expect_identical(out$acceptance_basis, "declared explained learner")
   expect_equal(out$acceptance_reference_score, focal_score)
   expect_equal(out$acceptance_limit, focal_score * 1.10)
   expect_true(out$candidates[learner_name == "focal", accepted])

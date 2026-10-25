@@ -126,7 +126,7 @@ NULL
 #' CSDG diagnostic functions
 #'
 #' These functions compute mixed-type dependence, calibration, decision curves, held-out permutation
-#' feature importance (PFI), cross-fitted local fidelity of local surrogates, and subgroup diagnostics.
+#' feature importance (PFI), cross-validated local fidelity of local surrogates, and subgroup diagnostics.
 #'
 #' `csdg_fold_pfi()` computes held-out marginal PFI in each resampling iteration: the increase in the chosen loss on
 #' the assessment rows when a feature group is permuted, averaged over `repetitions` permutations. If the resample
@@ -169,7 +169,7 @@ NULL
 #' \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 #' fixed rule, not tuned.
 #'
-#' Fidelity is cross-fitted: the perturbed points are split at random into `crossfit_folds` folds of nearly equal
+#' Fidelity is cross-validated: the perturbed points are split at random into `crossfit_folds` folds of nearly equal
 #' size (default 5; `csdg_local_surrogate()` and `csdg_oof_local_surrogate()` always use 5); each fold is predicted
 #' by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
 #' by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
@@ -178,9 +178,9 @@ NULL
 #' (`target_case_absolute_error`) is computed from a separate surrogate fitted to the perturbed points without the
 #' case. Apparent metrics (`apparent_*`) and the reported coefficients come from one surrogate fitted to the case and
 #' all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
-#' and cross-fit seeds are separate ([csdg_local_fidelity_audit()]: default 20 perturbation seeds; cross-fit seeds
-#' default to the perturbation seed plus 100000), and kernel widths can be varied (`kernel_widths`, default 0.50,
-#' 0.75, 1.00; primary 0.75).
+#' and cross-validation seeds are separate ([csdg_local_fidelity_audit()]: default 20 perturbation seeds;
+#' cross-validation seeds default to the perturbation seed plus 100000), and kernel widths can be varied
+#' (`kernel_widths`, default 0.50, 0.75, 1.00; primary 0.75).
 #'
 #' @param data A data frame or data table.
 #' @param features Feature names.
@@ -243,9 +243,9 @@ NULL
 #'   `calibration_intercept` and `calibration_slope` come from regressing observed outcomes on predictions.
 #'
 #'   For `csdg_local_surrogate()` and `csdg_oof_local_surrogate()`, `weighted_r2`, `weighted_rmse`, `weighted_mae`,
-#'   and `maximum_absolute_error` are cross-fitted over the perturbed points, `target_case_absolute_error` scores the
-#'   case with a surrogate fitted without it, and `apparent_weighted_r2`, `apparent_weighted_rmse`, and the returned
-#'   coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
+#'   and `maximum_absolute_error` are cross-validated over the perturbed points, `target_case_absolute_error` scores
+#'   the case with a surrogate fitted without it, and `apparent_weighted_r2`, `apparent_weighted_rmse`, and the
+#'   returned coefficients describe the surrogate fitted to all points (see the section "Local surrogate").
 #' @name csdg_diagnostics
 NULL
 
@@ -261,7 +261,7 @@ NULL
 #' @param tolerance_absolute,tolerance_relative Prespecified near-equivalence tolerances.
 #'   For `csdg_near_equivalence_sensitivity()`, either value may be a vector defining a sensitivity grid;
 #'   vector lengths must be one or equal to the number of scenarios.
-#' @param reference_learner Optional learner name around which the tolerance is defined.
+#' @param reference_learner Optional name of the explained learner, around whose score the tolerance is defined.
 #'   When omitted, the direction-specific best candidate is the reference.
 #' @param tolerance_source Source of the supplied near-equivalence tolerance.
 #' @param tolerance_rationale Rationale linking the supplied tolerance to the claim.
@@ -290,7 +290,7 @@ NULL
 #'
 #' Derives the gate plan of the claim ([csdg_gate_plan()]) and computes the diagnostics of the gates in the plan:
 #' held-out performance (G1), dependence and observed support (G2), calibration (G3a), decision curves (G3b),
-#' cross-fitted local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
+#' cross-validated local fidelity (G4), stability of held-out PFI (G5), comparison with similarly accurate models
 #' (G6a), leave-one-setting-out refits (G6b), and subgroup results (G7a); G0a and G0b check the claim and
 #' measurement cards, and G7b records user evidence supplied in `evidence`.
 #' Required gates are computed; held-out performance is also computed when it is context for the claim (a model

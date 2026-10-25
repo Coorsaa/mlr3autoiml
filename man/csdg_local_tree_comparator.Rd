@@ -27,13 +27,13 @@ csdg_local_tree_comparator(
 
 \item{seeds}{Either a vector of at least two perturbation seeds or a case-by-replicate matrix.}
 
-\item{crossfit_seeds}{Optional vector or matrix of cross-fit partition seeds.}
+\item{crossfit_seeds}{Optional vector or matrix of cross-validation partition seeds.}
 
 \item{kernel_width}{Positive locality-kernel width.}
 
 \item{n_perturb}{Number of perturbations per case and seed.}
 
-\item{crossfit_folds}{Number of surrogate cross-fitting folds.}
+\item{crossfit_folds}{Number of surrogate cross-validation folds.}
 
 \item{target_scale}{For classification, either \code{"response"} for probability or \code{"link"} for logit scale.}
 
@@ -53,12 +53,12 @@ and limitations.
 }
 \description{
 Evaluates a pre-pruned regression-tree surrogate on the same held-out cases, model-output scale, neighborhoods,
-locality weights, perturbation seeds, and cross-fit partitions used by \code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}.
+locality weights, perturbation seeds, and cross-validation partitions used by \code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}.
 The result helps distinguish limitations of an additive ridge surrogate from limitations shared by a nonlinear
 local approximation under the declared neighborhood design.
-The tree is fitted with \code{rpart::rpart(method = "anova")} to the same points, kernel weights, and cross-fit folds as
-the ridge surrogate (section "Local surrogate"), using the non-intercept columns of the same design matrix as
-predictors; the default control is \code{rpart::rpart.control(minsplit = 20, minbucket = 7, cp = 0.001, maxdepth = 6, xval = 0)}.
+The tree is fitted with \code{rpart::rpart(method = "anova")} to the same points, kernel weights, and cross-validation
+folds as the ridge surrogate (section "Local surrogate"), using the non-intercept columns of the same design
+matrix as predictors; the default control is \code{rpart::rpart.control(minsplit = 20, minbucket = 7, cp = 0.001, maxdepth = 6, xval = 0)}.
 }
 \section{Local surrogate}{
 
@@ -94,7 +94,7 @@ fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.
 
-Fidelity is cross-fitted: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
+Fidelity is cross-validated: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
 size (default 5; \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()} always use 5); each fold is predicted
 by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
 by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
@@ -103,8 +103,8 @@ MAE, and the maximum absolute error are computed over the perturbed points only.
 (\code{target_case_absolute_error}) is computed from a separate surrogate fitted to the perturbed points without the
 case. Apparent metrics (\verb{apparent_*}) and the reported coefficients come from one surrogate fitted to the case and
 all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
-and cross-fit seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds; cross-fit seeds
-default to the perturbation seed plus 100000), and kernel widths can be varied (\code{kernel_widths}, default 0.50,
-0.75, 1.00; primary 0.75).
+and cross-validation seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds;
+cross-validation seeds default to the perturbation seed plus 100000), and kernel widths can be varied
+(\code{kernel_widths}, default 0.50, 0.75, 1.00; primary 0.75).
 }
 

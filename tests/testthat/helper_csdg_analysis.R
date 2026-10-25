@@ -100,3 +100,6 @@ expect_pass_through = function(chk) {
   for (record in chk$records) testthat::expect_s3_class(.csdg_revalidate_evidence_record(record),
     "CSDGEvidenceRecord")
 }
+
+# The judgment of G0b that the tests enter for their simulated variables; without it, G0b is open.
+g0b_judged = function() csdg_judge("G0b", supported(), note = "Simulated variables, measured without error.")

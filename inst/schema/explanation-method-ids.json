@@ -6,6 +6,7 @@
     "decision_curve",
     "ice",
     "local_surrogate",
+    "loco",
     "marginal_shap",
     "other",
     "path_attribution",

@@ -61,6 +61,7 @@ supported = csdg_evidence_record(
 csdg_adjudicate_claim(list(supported), claim_applicable = TRUE)
 csdg_adjudicate_claim(list(), claim_applicable = TRUE)
 csdg_adjudicate_claim(
-  list(), claim_applicable = FALSE, applicability_rationale = "This claim is outside the evaluation."
+  list(), claim_applicable = FALSE,
+  applicability_rationale = "This claim is outside the evaluation."
 )
 }

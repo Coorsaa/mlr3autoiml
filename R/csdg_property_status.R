@@ -23,7 +23,8 @@
 #'   rationale = "The ordering is the same in every fold.",
 #'   required_property = "The ordering persists when the quantity is estimated again.",
 #'   observation = "Item 1 ranks above item 2 in all five folds.",
-#'   relevance_to_proposition = "Folds vary the training data while the model and perturbation stay fixed."
+#'   relevance_to_proposition = paste("Folds vary the training data while the model and perturbation",
+#'     "stay fixed.")
 #' )
 #' @name csdg_property_status
 NULL

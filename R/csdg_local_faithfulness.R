@@ -435,7 +435,7 @@ csdg_local_surrogate = function(
       folds = 5L,
       fold_assignment = "balanced seeded permutation, independently generated for each case",
       score_scope = paste(
-        "Cross-fitted metrics score perturbations; target-case error is scored from a surrogate fitted",
+        "Cross-validated metrics score perturbations; target-case error is scored from a surrogate fitted",
         "without the original case"
       ),
       fit_separation = paste(
@@ -463,11 +463,11 @@ csdg_local_surrogate = function(
     limitations = c(
       "A local surrogate assesses fidelity only in the constructed neighborhood.",
       paste(
-        "Reported weighted metrics are cross-fitted over the declared perturbations;",
+        "Reported weighted metrics are cross-validated over the declared perturbations;",
         "they do not measure generalization to independently observed cases."
       ),
       paste(
-        "The original case anchors cross-fitted perturbation fits; its target-case error comes from",
+        "The original case anchors the cross-validation fits; its target-case error comes from",
         "a separate surrogate fitted without that case."
       ),
       sprintf(
@@ -601,11 +601,14 @@ csdg_oof_local_surrogate = function(
     limitations = c(
       "Each diagnostic uses a fold model that did not train on the evaluated case.",
       paste(
-        "Each perturbation is scored by a cross-fitted surrogate that did not fit that perturbation;",
+        "Each perturbation is scored by a cross-validation surrogate that did not fit that perturbation;",
         "target-case error is obtained from a surrogate fitted without the original held-out case."
       ),
       "Neighborhoods are generated from the corresponding fold-training data and remain perturbation-dependent.",
-      "Returned coefficients are descriptive full-neighborhood ridge refits, not cross-fitted coefficients.",
+      paste(
+        "Returned coefficients are descriptive full-neighborhood ridge refits,",
+        "not coefficients of the cross-validation surrogates."
+      ),
       if (identical(selection, "post_hoc_communication")) {
         paste(
           "Cases selected after inspecting out-of-fold results are communication examples",

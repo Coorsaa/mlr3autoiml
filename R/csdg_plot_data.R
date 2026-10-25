@@ -1367,7 +1367,7 @@
     ) +
     scale_x_continuous(limits = x_limits) +
     labs(
-      x = .csdg_plot_data_option(options, "x_label", "Cross-fitted weighted local R-squared"),
+      x = .csdg_plot_data_option(options, "x_label", "Cross-validated weighted local R-squared"),
       y = NULL,
       title = title,
       subtitle = subtitle
@@ -2642,8 +2642,8 @@
 #'   `y_limits`, `caption`, and `display`.
 #'   Set `display = "aligned"` for an aligned dot display, or `display = "diverging"` for opposing bars of
 #'   performance-tolerance consumption and PFI pair-order reversals on a common proportion scale.
-#'   Both displays also accept `reference_learner` (the learner with which the others are compared),
-#'   `include_focal` (whether to show the reference learner itself; default `TRUE`), and `learner_order`;
+#'   Both displays also accept `reference_learner` (the explained learner, with which the others are compared),
+#'   `include_focal` (whether to show the explained learner itself; default `TRUE`), and `learner_order`;
 #'   the diverging display accepts `bar_width` between 0.05 and 0.9.
 #'   In the color style, group colors may be named by original group IDs or by uniquely mapped group labels.
 #'   The monochrome style uses black shapes instead.

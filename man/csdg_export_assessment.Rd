@@ -4,7 +4,7 @@
 \alias{csdg_export_assessment}
 \title{Export a claim assessment}
 \usage{
-csdg_export_assessment(x, path, prefix = NULL)
+csdg_export_assessment(x, path, prefix = NULL, claim_log = TRUE)
 }
 \arguments{
 \item{x}{A \code{\link[=csdg_assess]{csdg_assess()}} or \code{\link[=csdg_confirm]{csdg_confirm()}} result.}
@@ -12,6 +12,8 @@ csdg_export_assessment(x, path, prefix = NULL)
 \item{path}{Directory in which the export directory is created.}
 
 \item{prefix}{Name prefix of the export directory; defaults to the claim id.}
+
+\item{claim_log}{If \code{TRUE} (default), the claim log of the session is written as \code{claim_log.csv}.}
 }
 \value{
 The path of the export directory, invisibly.
@@ -20,7 +22,11 @@ The path of the export directory, invisibly.
 Writes the records of a \code{\link[=csdg_assess]{csdg_assess()}} or \code{\link[=csdg_confirm]{csdg_confirm()}} result to a directory
 \verb{<path>/<prefix>_csdg_assessment}: the claim card (\code{claim.json}), the criteria (\code{criteria.json}), the check table
 (\code{check.csv}), the evidence records (\code{records.json}), the gate plan (\code{gate_plan.csv}), the assessment
-(\code{assessment.json}), and, for a confirmation, the exploratory assessment (\code{exploratory.csv}).
+(\code{assessment.json}), for a confirmation the exploratory assessment (\code{exploratory.csv}), and the claim log of the
+session (\code{claim_log.csv}, see \code{\link[=csdg_claim_log]{csdg_claim_log()}}).
+The article asks researchers to report every claim they checked, not only the claims that were met; the claim log
+lists every claim derived and every check, assessment, and test on new data of the session, so that it can be
+reported with the assessment.
 No models, predictions, or row-level data are written.
 The directory is replaced atomically.
 }
@@ -30,7 +36,8 @@ n = 200
 x = data.frame(a = rnorm(n), b = rnorm(n), c = rnorm(n))
 x$y = 2 * x$a + x$b + rnorm(n)
 task = mlr3::as_task_regr(x, target = "y", id = "toy")
-imp = csdg_importance(csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3), repetitions = 5)
+fits = csdg_fit(task, list(tree = mlr3::lrn("regr.rpart")), folds = 3)
+imp = csdg_importance(fits, repetitions = 5)
 res = csdg_assess(csdg_check(claim_order(imp, "a", "b"), imp))
 dir = csdg_export_assessment(res, tempdir())
 list.files(dir)

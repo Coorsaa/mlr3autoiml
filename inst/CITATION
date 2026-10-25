@@ -5,7 +5,7 @@ bibentry(
   title = "mlr3autoiml: Claim-Scoped Diagnostic Gates for Interpretable Machine Learning",
   author = c(
     person("Stefan", "Coors"),
-    person("Clara", "Vetter"),
+    person("Clara S.", "Vetter"),
     person("Jonas", "Hauck"),
     person("Bernd", "Bischl"),
     person("Sven", "Hilbert")

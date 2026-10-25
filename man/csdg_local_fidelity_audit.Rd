@@ -29,7 +29,7 @@ csdg_local_fidelity_audit(
 \item{seeds}{Either a vector of at least two distinct perturbation seeds, reused for every case, or an integer-like
 matrix with one row per case and one distinct seed per replicate column.}
 
-\item{crossfit_seeds}{Optional vector or case-by-replicate matrix of cross-fit partition seeds.
+\item{crossfit_seeds}{Optional vector or case-by-replicate matrix of cross-validation partition seeds.
 When \code{NULL}, seeds distinct from \code{seeds} are generated deterministically.}
 
 \item{kernel_widths}{Unique positive kernel widths.}
@@ -38,7 +38,7 @@ When \code{NULL}, seeds distinct from \code{seeds} are generated deterministical
 
 \item{n_perturb}{Number of synthetic perturbations per case and seed.}
 
-\item{crossfit_folds}{Number of deterministic surrogate cross-fitting folds.}
+\item{crossfit_folds}{Number of deterministic surrogate cross-validation folds.}
 
 \item{fidelity_threshold}{Optional, claim- and use-specific weighted R-squared criterion used only for descriptive
 classification.
@@ -65,7 +65,7 @@ Evaluates multiple prespecified held-out cases with their corresponding fold mod
 seeds and kernel widths.
 }
 \details{
-Synthetic or empirical-neighbor neighborhoods, mixed-type distances, weighted ridge fitting, cross-fitting,
+Synthetic or empirical-neighbor neighborhoods, mixed-type distances, weighted ridge fitting, cross-validation,
 relative and absolute errors, target-case error, coefficient stability, and support diagnostics are reported.
 The section "Local surrogate" states exactly what is fitted.
 }
@@ -103,7 +103,7 @@ fit, \eqn{a} the number of non-constant design columns (intercept excluded), and
 \eqn{(X^\top W X + \Lambda) b = X^\top W y} and are transformed back to the original scale. The penalty is a
 fixed rule, not tuned.
 
-Fidelity is cross-fitted: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
+Fidelity is cross-validated: the perturbed points are split at random into \code{crossfit_folds} folds of nearly equal
 size (default 5; \code{csdg_local_surrogate()} and \code{csdg_oof_local_surrogate()} always use 5); each fold is predicted
 by a surrogate fitted to the case and the perturbed points of the other folds, so no perturbed point is predicted
 by a surrogate fitted to it (with 500 points, each surrogate is fitted to 400 perturbed points plus the case).
@@ -112,9 +112,9 @@ MAE, and the maximum absolute error are computed over the perturbed points only.
 (\code{target_case_absolute_error}) is computed from a separate surrogate fitted to the perturbed points without the
 case. Apparent metrics (\verb{apparent_*}) and the reported coefficients come from one surrogate fitted to the case and
 all perturbed points; they describe the fitted surrogate and are not fidelity on new points. Perturbation seeds
-and cross-fit seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds; cross-fit seeds
-default to the perturbation seed plus 100000), and kernel widths can be varied (\code{kernel_widths}, default 0.50,
-0.75, 1.00; primary 0.75).
+and cross-validation seeds are separate (\code{\link[=csdg_local_fidelity_audit]{csdg_local_fidelity_audit()}}: default 20 perturbation seeds;
+cross-validation seeds default to the perturbation seed plus 100000), and kernel widths can be varied
+(\code{kernel_widths}, default 0.50, 0.75, 1.00; primary 0.75).
 }
 
 \examples{

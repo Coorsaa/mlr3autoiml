@@ -20,10 +20,33 @@ test_that("a claim over all learners requires the result for each (G6a)", {
   expect_identical(claim_relies_mainly(imp, learners = names(imp$pfi))$id, "relies_mainly_a_b_all")
   expect_pass_through(chk)
 
-  chk = csdg_check(claim_relies_mainly(imp, k = 2, factor = 2), imp)
+  chk = csdg_check(claim_relies_mainly(imp, k = 2, factor = 2), imp, judgments = g0b_judged())
   expect_identical(chk$table[gate == "G6a", role], "context")
   expect_match(chk$table[gate == "G6a", observation], "does not hold")
   expect_identical(csdg_assess(chk)$assessment, "met")
+})
+
+test_that("G0b is open until the researcher judges it", {
+  imp = make_importance_fixture()
+  claim = claim_relies_mainly(imp)
+  chk = csdg_check(claim, imp)
+  row = chk$table[gate == "G0b"]
+  expect_identical(row$check, "measurement")
+  expect_identical(row$status, "open")
+  expect_identical(row$observation, "Measurement and data not yet judged; use csdg_judge(\"G0b\", ...).")
+  expect_true(any(grepl("^G0b   measurement         open          Measurement and data not yet judged;", format(chk))))
+  res = csdg_assess(chk)
+  expect_identical(res$assessment, "unresolved")
+  expect_identical(res$decisive$gate, "G0b")
+  expect_match(res$report, "The computed properties are supported")
+  expect_length(res$hints, 0L)
+  judged = csdg_assess(csdg_check(claim, imp, judgments = g0b_judged()))
+  expect_identical(judged$assessment, "met")
+  expect_match(paste(format(judged), collapse = " "), "Measurement and data \\(G0b\\) supported")
+  open_judgment = csdg_check(claim, imp, judgments = csdg_judge("G0b", open_status(), note = "codebook missing"))
+  expect_identical(csdg_assess(open_judgment)$assessment, "unresolved")
+  expect_match(csdg_assess(open_judgment)$report, "Judged by the researcher: codebook missing|codebook missing")
+  expect_match(csdg_assess(open_judgment)$report, "where the claim matters, report it as unresolved\\.$")
 })
 
 test_that("the gate plan follows the claim's model scope", {
@@ -61,7 +84,7 @@ test_that("labels and provenance distinguish exploration from a test on new data
   imp = make_importance_fixture()
   claim = claim_relies_mainly(imp)
   expect_identical(claim$record$provenance$origin, "retrospective_exploratory")
-  chk = csdg_check(claim, imp)
+  chk = csdg_check(claim, imp, judgments = g0b_judged())
   res = csdg_assess(chk)
   expect_identical(res$label, "met (exploratory)")
   expect_match(res$report, "established only after a test on new data")
@@ -104,6 +127,7 @@ test_that("print, format, and as.data.table methods", {
   expect_snapshot(print(claim))
   expect_snapshot(print(chk))
   expect_snapshot(print(res))
+  expect_snapshot(print(csdg_assess(csdg_check(claim, imp, judgments = g0b_judged()))))
   expect_named(as.data.table(chk), c("gate", "gate_name", "check", "learner", "role", "property", "criterion",
     "observation", "relevance", "status", "summary"))
   expect_named(as.data.table(claim), c("id", "kind", "statement", "origin", "quantity", "model", "procedure",
@@ -124,14 +148,18 @@ test_that("plot() draws the leading predictors per learner", {
   expect_true("GeomText" %in% layers)
 })
 
-test_that("csdg_export_assessment() writes the records without row-level data", {
+test_that("csdg_export_assessment() writes the records and the claim log without row-level data", {
+  csdg_claim_log_reset()
   imp = make_importance_fixture()
-  res = csdg_assess(csdg_check(claim_relies_mainly(imp), imp))
+  res = csdg_assess(csdg_check(claim_relies_mainly(imp), imp, judgments = g0b_judged()))
   dir = csdg_export_assessment(res, withr::local_tempdir())
   expect_true(all(c("claim.json", "criteria.json", "check.csv", "records.json", "gate_plan.csv",
-    "assessment.json") %in% list.files(dir)))
+    "assessment.json", "claim_log.csv") %in% list.files(dir)))
   assessment = jsonlite::read_json(file.path(dir, "assessment.json"))
   expect_identical(assessment$assessment, "met")
+  log = data.table::fread(file.path(dir, "claim_log.csv"))
+  expect_identical(log$function_name, c("claim_relies_mainly", "csdg_check", "csdg_assess"))
+  expect_false("claim_log.csv" %in% list.files(csdg_export_assessment(res, withr::local_tempdir(), claim_log = FALSE)))
   conf = csdg_confirm(res$check, make_importance_fixture(data_hash = "new_data"))
   expect_true("exploratory.csv" %in% list.files(csdg_export_assessment(conf, withr::local_tempdir())))
 })
@@ -153,20 +181,40 @@ test_that("a confirmation checks settings, overlap, and labels", {
   chk$source$row_hashes = c("r1", "r2")
   overlapping = new_imp
   overlapping$fits$row_hashes = c("r9", "r2")
-  expect_error(csdg_confirm(chk, overlapping), "1 of the new rows also occurs in the data of the check")
+  expect_warning(conf <- csdg_confirm(chk, overlapping),
+    "1 of the 2 new rows duplicates rows of the data of the check.*discrete data can share rows legitimately")
+  expect_identical(conf$duplicated_rows, 1L)
+  expect_output(print(conf), "New data: 1 of the rows duplicate rows of the data of the check")
+  expect_error(csdg_confirm(chk, overlapping, duplicates = "error"), "1 of the 2 new rows duplicates rows")
+  expect_identical(suppressWarnings(csdg_confirm(chk, new_imp))$duplicated_rows, 0L)
+})
+
+test_that("a confirmation carries judgments over unless new judgments replace them", {
+  imp = make_importance_fixture()
+  chk = csdg_check(claim_relies_mainly(imp), imp, judgments = g0b_judged())
+  new_imp = make_importance_fixture(data_hash = "new_data")
+  expect_identical(csdg_confirm(chk, new_imp)$assessment, "met")
+  conf = csdg_confirm(chk, new_imp, judgments = csdg_judge("G0b", contradicted(), note = "outcome recoded"))
+  expect_identical(conf$assessment, "not_met")
+  expect_match(conf$report, "outcome recoded")
+  unjudged = csdg_check(claim_relies_mainly(imp), imp)
+  expect_identical(csdg_confirm(unjudged, new_imp)$assessment, "unresolved")
 })
 
 test_that("reports suggest the closest claims and list other open properties", {
   imp = make_importance_fixture()
-  res = csdg_assess(csdg_check(claim_relies_mainly(imp, k = 1), imp))
+  res = csdg_assess(csdg_check(claim_relies_mainly(imp, k = 1), imp, judgments = g0b_judged()))
   expect_identical(res$assessment, "not_met")
+  expect_match(res$report, "where the claim matters, report it as not met\\.$")
   expect_match(res$hints, "claim_top_k\\(k = 1\\)\\) holds on average and reproduces in 4 of 4 folds")
   expect_match(res$hints, "with k = 2 \\(a, b\\), the selection reproduces in 4 of 4 folds")
   expect_match(res$report, "a has 1.50 times the PFI")
   centers = fixture_centers()
   centers[, "b"] = c(0.125, 0.215, 0.135, 0.205)
   imp = make_importance_fixture(centers = list(m1 = centers))
-  res = csdg_assess(csdg_check(claim_relies_mainly(imp, k = 1), imp))
+  res = csdg_assess(csdg_check(claim_relies_mainly(imp, k = 1), imp, judgments = g0b_judged()))
   expect_identical(res$assessment, "not_met")
   expect_match(res$report, "Also open: content \\(G2\\)")
+  unjudged = csdg_assess(csdg_check(claim_relies_mainly(imp, k = 1), imp))
+  expect_match(unjudged$report, "Also open: measurement and data \\(G0b\\) and content \\(G2\\)")
 })
