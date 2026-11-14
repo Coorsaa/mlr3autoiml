@@ -21,7 +21,7 @@ base::open()."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,7 +34,7 @@ base::open()."></head><body>
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -100,7 +100,8 @@ vocabulary of the package, so a misspelled status cannot enter a claim record.</
 <span class="r-in"><span>  rationale <span class="op">=</span> <span class="st">"The ordering is the same in every fold."</span>,</span></span>
 <span class="r-in"><span>  required_property <span class="op">=</span> <span class="st">"The ordering persists when the quantity is estimated again."</span>,</span></span>
 <span class="r-in"><span>  observation <span class="op">=</span> <span class="st">"Item 1 ranks above item 2 in all five folds."</span>,</span></span>
-<span class="r-in"><span>  relevance_to_proposition <span class="op">=</span> <span class="st">"Folds vary the training data while the model and perturbation stay fixed."</span></span></span>
+<span class="r-in"><span>  relevance_to_proposition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Folds vary the training data while the model and perturbation"</span>,</span></span>
+<span class="r-in"><span>    <span class="st">"stay fixed."</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;CSDGEvidenceRecord&gt; G5 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Role: required property </span>
@@ -114,7 +115,7 @@ vocabulary of the package, so a misspelled status cannot enter a claim record.</
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">

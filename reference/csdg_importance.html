@@ -3,7 +3,7 @@
 learner from a csdg_fit() result, together with the held-out loss of each learner and of the model without
 predictors, and the improvement over that model.
 The loss is the measure of csdg_fit(), so PFI and the improvement are in the same units.
-PFI values are not parts of the improvement; PFI relative to the improvement can exceed 100%.
+PFI values are not parts of the improvement: a single PFI value, or their sum, can exceed it.
 Marginal PFI permutes each predictor in the held-out fold (csdg_fold_pfi(), one call per learner, single
 predictors first so that their values do not change when groups are added).
 Grouped PFI (groups) permutes the members of a group jointly.
@@ -25,7 +25,7 @@ settings.'><meta property="og:description" content='Second step of the analysis-
 learner from a csdg_fit() result, together with the held-out loss of each learner and of the model without
 predictors, and the improvement over that model.
 The loss is the measure of csdg_fit(), so PFI and the improvement are in the same units.
-PFI values are not parts of the improvement; PFI relative to the improvement can exceed 100%.
+PFI values are not parts of the improvement: a single PFI value, or their sum, can exceed it.
 Marginal PFI permutes each predictor in the held-out fold (csdg_fold_pfi(), one call per learner, single
 predictors first so that their values do not change when groups are added).
 Grouped PFI (groups) permutes the members of a group jointly.
@@ -51,7 +51,7 @@ settings.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -64,7 +64,7 @@ settings.'></head><body>
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -92,7 +92,7 @@ settings.'></head><body>
 learner from a <code><a href="csdg_fit.html">csdg_fit()</a></code> result, together with the held-out loss of each learner and of the model without
 predictors, and the improvement over that model.
 The loss is the measure of <code><a href="csdg_fit.html">csdg_fit()</a></code>, so PFI and the improvement are in the same units.
-PFI values are not parts of the improvement; PFI relative to the improvement can exceed 100%.</p>
+PFI values are not parts of the improvement: a single PFI value, or their sum, can exceed it.</p>
 <p>Marginal PFI permutes each predictor in the held-out fold (<code><a href="csdg_diagnostics.html">csdg_fold_pfi()</a></code>, one call per learner, single
 predictors first so that their values do not change when groups are added).
 Grouped PFI (<code>groups</code>) permutes the members of a group jointly.
@@ -123,10 +123,10 @@ settings.</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for class 'CSDGImportance'</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">2L</span>, n <span class="op">=</span> <span class="fl">6L</span>, learner <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">2L</span>, n <span class="op">=</span> <span class="fl">6L</span>, learner <span class="op">=</span> <span class="cn">NULL</span>, width <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"width"</span>, <span class="fl">80L</span><span class="op">)</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for class 'CSDGImportance'</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">2L</span>, n <span class="op">=</span> <span class="fl">6L</span>, learner <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">x</span>, k <span class="op">=</span> <span class="fl">2L</span>, n <span class="op">=</span> <span class="fl">6L</span>, learner <span class="op">=</span> <span class="cn">NULL</span>, width <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"width"</span>, <span class="fl">80L</span><span class="op">)</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for class 'CSDGImportance'</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span></span>
@@ -190,7 +190,7 @@ and stored in the result.</p></dd>
 
 <dt id="arg-k">k<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
 <dd><p>For <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>: the column "folds in top k" counts the folds in which a predictor has one of the <code>k</code>
-largest PFI values (at most the number of predictors minus 1).</p></dd>
+largest values (at most the number of predictors minus 1).</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
@@ -199,6 +199,10 @@ largest PFI values (at most the number of predictors minus 1).</p></dd>
 
 <dt id="arg-learner">learner<a class="anchor" aria-label="anchor" href="#arg-learner"></a></dt>
 <dd><p>For <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> and <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>: names of the learners shown; defaults to all.</p></dd>
+
+
+<dt id="arg-width">width<a class="anchor" aria-label="anchor" href="#arg-width"></a></dt>
+<dd><p>For <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>: line width of the notes.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -229,7 +233,8 @@ of each learner, for example two correlated items with small PFI.</p></dd>
 
 
 <dt id="arg-scale">scale<a class="anchor" aria-label="anchor" href="#arg-scale"></a></dt>
-<dd><p>For <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>: <code>"loss"</code> (PFI in loss units) or <code>"relative"</code> (PFI relative to the improvement).</p></dd>
+<dd><p>For <code><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot()</a></code>: <code>"loss"</code> (in loss units) or <code>"relative"</code> (as a multiple of the improvement, which a
+single value can exceed).</p></dd>
 
 
 <dt id="arg-min-importance">min_importance<a class="anchor" aria-label="anchor" href="#arg-min-importance"></a></dt>
@@ -240,12 +245,14 @@ the default minimum importance of <code><a href="csdg_check.html">csdg_check()</
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>CSDGImportance</code> list with <code>fits</code>, <code>learners</code>, the settings (<code>loss</code>, <code>measure</code>, <code>repetitions</code>,
-<code>batch_size</code>, <code>seed</code>, <code>groups</code>, <code>strata_features</code>, <code>strata_definition</code>, <code>conditional_on</code>), <code>pfi</code> and
-<code>conditional</code> (<code><a href="csdg_diagnostics.html">csdg_fold_pfi()</a></code> results per learner), and the tables <code>performance</code> (held-out loss per learner
-and fold, with the model without predictors and the improvement), <code>fold_pfi</code> (PFI per learner, fold, and
+<code>batch_size</code>, <code>seed</code>, <code>groups</code>, <code>strata_features</code>, <code>strata_definition</code>, <code>conditional_on</code>), <code>quantity</code> (<code>"pfi"</code>),
+<code>pfi</code> and <code>conditional</code> (<code><a href="csdg_diagnostics.html">csdg_fold_pfi()</a></code> results per learner), and the tables <code>performance</code> (held-out loss per
+learner and fold, with the model without predictors and the improvement), <code>fold_pfi</code> (PFI per learner, fold, and
 predictor or group, with <code>type</code> <code>"marginal"</code>, <code>"grouped"</code>, or <code>"conditional"</code>), <code>summary</code> (means over folds with
-PFI relative to the improvement, the rank, and the number of folds with positive PFI), and <code>improvement</code> (per
-learner).</p>
+the ratio of PFI to the improvement, the rank, and the number of folds with positive PFI), and <code>improvement</code> (per
+learner).
+<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows, per learner, the improvement and the default minimum importance of <code><a href="csdg_check.html">csdg_check()</a></code> (1% of the
+improvement) in loss units, and per predictor the mean PFI with its corrected 95% interval.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -263,13 +270,17 @@ learner).</p>
 <span class="r-in"><span><span class="va">imp</span> <span class="op">=</span> <span class="fu">csdg_importance</span><span class="op">(</span><span class="va">fits</span>, repetitions <span class="op">=</span> <span class="fl">5</span>, seed <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">imp</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;CSDGImportance&gt; held-out PFI, increase in RMSE; 3 folds x 5 permutations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> decision tree: held-out RMSE 1.55 versus 2.42 for the model without predictors (improvement 0.874)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   predictor   mean PFI   relative to improvement   folds in top 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   a               1.48                      169%              3/3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b              0.417                       48%              3/3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   c                  0                      0.0%              0/3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Folds in top 2: folds in which the predictor has one of the 2 largest PFI values (print(imp, k = )).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> PFI values are not parts of the improvement, so PFI relative to the improvement can exceed 100%.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> decision tree: held-out RMSE 1.55; model without predictors 2.42</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   improvement 0.874; minimum importance (1% of the improvement) 0.0087</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   predictor   mean PFI   corrected 95% interval   folds in top 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   a               1.48            [0.311, 2.65]              3/3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b              0.417          [0.0725, 0.761]              3/3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   c                  0                   [0, 0]              0/3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Folds in top 2: folds in which the predictor has one of the 2 largest PFI</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> values (print(x, k = )).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intervals are reported descriptively. The minimum importance, the default</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> criterion of csdg_check(), is given in RMSE units, because PFI values are not</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> parts of the improvement.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table</a></span><span class="op">(</span><span class="va">imp</span>, interval <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    learner feature_group features     type mean_importance    lower     upper</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     &lt;char&gt;        &lt;char&gt;   &lt;char&gt;   &lt;char&gt;           &lt;num&gt;    &lt;num&gt;     &lt;num&gt;</span>
@@ -288,7 +299,7 @@ learner).</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">

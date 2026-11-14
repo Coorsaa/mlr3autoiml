@@ -35,6 +35,7 @@
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_calibration_bootstrap.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_cards.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_check.html</loc></url>
+<url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_claim_log.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_claim_matrix.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_claim_record_template.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_claim_relation.html</loc></url>
@@ -57,6 +58,7 @@
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_local_fidelity_randomness_audit.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_local_support.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_local_tree_comparator.html</loc></url>
+<url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_loco.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_matched_setting_exclusion.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_model_diagnostics.html</loc></url>
 <url><loc>https://stefancoors.de/mlr3autoiml/reference/csdg_pfi_mc_difference.html</loc></url>

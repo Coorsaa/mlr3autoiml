@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -35,7 +35,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -83,10 +83,11 @@ unchanged, so its permutation feature importance (PFI) is 0. Model B
 reverses the values. Grouped PFI, which shuffles both items together, is
 2 in both models; conditional PFI, which draws the permuted item given
 the other item, is 0, because that draw equals the original value. This
-vignette computes these values from 10,000 simulated observations and
-assesses the three claims of the article with the functions introduced
-in
-<code><a href="../articles/exploratory_workflow.html">vignette("exploratory_workflow", package = "mlr3autoiml")</a></code>.</p>
+vignette computes these values from 10,000 simulated observations with
+the functions introduced in
+<code><a href="../articles/exploratory_workflow.html">vignette("exploratory_workflow", package = "mlr3autoiml")</a></code>
+and assesses the two claims of the article’s numerical example and the
+unqualified variant that shows why the qualifier is needed.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://stefancoors.de/mlr3autoiml/">mlr3autoiml</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mlr3.mlr-org.com" class="external-link">mlr3</a></span><span class="op">)</span></span>
@@ -112,7 +113,6 @@ nothing.</p>
 <span><span class="op">}</span></span>
 <span><span class="va">fits</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_fit.html">csdg_fit</a></span><span class="op">(</span><span class="va">task</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>A <span class="op">=</span> <span class="fu">model_using</span><span class="op">(</span><span class="st">"item_1"</span><span class="op">)</span>, B <span class="op">=</span> <span class="fu">model_using</span><span class="op">(</span><span class="st">"item_2"</span><span class="op">)</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  measure <span class="op">=</span> <span class="st">"regr.mse"</span>, labels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>A <span class="op">=</span> <span class="st">"model A"</span>, B <span class="op">=</span> <span class="st">"model B"</span><span class="op">)</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: package 'future' was built under R version 4.5.2</span></span>
 <span><span class="va">imp</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_importance.html">csdg_importance</a></span><span class="op">(</span><span class="va">fits</span>, repetitions <span class="op">=</span> <span class="fl">20</span>, groups <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>both_items <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"item_1"</span>, <span class="st">"item_2"</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  strata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>item_1 <span class="op">=</span> <span class="va">z</span>, item_2 <span class="op">=</span> <span class="va">z</span><span class="op">)</span>, seed <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Warning: Conditional PFI of item_1 and item_2: the median stratum size in the</span></span>
@@ -120,50 +120,62 @@ nothing.</p>
 <span><span class="co">#&gt; values (none in strata of one row).</span></span>
 <span><span class="va">imp</span></span>
 <span><span class="co">#&gt; &lt;CSDGImportance&gt; held-out PFI, increase in squared error; 5 folds x 20 permutations</span></span>
-<span><span class="co">#&gt; model A: held-out squared error 0.0000 versus 1.02 for the model without predictors (improvement 1.02)</span></span>
-<span><span class="co">#&gt;   predictor   mean PFI   relative to improvement   folds in top 1</span></span>
-<span><span class="co">#&gt;   item_1          2.05                      200%              5/5</span></span>
-<span><span class="co">#&gt;   item_2             0                      0.0%              0/5</span></span>
-<span><span class="co">#&gt;   grouped: both_items (item_1, item_2) 2.05 (200%)</span></span>
-<span><span class="co">#&gt;   conditional: item_1, within the supplied strata: 0 (0.0%)</span></span>
-<span><span class="co">#&gt;   conditional: item_2, within the supplied strata: 0 (0.0%)</span></span>
-<span><span class="co">#&gt; model B: held-out squared error 0.0000 versus 1.02 for the model without predictors (improvement 1.02)</span></span>
-<span><span class="co">#&gt;   predictor   mean PFI   relative to improvement   folds in top 1</span></span>
-<span><span class="co">#&gt;   item_2          2.04                      200%              5/5</span></span>
-<span><span class="co">#&gt;   item_1             0                      0.0%              0/5</span></span>
-<span><span class="co">#&gt;   grouped: both_items (item_1, item_2) 2.05 (200%)</span></span>
-<span><span class="co">#&gt;   conditional: item_1, within the supplied strata: 0 (0.0%)</span></span>
-<span><span class="co">#&gt;   conditional: item_2, within the supplied strata: 0 (0.0%)</span></span>
-<span><span class="co">#&gt; Folds in top 1: folds in which the predictor has the largest PFI value (print(imp, k = )).</span></span>
-<span><span class="co">#&gt; PFI values are not parts of the improvement, so PFI relative to the improvement can exceed 100%.</span></span></code></pre></div>
-<p>The estimates are close to the exact values; relative to the
-improvement over the model without predictors, they are about 200%,
-because PFI values are not parts of the improvement. The claims below
-are derived from these results, so the package labels their assessments
-exploratory.</p>
+<span><span class="co">#&gt; model A: held-out squared error 0.0000; model without predictors 1.02</span></span>
+<span><span class="co">#&gt;   improvement 1.02; minimum importance (1% of the improvement) 0.0102</span></span>
+<span><span class="co">#&gt;   predictor   mean PFI   corrected 95% interval   folds in top 1</span></span>
+<span><span class="co">#&gt;   item_1          2.05             [1.96, 2.14]              5/5</span></span>
+<span><span class="co">#&gt;   item_2             0                   [0, 0]              0/5</span></span>
+<span><span class="co">#&gt;   grouped: both_items (item_1, item_2) 2.05 [1.96, 2.15]</span></span>
+<span><span class="co">#&gt;   conditional: item_1, within the supplied strata: 0 [0, 0]</span></span>
+<span><span class="co">#&gt;   conditional: item_2, within the supplied strata: 0 [0, 0]</span></span>
+<span><span class="co">#&gt; model B: held-out squared error 0.0000; model without predictors 1.02</span></span>
+<span><span class="co">#&gt;   improvement 1.02; minimum importance (1% of the improvement) 0.0102</span></span>
+<span><span class="co">#&gt;   predictor   mean PFI   corrected 95% interval   folds in top 1</span></span>
+<span><span class="co">#&gt;   item_2          2.04             [1.95, 2.14]              5/5</span></span>
+<span><span class="co">#&gt;   item_1             0                   [0, 0]              0/5</span></span>
+<span><span class="co">#&gt;   grouped: both_items (item_1, item_2) 2.05 [1.96, 2.15]</span></span>
+<span><span class="co">#&gt;   conditional: item_1, within the supplied strata: 0 [0, 0]</span></span>
+<span><span class="co">#&gt;   conditional: item_2, within the supplied strata: 0 [0, 0]</span></span>
+<span><span class="co">#&gt; Folds in top 1: folds in which the predictor has the largest PFI value</span></span>
+<span><span class="co">#&gt; (print(x, k = )).</span></span>
+<span><span class="co">#&gt; Intervals are reported descriptively. The minimum importance, the default</span></span>
+<span><span class="co">#&gt; criterion of csdg_check(), is given in squared error units, because PFI values</span></span>
+<span><span class="co">#&gt; are not parts of the improvement.</span></span></code></pre></div>
+<p>The estimates are close to the exact values. They are about twice the
+improvement over the model without predictors, because PFI values are
+not parts of the improvement: shuffling the item that a model uses
+doubles the expected squared error of the model without predictors. The
+claims below are derived from these results, so the package labels their
+assessments exploratory.</p>
+<p>Whether the data cover what the claims name (G0b, measurement and
+data) cannot be computed; the package leaves it open until the
+researcher judges it. Here the items and the outcome are simulated
+without error, and the judgment is passed to every check.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">g0b</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_judge.html">csdg_judge</a></span><span class="op">(</span><span class="st">"G0b"</span>, <span class="fu"><a href="../reference/csdg_property_status.html">supported</a></span><span class="op">(</span><span class="op">)</span>, note <span class="op">=</span> <span class="st">"Items and outcome simulated without measurement error."</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="the-original-claim-covers-both-models">The original claim covers both models<a class="anchor" aria-label="anchor" href="#the-original-claim-covers-both-models"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">items</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>item_1 <span class="op">=</span> <span class="st">"item 1"</span>, item_2 <span class="op">=</span> <span class="st">"item 2"</span><span class="op">)</span></span>
 <span><span class="va">claim_both</span> <span class="op">=</span> <span class="fu"><a href="../reference/claim_from_results.html">claim_order</a></span><span class="op">(</span><span class="va">imp</span>, <span class="st">"item_1"</span>, <span class="st">"item_2"</span>, learners <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"B"</span><span class="op">)</span>, marginal_only <span class="op">=</span> <span class="cn">TRUE</span>, labels <span class="op">=</span> <span class="va">items</span><span class="op">)</span></span>
-<span><span class="va">res_both</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_assess.html">csdg_assess</a></span><span class="op">(</span><span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_both</span>, <span class="va">imp</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">res_both</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_assess.html">csdg_assess</a></span><span class="op">(</span><span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_both</span>, <span class="va">imp</span>, judgments <span class="op">=</span> <span class="va">g0b</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">res_both</span></span>
 <span><span class="co">#&gt; &lt;CSDG assessment&gt; Under marginal permutation, model A and model B both rely</span></span>
 <span><span class="co">#&gt; more on item 1 than on item 2.</span></span>
 <span><span class="co">#&gt;   Not met (exploratory)</span></span>
-<span><span class="co">#&gt;   Specification (G0a) supported | Measurement (G0b) supported | Procedure (G2)</span></span>
-<span><span class="co">#&gt;   for model A supported | Stability (G5) for model A supported | Content (G6a)</span></span>
-<span><span class="co">#&gt;   for model A supported | Minimum importance (G6a) for model A supported |</span></span>
-<span><span class="co">#&gt;   Content (G6a) for model B contradicted | Minimum importance (G6a) for model B</span></span>
-<span><span class="co">#&gt;   contradicted</span></span>
+<span><span class="co">#&gt;   Specification (G0a) supported | Measurement and data (G0b) supported |</span></span>
+<span><span class="co">#&gt;   Procedure (G2) for model A supported | Stability (G5) for model A supported |</span></span>
+<span><span class="co">#&gt;   Content (G6a) for model A supported | Minimum importance (G6a) for model A</span></span>
+<span><span class="co">#&gt;   supported | Content (G6a) for model B contradicted | Minimum importance (G6a)</span></span>
+<span><span class="co">#&gt;   for model B contradicted</span></span>
 <span><span class="co">#&gt;   Content (G6a) for model B is contradicted: on average, item 1 0 versus item 2</span></span>
 <span><span class="co">#&gt;   2.04 (difference -2.04 [-2.14, -1.95]); criterion: a positive difference;</span></span>
-<span><span class="co">#&gt;   also, minimum importance (G6a) for model B is contradicted: item 1 has 0.0%</span></span>
-<span><span class="co">#&gt;   of the improvement, below the minimum of 1% (0.0102). Revise the claim to</span></span>
-<span><span class="co">#&gt;   what the evidence supports, or withhold it; where the claim matters, report</span></span>
-<span><span class="co">#&gt;   it as not supported.</span></span>
+<span><span class="co">#&gt;   also, minimum importance (G6a) for model B is contradicted: item 1 has 0,</span></span>
+<span><span class="co">#&gt;   below the minimum importance 0.0102 (1% of the improvement). Revise the claim</span></span>
+<span><span class="co">#&gt;   to what the evidence supports, or withhold it; where the claim matters,</span></span>
+<span><span class="co">#&gt;   report it as not met.</span></span>
 <span><span class="co">#&gt;   Decision options: revise or withhold</span></span></code></pre></div>
 <p>The claim is not met (exploratory): it covers both models, so its
 content is checked for each under G6a, and model B reverses the
@@ -176,19 +188,19 @@ ordering.</p>
 function; only a permuted input has unequal items. Without the qualifier
 “under marginal permutation,” the claim about model A states more than
 marginal PFI shows.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">claim_a</span> <span class="op">=</span> <span class="fu"><a href="../reference/claim_from_results.html">claim_order</a></span><span class="op">(</span><span class="va">imp</span>, <span class="st">"item_1"</span>, <span class="st">"item_2"</span>, learners <span class="op">=</span> <span class="st">"A"</span>, labels <span class="op">=</span> <span class="va">items</span><span class="op">)</span></span>
-<span><span class="va">res_a</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_assess.html">csdg_assess</a></span><span class="op">(</span><span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_a</span>, <span class="va">imp</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">res_a</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_assess.html">csdg_assess</a></span><span class="op">(</span><span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_a</span>, <span class="va">imp</span>, judgments <span class="op">=</span> <span class="va">g0b</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">res_a</span></span>
 <span><span class="co">#&gt; &lt;CSDG assessment&gt; Model A relies more on item 1 than on item 2.</span></span>
 <span><span class="co">#&gt;   Not met (exploratory)</span></span>
-<span><span class="co">#&gt;   Specification (G0a) supported | Measurement (G0b) supported | Content (G2)</span></span>
-<span><span class="co">#&gt;   supported | Minimum importance (G2) supported | Procedure (G2) contradicted |</span></span>
-<span><span class="co">#&gt;   Stability (G5) supported</span></span>
+<span><span class="co">#&gt;   Specification (G0a) supported | Measurement and data (G0b) supported |</span></span>
+<span><span class="co">#&gt;   Content (G2) supported | Minimum importance (G2) supported | Procedure (G2)</span></span>
+<span><span class="co">#&gt;   contradicted | Stability (G5) supported</span></span>
 <span><span class="co">#&gt;   Procedure (G2) is contradicted: within the supplied strata, item 1 adds 0</span></span>
 <span><span class="co">#&gt;   (below the minimum importance 0.0102); the order is supported only under</span></span>
 <span><span class="co">#&gt;   marginal permutation. Revise the claim to what the evidence supports, or</span></span>
-<span><span class="co">#&gt;   withhold it; where the claim matters, report it as not supported.</span></span>
+<span><span class="co">#&gt;   withhold it; where the claim matters, report it as not met.</span></span>
 <span><span class="co">#&gt;   Options on these results (exploratory; check before reporting): marginal_only</span></span>
 <span><span class="co">#&gt;   = TRUE limits the wording to marginal permutation.</span></span>
 <span><span class="co">#&gt;   Decision options: revise or withhold</span></span></code></pre></div>
@@ -199,9 +211,9 @@ is contradicted and the claim is not met (exploratory).</p>
 <h2 id="the-revised-claim">The revised claim<a class="anchor" aria-label="anchor" href="#the-revised-claim"></a>
 </h2>
 <p>The revised claim names model A and the marginal permutation.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">claim_revised</span> <span class="op">=</span> <span class="fu"><a href="../reference/claim_from_results.html">claim_order</a></span><span class="op">(</span><span class="va">imp</span>, <span class="st">"item_1"</span>, <span class="st">"item_2"</span>, learners <span class="op">=</span> <span class="st">"A"</span>, marginal_only <span class="op">=</span> <span class="cn">TRUE</span>, labels <span class="op">=</span> <span class="va">items</span><span class="op">)</span></span>
-<span><span class="va">chk_revised</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_revised</span>, <span class="va">imp</span><span class="op">)</span></span>
+<span><span class="va">chk_revised</span> <span class="op">=</span> <span class="fu"><a href="../reference/csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="va">claim_revised</span>, <span class="va">imp</span>, judgments <span class="op">=</span> <span class="va">g0b</span><span class="op">)</span></span>
 <span><span class="va">chk_revised</span></span>
 <span><span class="co">#&gt; &lt;CSDG check&gt; Under marginal permutation, model A relies more on item 1 than on</span></span>
 <span><span class="co">#&gt; item 2.</span></span>
@@ -209,31 +221,40 @@ is contradicted and the claim is not met (exploratory).</p>
 <span><span class="co">#&gt; at least 5 of 5 folds; Monte Carlo rule; corrected 95% interval must clear the</span></span>
 <span><span class="co">#&gt; smallest relevant difference.</span></span>
 <span><span class="co">#&gt; gate  check               status        observation</span></span>
-<span><span class="co">#&gt; G0a/b scope               supported     The six scope elements are generated</span></span>
-<span><span class="co">#&gt;                                         from the analysis; the claim names</span></span>
-<span><span class="co">#&gt;                                         analyzed variables, not constructs.</span></span>
+<span><span class="co">#&gt; G0a   specification       supported     Generated from the analysis: quantity,</span></span>
+<span><span class="co">#&gt;                                         model, procedure, data, meaning (model</span></span>
+<span><span class="co">#&gt;                                         description), and use.</span></span>
+<span><span class="co">#&gt; G0b   measurement         supported     Judged by the researcher: Items and</span></span>
+<span><span class="co">#&gt;                                         outcome simulated without measurement</span></span>
+<span><span class="co">#&gt;                                         error.</span></span>
 <span><span class="co">#&gt; G1    performance         context       Held-out squared error 0.0000 versus</span></span>
 <span><span class="co">#&gt;                                         1.02 for the model without predictors</span></span>
-<span><span class="co">#&gt;                                         (improvement 1.02, 100%); 5 of 5 folds</span></span>
-<span><span class="co">#&gt;                                         improve.</span></span>
+<span><span class="co">#&gt;                                         (improvement 1.02, a reduction by</span></span>
+<span><span class="co">#&gt;                                         100%); 5 of 5 folds improve.</span></span>
+<span><span class="co">#&gt; G2    dependence          context       R^2 on the other predictor: item 1 1.00</span></span>
+<span><span class="co">#&gt;                                         and item 2 1.00; conditional PFI and</span></span>
+<span><span class="co">#&gt;                                         grouped PFI of both_items cover item 1</span></span>
+<span><span class="co">#&gt;                                         and item 2.</span></span>
 <span><span class="co">#&gt; G2    content             supported     item 1 2.05 versus item 2 0; difference</span></span>
 <span><span class="co">#&gt;                                         (PFI of item 1 minus PFI of item 2)</span></span>
 <span><span class="co">#&gt;                                         2.05 [1.96, 2.14].</span></span>
-<span><span class="co">#&gt; G2    minimum importance  supported     item 1 2.05 (200%) of the improvement</span></span>
-<span><span class="co">#&gt;                                         of 1.02 (1.02 to 0.0000).</span></span>
+<span><span class="co">#&gt; G2    minimum importance  supported     item 1 2.05 versus the minimum</span></span>
+<span><span class="co">#&gt;                                         importance 0.0102 (1% of the</span></span>
+<span><span class="co">#&gt;                                         improvement of 1.02, from 1.02 to</span></span>
+<span><span class="co">#&gt;                                         0.0000).</span></span>
 <span><span class="co">#&gt; G2    procedure           supported     Held-out marginal PFI with squared</span></span>
 <span><span class="co">#&gt;                                         error, 20 permutations per fold in 5</span></span>
 <span><span class="co">#&gt;                                         folds, as the scope names. Conditional</span></span>
 <span><span class="co">#&gt;                                         PFI of item 1 and item 2 is 0 and 0</span></span>
-<span><span class="co">#&gt;                                         (the order is not established, within</span></span>
-<span><span class="co">#&gt;                                         Monte Carlo error); within the supplied</span></span>
-<span><span class="co">#&gt;                                         strata, item 1 adds 0 (below the</span></span>
-<span><span class="co">#&gt;                                         minimum importance 0.0102). The wording</span></span>
-<span><span class="co">#&gt;                                         names the marginal permutation, so the</span></span>
-<span><span class="co">#&gt;                                         reversal shows what the qualifier is</span></span>
-<span><span class="co">#&gt;                                         for. Grouped PFI of both_items (item_1,</span></span>
-<span><span class="co">#&gt;                                         item_2) 2.05 measures reliance on the</span></span>
-<span><span class="co">#&gt;                                         group; it does not order its members.</span></span>
+<span><span class="co">#&gt;                                         (the order is inconclusive, a tie);</span></span>
+<span><span class="co">#&gt;                                         within the supplied strata, item 1 adds</span></span>
+<span><span class="co">#&gt;                                         0 (below the minimum importance</span></span>
+<span><span class="co">#&gt;                                         0.0102). The wording names the marginal</span></span>
+<span><span class="co">#&gt;                                         permutation, so the reversal shows what</span></span>
+<span><span class="co">#&gt;                                         the qualifier is for. Grouped PFI of</span></span>
+<span><span class="co">#&gt;                                         both_items (item_1, item_2) 2.05</span></span>
+<span><span class="co">#&gt;                                         measures reliance on the group; it does</span></span>
+<span><span class="co">#&gt;                                         not order its members.</span></span>
 <span><span class="co">#&gt; G5    stability           supported     item 1 exceeds item 2 in 5 of 5 folds.</span></span>
 <span><span class="co">#&gt; G6a   other learner       context       model B: the result does not hold (item</span></span>
 <span><span class="co">#&gt;                                         1 0 versus item 2 2.04).</span></span>
@@ -242,9 +263,9 @@ is contradicted and the claim is not met (exploratory).</p>
 <span><span class="co">#&gt; &lt;CSDG assessment&gt; Under marginal permutation, model A relies more on item 1</span></span>
 <span><span class="co">#&gt; than on item 2.</span></span>
 <span><span class="co">#&gt;   Met (exploratory)</span></span>
-<span><span class="co">#&gt;   Specification (G0a) supported | Measurement (G0b) supported | Content (G2)</span></span>
-<span><span class="co">#&gt;   supported | Minimum importance (G2) supported | Procedure (G2) supported |</span></span>
-<span><span class="co">#&gt;   Stability (G5) supported</span></span>
+<span><span class="co">#&gt;   Specification (G0a) supported | Measurement and data (G0b) supported |</span></span>
+<span><span class="co">#&gt;   Content (G2) supported | Minimum importance (G2) supported | Procedure (G2)</span></span>
+<span><span class="co">#&gt;   supported | Stability (G5) supported</span></span>
 <span><span class="co">#&gt;   On average, item 1 2.05 versus item 2 0 (difference 2.05 [1.96, 2.14]); item</span></span>
 <span><span class="co">#&gt;   1 exceeds item 2 in 5 of 5 folds. The claim was formulated after the</span></span>
 <span><span class="co">#&gt;   explanation was inspected; it is established only after a test on new data</span></span>
@@ -274,7 +295,7 @@ for a claim stated before the analysis, find the record functions in
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">

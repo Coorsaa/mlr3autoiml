@@ -5,17 +5,35 @@ Look at the result with print() and plot() before stating a direction with claim
 The ALE is computed on intervals quantile intervals of the predictor in the held-out fold: within each interval,
 the predictions at its upper and lower boundary are differenced and averaged over the rows in the interval, and
 the averages are accumulated.
+The accumulated curve is centered by its data-weighted mean, so that its mean over the rows of the held-out fold
+is zero: each interval contributes the average of the accumulated effect at its two boundaries, weighted by the
+number of rows in the interval (Apley and Zhu, 2020).
 For classification, the predictions are probabilities of the positive class.
-The change is the difference of the accumulated effect between the two percentiles; the summary averages it over
-folds and reports the corrected resampled 95% interval (csdg_learner_pfi_interval()) descriptively."><meta property="og:description" content="Computes, for each learner and fold of a csdg_fit() result, the accumulated local effect (ALE) of numeric
+The change is the difference of the accumulated effect between the two percentiles, which the centering does not
+affect; the summary averages it over folds and reports the corrected resampled 95% interval
+(csdg_learner_pfi_interval()) descriptively.
+In each fold, the result also records the largest decrease (max_decrease) and the largest increase
+(max_increase) of the accumulated effect between adjacent grid points in the range between the two percentiles,
+which the percentiles themselves bound.
+For a claim that the predictions rise (or fall) with a predictor, csdg_check() compares the largest decrease (or
+increase) with the minimum change."><meta property="og:description" content="Computes, for each learner and fold of a csdg_fit() result, the accumulated local effect (ALE) of numeric
 predictors in the held-out fold and its change between two percentiles of the predictor (default 10th and 90th).
 Look at the result with print() and plot() before stating a direction with claim_direction().
 The ALE is computed on intervals quantile intervals of the predictor in the held-out fold: within each interval,
 the predictions at its upper and lower boundary are differenced and averaged over the rows in the interval, and
 the averages are accumulated.
+The accumulated curve is centered by its data-weighted mean, so that its mean over the rows of the held-out fold
+is zero: each interval contributes the average of the accumulated effect at its two boundaries, weighted by the
+number of rows in the interval (Apley and Zhu, 2020).
 For classification, the predictions are probabilities of the positive class.
-The change is the difference of the accumulated effect between the two percentiles; the summary averages it over
-folds and reports the corrected resampled 95% interval (csdg_learner_pfi_interval()) descriptively."></head><body>
+The change is the difference of the accumulated effect between the two percentiles, which the centering does not
+affect; the summary averages it over folds and reports the corrected resampled 95% interval
+(csdg_learner_pfi_interval()) descriptively.
+In each fold, the result also records the largest decrease (max_decrease) and the largest increase
+(max_increase) of the accumulated effect between adjacent grid points in the range between the two percentiles,
+which the percentiles themselves bound.
+For a claim that the predictions rise (or fall) with a predictor, csdg_check() compares the largest decrease (or
+increase) with the minimum change."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -23,7 +41,7 @@ folds and reports the corrected resampled 95% interval (csdg_learner_pfi_interva
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,7 +54,7 @@ folds and reports the corrected resampled 95% interval (csdg_learner_pfi_interva
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -66,9 +84,18 @@ Look at the result with <code><a href="https://rdrr.io/r/base/print.html" class=
 <p>The ALE is computed on <code>intervals</code> quantile intervals of the predictor in the held-out fold: within each interval,
 the predictions at its upper and lower boundary are differenced and averaged over the rows in the interval, and
 the averages are accumulated.
+The accumulated curve is centered by its data-weighted mean, so that its mean over the rows of the held-out fold
+is zero: each interval contributes the average of the accumulated effect at its two boundaries, weighted by the
+number of rows in the interval (Apley and Zhu, 2020).
 For classification, the predictions are probabilities of the positive class.
-The change is the difference of the accumulated effect between the two percentiles; the summary averages it over
-folds and reports the corrected resampled 95% interval (<code><a href="csdg_learner_pfi_interval.html">csdg_learner_pfi_interval()</a></code>) descriptively.</p>
+The change is the difference of the accumulated effect between the two percentiles, which the centering does not
+affect; the summary averages it over folds and reports the corrected resampled 95% interval
+(<code><a href="csdg_learner_pfi_interval.html">csdg_learner_pfi_interval()</a></code>) descriptively.
+In each fold, the result also records the largest decrease (<code>max_decrease</code>) and the largest increase
+(<code>max_increase</code>) of the accumulated effect between adjacent grid points in the range between the two percentiles,
+which the percentiles themselves bound.
+For a claim that the predictions rise (or fall) with a predictor, <code><a href="csdg_check.html">csdg_check()</a></code> compares the largest decrease (or
+increase) with the minimum change.</p>
     </div>
 
     <div class="section level2">
@@ -137,9 +164,15 @@ measured.</p></dd>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A <code>CSDGEffect</code> list with <code>fits</code>, <code>features</code>, <code>probs</code>, <code>intervals</code>, <code>changes</code> (one row per learner,
-predictor, and fold), <code>curves</code> (the ALE per fold), and <code>summary</code> (mean change, corrected interval, and the
-number of folds with a positive change per learner and predictor).
+predictor, and fold, with the change, the two percentiles, <code>max_decrease</code>, and <code>max_increase</code>), <code>curves</code> (the ALE
+per fold), and <code>summary</code> (mean change, corrected interval, the number of folds with a positive change, and the
+largest <code>max_decrease</code> and <code>max_increase</code> over folds, per learner and predictor).
 <code><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table()</a></code> returns one of the tables.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Apley, D. W., and Zhu, J. (2020). Visualizing the effects of predictor variables in black box supervised learning
+models. Journal of the Royal Statistical Society: Series B (Statistical Methodology), 82(4), 1059-1086.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -169,7 +202,7 @@ number of folds with a positive change per learner and predictor).
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">

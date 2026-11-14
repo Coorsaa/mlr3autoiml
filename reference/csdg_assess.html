@@ -7,7 +7,9 @@ A claim derived from the results is labeled "(exploratory)": it was formulated a
 inspected and is established only after a test on new data with csdg_confirm().
 The report names each decisive property by its check and gate, for example "Content (G2)" or "Procedure (G2)";
 for a claim that is not met or unresolved, it adds the other open properties and, where the results suggest one,
-the closest claim that the averages satisfy (exploratory, to be checked before it is reported).'><meta property="og:description" content='Fifth step of the analysis-first interface: applies the decision rule of the article to the records of a
+the closest claim that the averages satisfy (exploratory, to be checked before it is reported).
+G0b (measurement and data) is open until the researcher judges it with csdg_judge(); if it is the only open
+property, the report says that the computed properties are supported.'><meta property="og:description" content='Fifth step of the analysis-first interface: applies the decision rule of the article to the records of a
 csdg_check() result with csdg_adjudicate_claim().
 A claim is not met if a required property is contradicted, unresolved if one is open, and met otherwise;
 favorable results never offset a contradicted property.
@@ -15,7 +17,9 @@ A claim derived from the results is labeled "(exploratory)": it was formulated a
 inspected and is established only after a test on new data with csdg_confirm().
 The report names each decisive property by its check and gate, for example "Content (G2)" or "Procedure (G2)";
 for a claim that is not met or unresolved, it adds the other open properties and, where the results suggest one,
-the closest claim that the averages satisfy (exploratory, to be checked before it is reported).'></head><body>
+the closest claim that the averages satisfy (exploratory, to be checked before it is reported).
+G0b (measurement and data) is open until the researcher judges it with csdg_judge(); if it is the only open
+property, the report says that the computed properties are supported.'></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -23,7 +27,7 @@ the closest claim that the averages satisfy (exploratory, to be checked before i
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,7 +40,7 @@ the closest claim that the averages satisfy (exploratory, to be checked before i
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -69,6 +73,8 @@ inspected and is established only after a test on new data with <code><a href="c
 The report names each decisive property by its check and gate, for example "Content (G2)" or "Procedure (G2)";
 for a claim that is not met or unresolved, it adds the other open properties and, where the results suggest one,
 the closest claim that the averages satisfy (exploratory, to be checked before it is reported).</p>
+<p>G0b (measurement and data) is open until the researcher judges it with <code><a href="csdg_judge.html">csdg_judge()</a></code>; if it is the only open
+property, the report says that the computed properties are supported.</p>
     </div>
 
     <div class="section level2">
@@ -94,7 +100,8 @@ the closest claim that the averages satisfy (exploratory, to be checked before i
 <code>label</code> (for example <code>"met (exploratory)"</code>), <code>decisive</code> (the contradicted required rows if any, otherwise the
 open ones), <code>also_open</code>, <code>hints</code>, <code>decision_options</code>, <code>report</code> (a few sentences), <code>adjudication</code> (the
 <code><a href="csdg_adjudicate_claim.html">csdg_adjudicate_claim()</a></code> result), and <code>note</code>.
-<code><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table()</a></code> returns one row for reports.</p>
+<code><a href="https://rdrr.io/pkg/data.table/man/as.data.table.html" class="external-link">as.data.table()</a></code> returns one row for reports.
+Each call is added to the claim log (<code><a href="csdg_claim_log.html">csdg_claim_log()</a></code>).</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -110,13 +117,14 @@ open ones), <code>also_open</code>, <code>hints</code>, <code>decision_options</
 <span class="r-in"><span><span class="va">task</span> <span class="op">=</span> <span class="fu">mlr3</span><span class="fu">::</span><span class="fu"><a href="https://mlr3.mlr-org.com/reference/as_task_regr.html" class="external-link">as_task_regr</a></span><span class="op">(</span><span class="va">x</span>, target <span class="op">=</span> <span class="st">"y"</span>, id <span class="op">=</span> <span class="st">"toy"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">fits</span> <span class="op">=</span> <span class="fu"><a href="csdg_fit.html">csdg_fit</a></span><span class="op">(</span><span class="va">task</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>tree <span class="op">=</span> <span class="fu">mlr3</span><span class="fu">::</span><span class="fu"><a href="https://mlr3.mlr-org.com/reference/mlr_sugar.html" class="external-link">lrn</a></span><span class="op">(</span><span class="st">"regr.rpart"</span><span class="op">)</span><span class="op">)</span>, folds <span class="op">=</span> <span class="fl">3</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">imp</span> <span class="op">=</span> <span class="fu"><a href="csdg_importance.html">csdg_importance</a></span><span class="op">(</span><span class="va">fits</span>, repetitions <span class="op">=</span> <span class="fl">5</span>, seed <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">res</span> <span class="op">=</span> <span class="fu">csdg_assess</span><span class="op">(</span><span class="fu"><a href="csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="fu"><a href="claim_from_results.html">claim_order</a></span><span class="op">(</span><span class="va">imp</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"b"</span><span class="op">)</span><span class="op">)</span>, <span class="va">imp</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">g0b</span> <span class="op">=</span> <span class="fu"><a href="csdg_judge.html">csdg_judge</a></span><span class="op">(</span><span class="st">"G0b"</span>, <span class="fu"><a href="csdg_property_status.html">supported</a></span><span class="op">(</span><span class="op">)</span>, note <span class="op">=</span> <span class="st">"Simulated variables, measured without error."</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">res</span> <span class="op">=</span> <span class="fu">csdg_assess</span><span class="op">(</span><span class="fu"><a href="csdg_check.html">csdg_check</a></span><span class="op">(</span><span class="fu"><a href="claim_from_results.html">claim_order</a></span><span class="op">(</span><span class="va">imp</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"a"</span>, <span class="st">"b"</span><span class="op">)</span><span class="op">)</span>, <span class="va">imp</span>, judgments <span class="op">=</span> <span class="va">g0b</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">res</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;CSDG assessment&gt; Decision tree relies more on a than on b.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   Met (exploratory)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Specification (G0a) supported | Measurement (G0b) supported | Content (G2)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   supported | Minimum importance (G2) supported | Procedure (G2) supported |</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   Stability (G5) supported</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Specification (G0a) supported | Measurement and data (G0b) supported |</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Content (G2) supported | Minimum importance (G2) supported | Procedure (G2)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   supported | Stability (G5) supported</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   On average, a 1.48 versus b 0.417 (difference 1.06 [0.211, 1.92]); a exceeds</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   b in 3 of 3 folds. The claim was formulated after the explanation was</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   inspected; it is established only after a test on new data (csdg_confirm()).</span>
@@ -128,7 +136,7 @@ open ones), <code>also_open</code>, <code>hints</code>, <code>decision_options</
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">

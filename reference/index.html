@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">mlr3autoiml</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,7 +20,7 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>CSDG guide</h6></li>
-    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">Checking what an explanation shows</a></li>
+    <li><a class="dropdown-item" href="../articles/exploratory_workflow.html">From an explanation to a checked claim</a></li>
     <li><a class="dropdown-item" href="../articles/claim_scoped_diagnostic_gates.html">The numerical example of the article</a></li>
     <li><hr class="dropdown-divider"></li>
     <li><h6 class="dropdown-header" data-toc-skip>Legacy AutoIML workflow</h6></li>
@@ -44,7 +44,7 @@
     <div class="section level2">
       <h2 id="csdg-analysis">CSDG analysis<a class="anchor" aria-label="anchor" href="#csdg-analysis"></a></h2>
 
-      <div class="section-desc"><p>Fit learners, compute held-out PFI, derive a claim from the result, check it, and assess it.</p></div>
+      <div class="section-desc"><p>Fit learners, compute held-out PFI or LOCO, derive a claim from the result, check it, assess it, and log it.</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -64,6 +64,13 @@
 
         </dt>
         <dd>Held-out permutation feature importance of fitted learners</dd>
+
+        <dt>
+
+          <code><a href="csdg_loco.html">csdg_loco()</a></code>
+
+        </dt>
+        <dd>Leave-one-covariate-out importance of fitted learners</dd>
 
         <dt>
 
@@ -113,6 +120,13 @@
 
         </dt>
         <dd>Export a claim assessment</dd>
+
+        <dt>
+
+          <code><a href="csdg_claim_log.html">csdg_claim_log()</a></code> <code><a href="csdg_claim_log.html">csdg_claim_log_reset()</a></code>
+
+        </dt>
+        <dd>Log of the claims checked in a session</dd>
       </dl></div><div class="section level2">
       <h2 id="csdg-cards-and-planning">CSDG cards and planning<a class="anchor" aria-label="anchor" href="#csdg-cards-and-planning"></a></h2>
 
@@ -270,7 +284,7 @@
           <code><a href="csdg_local_fidelity_randomness_audit.html">csdg_local_fidelity_randomness_audit()</a></code>
 
         </dt>
-        <dd>Separate perturbation and cross-fit variation in a local-fidelity audit</dd>
+        <dd>Separate perturbation and cross-validation variation in a local-fidelity audit</dd>
 
         <dt>
 
@@ -546,7 +560,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Stefan Coors, Clara Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
+  <p>Developed by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, Sven Hilbert.</p>
 </div>
 
 <div class="pkgdown-footer-right">
