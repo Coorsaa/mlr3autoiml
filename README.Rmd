@@ -159,8 +159,11 @@ sharing it.
 
 ## The accompanying article
 
-Version 0.1.0 produced the initial analyses of the accompanying article. The scripts of its two empirical
-applications are kept in a separate analysis repository.
+The package accompanies the article *Which Conclusions Does an Explanation Support? Claim-Scoped Diagnostic Gates
+for Interpretable Machine Learning in Psychology* by Stefan Coors, Clara S. Vetter, Jonas Hauck, Bernd Bischl, and Sven
+Hilbert (manuscript submitted for publication). Version 0.3.0 implements the workflow as described in the article;
+earlier versions produced its analyses. The scripts of its two empirical applications are in the
+[analysis repository](https://github.com/coorsaa/csdg-analysis). To cite the package, use `citation("mlr3autoiml")`.
 
 ## Legacy AutoIML workflow
 
